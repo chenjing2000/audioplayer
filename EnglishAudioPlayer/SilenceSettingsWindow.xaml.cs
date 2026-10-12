@@ -2,11 +2,13 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace AudioPausePlayer;
 
 public partial class SilenceSettingsWindow : Window
 {
+    private readonly DispatcherTimer validationTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     public SilenceSettings Settings { get; private set; }
 
     public SilenceSettingsWindow(SilenceSettings settings)
@@ -14,12 +16,15 @@ public partial class SilenceSettingsWindow : Window
         InitializeComponent();
         Settings = settings;
         LoadValues(settings);
+        validationTimer.Tick += (_, _) => HideValueError();
+        Closed += (_, _) => validationTimer.Stop();
     }
 
     private void RestoreDefaultsButton_Click(object sender, RoutedEventArgs e)
     {
         var defaults = new SilenceSettings();
         LoadValues(defaults);
+        HideValueError();
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -121,8 +126,6 @@ public partial class SilenceSettingsWindow : Window
         if (text.Length == 0) return true;
 
         int start = text[0] == '+' ? 1 : 0;
-        if (start == text.Length) return true;
-
         for (int i = start; i < text.Length; i++)
         {
             if (text[i] < '0' || text[i] > '9') return false;
@@ -135,8 +138,6 @@ public partial class SilenceSettingsWindow : Window
         if (text.Length == 0) return true;
 
         int start = text[0] == '+' || text[0] == '-' ? 1 : 0;
-        if (start == text.Length) return true;
-
         for (int i = start; i < text.Length; i++)
         {
             if (text[i] < '0' || text[i] > '9') return false;
@@ -146,7 +147,19 @@ public partial class SilenceSettingsWindow : Window
 
     private bool ShowValueError(string message)
     {
-        MessageBox.Show(this, message, "参数错误", MessageBoxButton.OK, MessageBoxImage.Warning);
+        validationTimer.Stop();
+        ValidationText.Text = "参数错误：" + message;
+        HelpText.Visibility = Visibility.Collapsed;
+        ValidationBar.Visibility = Visibility.Visible;
+        validationTimer.Start();
         return false;
+    }
+
+    private void HideValueError()
+    {
+        validationTimer.Stop();
+        ValidationText.Text = "";
+        ValidationBar.Visibility = Visibility.Collapsed;
+        HelpText.Visibility = Visibility.Visible;
     }
 }

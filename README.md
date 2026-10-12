@@ -18,7 +18,7 @@
 EnglishAudioPlayer/
 ├── App.xaml / App.xaml.cs
 ├── MainWindow.xaml / MainWindow.xaml.cs
-├── WindowStyleHelper.cs
+├── SettingsStore.cs
 ├── AudioPlayer.cs
 ├── SilenceDetector.cs
 ├── SilenceSettings.cs
@@ -49,7 +49,7 @@ tests/
 | `AudioLibrary.cs` | 扫描当前文件夹中的 MP3、自然排序并读取标签 |
 | `AudioTrack.cs` | 保存列表项数据及播放/暂停显示状态 |
 | `MainWindow.xaml/.cs` | WPF 布局、用户输入、后台分析和各模块协调 |
-| `WindowStyleHelper.cs` | 仅负责禁用系统最大化按钮，同时保留窗口手动缩放能力 |
+| `SettingsStore.cs` | 在 exe 同目录初始化、验证并保存用户配置 |
 
 `MainWindow` 不处理 PCM、RMS 或 MP3 解码；`SilenceDetector` 不依赖播放器或 UI；`AudioPlayer` 不知道播放列表和停顿检测逻辑。
 
@@ -77,6 +77,7 @@ dotnet run --project EnglishAudioPlayer/AudioPausePlayer.csproj --no-restore
 - **进度条**：点击或拖动后 Seek，保持原播放/暂停状态。
 - **停止按钮右侧的圆形设置按钮**：打开停顿检测设置。修改后点“确定”立即生效；当前已加载音频会在后台重新分析，播放状态不变。
 - **恢复默认**：将设置页中的四个参数恢复为默认值；点“确定”后应用。
+- **设置错误**：在设置窗口内提示，5 秒后收起；不弹出消息窗口。
 
 分析期间普通播放、暂停、停止和拖动定位仍可使用；为避免多个分析任务重叠，分析完成前不允许切换播放文件或重新打开文件夹。
 
@@ -100,7 +101,7 @@ dotnet run --project EnglishAudioPlayer/AudioPausePlayer.csproj --no-restore
 前后跳转容差               1 - 5000 ms
 ```
 
-前三项决定停顿识别，导航容差决定左右方向键在当前位置附近跳过多大的范围。停顿位置取静音区间中点。设置仅在当前程序运行期间保存，不写配置文件。
+前三项决定停顿识别，导航容差决定左右方向键在当前位置附近跳过多大的范围。停顿位置取静音区间中点。四项设置保存在主程序同目录的 `<主程序名>.settings.json` 中，下次启动自动读取。
 
 参数输入框只接受 ASCII 数字 `0-9` 和位于首位的正负号；分析帧长度、最短停顿时长、前后跳转容差不允许负号，静音阈值允许负号。小数点、字母、空格和其它特殊字符均不能通过键盘输入或粘贴进入输入框。
 
@@ -108,12 +109,12 @@ dotnet run --project EnglishAudioPlayer/AudioPausePlayer.csproj --no-restore
 
 ## 界面
 
-- 默认宽度：主屏宽度的 50%，计算结果取整数
+- 默认宽度：屏幕工作区宽度的 50%，计算结果取整数
 - 默认高度：可用屏幕高度的 60%，计算结果取整数
-- 不支持窗口最大化；窗口仍可通过边缘或角部手动调整大小
+- 支持窗口最大化和通过边缘或角部手动调整大小
 - 最小尺寸：`520 × 420`
-- 最大尺寸：`900 × 600`
-- 初始尺寸按屏幕工作区约 `50% × 60%` 计算，并限制在上述最小/最大范围内；尺寸和位置计算结果取整数
+- 没有应用层面的最大尺寸限制
+- 初始尺寸按屏幕工作区约 `50% × 60%` 计算，受最小尺寸约束；尺寸和位置计算结果取整数
 - 字体：12
 - 三个主按钮：`36 × 36`，圆角 7
 - 按钮图标：`34 × 34`，水平、垂直居中
@@ -131,7 +132,7 @@ dotnet restore tests/AudioPausePlayer.Tests/AudioPausePlayer.Tests.csproj
 dotnet run --project tests/AudioPausePlayer.Tests --no-restore
 ```
 
-如果项目根目录存在 `audio/*.mp3`，还会额外执行有效 MP3 标签测试。以下集成测试同样需要至少一份本地 MP3：
+如果项目根目录存在 `audio/*.mp3`，还会额外执行有效 MP3 标签测试。音频报告和播放集成测试需要本地 MP3；WPF 测试在没有 MP3 时仍检查布局、配置和窗口行为，并跳过音频相关检查：
 
 ```powershell
 # 生成真实音频停顿报告到 docs/test-results/
@@ -148,10 +149,14 @@ dotnet run --project tests/AudioPausePlayer.Tests --no-restore -- --ui
 
 ## 发布
 
-采用普通 framework-dependent 文件夹发布：
+采用 Windows x64、framework-dependent 单文件发布，不包含 .NET 运行时：
 
 ```powershell
-dotnet publish EnglishAudioPlayer/AudioPausePlayer.csproj -c Release -p:DebugType=None -p:DebugSymbols=false -o artifacts/app
+dotnet publish EnglishAudioPlayer/AudioPausePlayer.csproj -p:PublishProfile=SingleFile
 ```
 
-`artifacts/` 已加入 `.gitignore`。发布目录中的主程序和依赖 DLL 需要一起保留。
+输出为 `dist/EnglishAudioPlayer.exe`。目标电脑需要 .NET 10 Desktop Runtime x64，缺少时由 .NET 启动器提示安装。首次运行会在 exe 同目录自动创建 `<主程序名>.settings.json`，保存当前四项停顿参数；更新时保留已有配置。`dist/` 已加入 `.gitignore`。
+
+主窗口保留最小尺寸，解除最大尺寸限制并支持系统最大化。完整发布命令、配置处理和更新方法见 [程序说明](docs/program-overview.md)。
+
+模块设计检查、必要异步机制的理由及本次整改记录也见程序说明第 8 节。当前回归检查为 35 项核心检查、58 项 WPF 检查；没有本地 MP3 时跳过教材音频相关检查。

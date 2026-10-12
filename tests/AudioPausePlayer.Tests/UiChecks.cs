@@ -11,6 +11,9 @@ using NAudio.Wave;
 
 internal static class UiChecks
 {
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetWindowLong(IntPtr window, int index);
+
     public static Task<int> RunAsync(string audioFolder)
     {
         var done = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -34,7 +37,9 @@ internal static class UiChecks
                 }
                 try
                 {
-                    window = new MainWindow();
+                    var settingsStore = new SettingsStore(Path.Combine(audioFolder, "UiPlayer.settings.json"));
+                    window = new MainWindow(settingsStore);
+                    Assert(File.Exists(settingsStore.FilePath), "First launch initializes settings file");
                     Rect workArea = SystemParameters.WorkArea;
                     double expectedLeft = Math.Round(workArea.Left + (workArea.Width - window.Width) / 2);
                     double expectedTop = Math.Round(workArea.Top + (workArea.Height - window.Height) / 2);
@@ -47,8 +52,10 @@ internal static class UiChecks
                     Assert(Math.Abs(window.Width - expectedWidth) < 1 && Math.Abs(window.Height - expectedHeight) < 1,
                            "Default size uses rounded screen proportions within the window limits");
                     Assert(Math.Abs(window.MinWidth - 520) < 0.01 && Math.Abs(window.MinHeight - 420) < 0.01, "Minimum window size is 520x420");
-                    Assert(Math.Abs(window.MaxWidth - 900) < 0.01 && Math.Abs(window.MaxHeight - 600) < 0.01, "Maximum window size is 900x600");
-                    Assert(window.ResizeMode == ResizeMode.CanResize, "Window remains resizable while maximize is disabled separately");
+                    Assert(double.IsPositiveInfinity(window.MaxWidth) && double.IsPositiveInfinity(window.MaxHeight), "Window has no application size ceiling");
+                    int nativeStyle = GetWindowLong(new System.Windows.Interop.WindowInteropHelper(window).Handle, -16);
+                    Assert((nativeStyle & 0x00010000) != 0, "Native maximize button is enabled");
+                    Assert(window.ResizeMode == ResizeMode.CanResize, "Window remains resizable");
                     var notification = (Border)window.FindName("NotificationBar");
                     var notificationText = (TextBlock)window.FindName("NotificationText");
                     Assert(notification.Visibility == Visibility.Collapsed, "Notification normally collapsed");
@@ -95,6 +102,14 @@ internal static class UiChecks
                     var okButton = (Button)settingsWindow.FindName("OkButton");
                     Assert(Math.Abs(restoreButton.Width - 76) < 0.01, "Restore defaults button width is 76");
                     Assert(Math.Abs(cancelButton.Width - 54) < 0.01 && Math.Abs(okButton.Width - 54) < 0.01, "Cancel and OK button widths are 54");
+                    ((TextBox)settingsWindow.FindName("FrameMillisecondsTextBox")).Text = "0";
+                    okButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    var validationBar = (Border)settingsWindow.FindName("ValidationBar");
+                    Assert(validationBar.Visibility == Visibility.Visible && settingsWindow.Settings.FrameMilliseconds == 10,
+                        "Invalid settings show an inline warning without changing parameters");
+                    await Task.Delay(5200);
+                    Assert(validationBar.Visibility == Visibility.Collapsed && ((TextBlock)settingsWindow.FindName("HelpText")).Visibility == Visibility.Visible,
+                        "Settings warning collapses after five seconds");
                     settingsWindow.Close();
                     Assert(Math.Abs(window.FontSize - 12) < 0.01 && Math.Abs(timeText.FontSize - 12) < 0.01 && Math.Abs(list.FontSize - 12) < 0.01, "UI font size is 12");
                     Assert(Grid.GetColumn(slider) == 1 && Grid.GetColumn(timeText) == 2 && Grid.GetColumn(playButton) == 3, "Time display sits between progress slider and play button");
@@ -114,6 +129,54 @@ internal static class UiChecks
                     Assert(slider.VerticalAlignment == VerticalAlignment.Center && timeText.VerticalAlignment == VerticalAlignment.Center, "Progress slider and time display are vertically centered");
                     Assert(list.RowHeight == 25, "List row height is 25");
                     Assert(list.ColumnHeaderHeight == 32, "List header height is 32");
+                    window.Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        var editWindow = app.Windows.OfType<SilenceSettingsWindow>().Single(w => w.IsVisible);
+                        ((TextBox)editWindow.FindName("FrameMillisecondsTextBox")).Text = "25";
+                        ((TextBox)editWindow.FindName("MinimumSilenceTextBox")).Text = "600";
+                        ((Button)editWindow.FindName("OkButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }));
+                    settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    var saved = settingsStore.LoadOrCreate();
+                    Assert(saved.FrameMilliseconds == 25 && saved.MinimumSilenceMilliseconds == 600
+                        && Field<SilenceSettings>(window, "silenceSettings")!.FrameMilliseconds == 25,
+                        "Settings dialog saves confirmed values before applying them");
+                    var restoredWindow = new MainWindow(settingsStore);
+                    Assert(Field<SilenceSettings>(restoredWindow, "silenceSettings")!.FrameMilliseconds == 25,
+                        "Window restores saved settings on next launch");
+                    restoredWindow.Close();
+                    string invalidConfiguration = "{broken";
+                    File.WriteAllText(settingsStore.FilePath, invalidConfiguration);
+                    var invalidWindow = new MainWindow(settingsStore);
+                    Assert(!FieldValue<bool>(invalidWindow, "settingsFileReady")
+                        && ((Border)invalidWindow.FindName("NotificationBar")).Visibility == Visibility.Visible
+                        && File.ReadAllText(settingsStore.FilePath) == invalidConfiguration,
+                        "Invalid configuration is preserved and reported inline");
+                    invalidWindow.Close();
+                    settingsStore.Save(saved);
+                    string recoveryPath = Path.Combine(audioFolder, "recovery.wav");
+                    using (var writer = new WaveFileWriter(recoveryPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                        writer.WriteSamples(new float[44100], 0, 44100);
+                    var recoveryTrack = new AudioTrack { FilePath = recoveryPath, Title = "Recovery" };
+                    MethodInfo playTrack = typeof(MainWindow).GetMethod("PlayTrackAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                    await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
+                    if (Field<Task>(window, "analysisTask") is Task recoveryAnalysis) await recoveryAnalysis;
+                    await Field<AudioPlayer>(window, "player")!.StopAsync();
+                    string brokenPath = Path.Combine(audioFolder, "broken.wav");
+                    File.WriteAllText(brokenPath, "not an audio file");
+                    bool failedOpen = false;
+                    try { await (Task)playTrack.Invoke(window, new object[] { new AudioTrack { FilePath = brokenPath } })!; }
+                    catch (Exception) { failedOpen = true; }
+                    Assert(failedOpen, "Broken replacement track is rejected");
+                    await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
+                    Assert(Field<AudioPlayer>(window, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
+                    if (Field<Task>(window, "analysisTask") is Task recoveredAnalysis) await recoveredAnalysis;
+                    await Field<AudioPlayer>(window, "player")!.CloseAsync();
+                    if (Directory.GetFiles(audioFolder, "*.mp3").Length == 0)
+                    {
+                        Console.WriteLine("SKIP audio-dependent UI checks: no local MP3 available.");
+                        return;
+                    }
                     Assert(list.Columns.Count == 4 && list.Items.Count == 3, "Four columns and three MP3 files");
                     list.UpdateLayout();
                     var row0 = (DataGridRow)list.ItemContainerGenerator.ContainerFromIndex(0);
@@ -261,7 +324,7 @@ internal static class UiChecks
                         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
                         Assert(file.Length > 0, "File released: " + Path.GetFileName(path));
                     }
-                    window = new MainWindow { ShowInTaskbar = false, ShowActivated = false, Left = -20000, Top = -20000 };
+                    window = new MainWindow(settingsStore) { ShowInTaskbar = false, ShowActivated = false, Left = -20000, Top = -20000 };
                     window.Show();
                     await window.LoadFolderAsync(audioFolder);
                     await window.HandleShortcutAsync(Key.Space);

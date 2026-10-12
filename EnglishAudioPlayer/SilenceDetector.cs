@@ -58,7 +58,7 @@ public static class SilenceDetector
             double sum = 0;
             for (int i = 0; i < count; i++) sum += (double)buffer[i] * buffer[i];
             double rms = Math.Sqrt(sum / count);
-            double db = rms <= 1e-7 ? -100.0 : 20.0 * Math.Log10(rms);
+            double db = rms == 0 ? double.NegativeInfinity : 20.0 * Math.Log10(rms);
 
             if (db < silenceThresholdDb)
             {

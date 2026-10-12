@@ -22,6 +22,67 @@ float[] Signal(int soundBefore, int silence, int soundAfter)
     => Enumerable.Repeat(0.5f, soundBefore).Concat(new float[silence]).Concat(Enumerable.Repeat(0.5f, soundAfter)).ToArray();
 
 
+Check("Settings initialize beside executable, persist and preserve invalid files", () =>
+{
+    string folder = Path.Combine(AppContext.BaseDirectory, "settings-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        var store = new SettingsStore(Path.Combine(folder, "RenamedPlayer.settings.json"));
+        Assert(!File.Exists(store.FilePath));
+        var settings = store.LoadOrCreate();
+        Assert(File.Exists(store.FilePath) && settings.FrameMilliseconds == 10);
+        settings.FrameMilliseconds = 20;
+        settings.MinimumSilenceMilliseconds = 500;
+        settings.SilenceThresholdDb = -40;
+        settings.NavigationToleranceMilliseconds = 250;
+        store.Save(settings);
+        var loaded = new SettingsStore(store.FilePath).LoadOrCreate();
+        Assert(loaded.FrameMilliseconds == 20 && loaded.MinimumSilenceMilliseconds == 500
+            && loaded.SilenceThresholdDb == -40 && loaded.NavigationToleranceMilliseconds == 250);
+        string previous = File.ReadAllText(store.FilePath);
+        settings.FrameMilliseconds = 0;
+        try { store.Save(settings); throw new Exception("Invalid settings accepted"); }
+        catch (ArgumentOutOfRangeException) { }
+        Assert(File.ReadAllText(store.FilePath) == previous);
+        foreach (string invalid in new[] { "{broken", "null", "{\"FrameMilliseconds\":0}" })
+        {
+            File.WriteAllText(store.FilePath, invalid);
+            bool rejected = false;
+            try { store.LoadOrCreate(); }
+            catch (Exception ex) when (ex is System.Text.Json.JsonException or ArgumentException) { rejected = true; }
+            Assert(rejected && File.ReadAllText(store.FilePath) == invalid);
+        }
+        Assert(Directory.GetFiles(folder).Length == 1, "Temporary settings files left behind");
+        Assert(SettingsStore.GetFilePath(Path.Combine(folder, "RenamedPlayer.exe")) == store.FilePath);
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
+Check("Settings save failure preserves original configuration", () =>
+{
+    string folder = Path.Combine(AppContext.BaseDirectory, "readonly-settings-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    string path = Path.Combine(folder, "Player.settings.json");
+    try
+    {
+        var store = new SettingsStore(path);
+        store.LoadOrCreate();
+        string original = File.ReadAllText(path);
+        File.SetAttributes(path, FileAttributes.ReadOnly);
+        bool rejected = false;
+        try { store.Save(new SilenceSettings { FrameMilliseconds = 30 }); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { rejected = true; }
+        Assert(rejected && File.ReadAllText(path) == original);
+        Assert(Directory.GetFiles(folder).Length == 1);
+    }
+    finally
+    {
+        if (File.Exists(path)) File.SetAttributes(path, FileAttributes.Normal);
+        Directory.Delete(folder, true);
+    }
+});
+
 Check("Silence settings defaults", () =>
 {
     var settings = new SilenceSettings();
@@ -39,6 +100,13 @@ Check("Custom silence threshold is used", () =>
 {
     var settings = new SilenceSettings { SilenceThresholdDb = -50 };
     Assert(Detect(Enumerable.Repeat(0.005f, 400).ToArray(), settings: settings).Count == 0);
+});
+Check("Minimum threshold detects digital silence and very quiet samples", () =>
+{
+    var settings = new SilenceSettings { SilenceThresholdDb = -100 };
+    Assert(Detect(new float[400], settings: settings).Count == 1);
+    Assert(Detect(Enumerable.Repeat(1e-8f, 400).ToArray(), settings: settings).Count == 1);
+    Assert(Detect(Enumerable.Repeat(0.0001f, 400).ToArray(), settings: settings).Count == 0);
 });
 Check("299 ms is too short", () => Assert(Detect(new float[299]).Count == 0));
 Check("300 ms qualifies at EOF", () => { var r = Detect(new float[300]); Assert(r.Count == 1 && r[0].Start == TimeSpan.Zero && r[0].End == TimeSpan.FromMilliseconds(300)); });
@@ -294,19 +362,17 @@ if (args.Contains("--playback"))
 
 if (args.Contains("--ui"))
 {
-    if (sampleMp3 is null)
-    {
-        Console.WriteLine("SKIP --ui: add local audio/*.mp3 files first.");
-    }
-    else
     {
         string uiFixture = Path.Combine(AppContext.BaseDirectory, "ui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(uiFixture);
         try
         {
-            File.Copy(sampleMp3, Path.Combine(uiFixture, "01.mp3"));
-            File.Copy(sampleMp3, Path.Combine(uiFixture, "02.mp3"));
-            File.Copy(sampleMp3, Path.Combine(uiFixture, "03.mp3"));
+            if (sampleMp3 is not null)
+            {
+                File.Copy(sampleMp3, Path.Combine(uiFixture, "01.mp3"));
+                File.Copy(sampleMp3, Path.Combine(uiFixture, "02.mp3"));
+                File.Copy(sampleMp3, Path.Combine(uiFixture, "03.mp3"));
+            }
             failures += await UiChecks.RunAsync(uiFixture);
         }
         finally

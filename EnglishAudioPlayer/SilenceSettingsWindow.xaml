@@ -39,8 +39,12 @@
         <TextBox x:Name="NavigationToleranceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="3" Grid.Column="1" Margin="0,0,0,14" Padding="6,4"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"/>
 
-        <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Foreground="#6B7280" TextWrapping="Wrap"
+        <TextBlock x:Name="HelpText" Grid.Row="4" Grid.ColumnSpan="2" Foreground="#6B7280" TextWrapping="Wrap"
                    Text="默认值：10 ms、300 ms、-45 dBFS、200 ms。参数修改后，当前已加载音频会重新分析停顿位置。"/>
+        <Border x:Name="ValidationBar" Grid.Row="4" Grid.ColumnSpan="2" Visibility="Collapsed"
+                Background="#FFF4D6" CornerRadius="6" Padding="8" VerticalAlignment="Bottom">
+            <TextBlock x:Name="ValidationText" Foreground="#92400E" TextWrapping="Wrap"/>
+        </Border>
 
         <Grid Grid.Row="5" Grid.ColumnSpan="2" Margin="0,20,0,0">
             <Grid.ColumnDefinitions>

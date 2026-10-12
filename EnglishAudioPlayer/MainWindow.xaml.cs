@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -18,6 +20,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private readonly DispatcherTimer notificationTimer = new() { Interval = TimeSpan.FromSeconds(5) };
     private SilenceSettings silenceSettings = new();
+    private readonly SettingsStore settingsStore;
+    private bool settingsFileReady;
     private List<SilenceRange> ranges = new();
     private AudioTrack? loadedTrack;
     private bool operationBusy;
@@ -33,17 +37,21 @@ public partial class MainWindow : Window
     private Task navigationTask = Task.CompletedTask;
     private Exception? displayedPlaybackError;
 
-    public MainWindow()
+    public MainWindow() : this(new SettingsStore())
     {
+    }
+
+    internal MainWindow(SettingsStore settingsStore)
+    {
+        this.settingsStore = settingsStore;
         InitializeComponent();
         Rect workArea = SystemParameters.WorkArea;
         double desiredWidth = Math.Round(workArea.Width * 0.5);
         double desiredHeight = Math.Round(workArea.Height * 0.6);
-        Width = Math.Clamp(desiredWidth, MinWidth, MaxWidth);
-        Height = Math.Clamp(desiredHeight, MinHeight, MaxHeight);
+        Width = Math.Max(desiredWidth, MinWidth);
+        Height = Math.Max(desiredHeight, MinHeight);
         Left = Math.Round(workArea.Left + (workArea.Width - Width) / 2);
         Top = Math.Round(workArea.Top + (workArea.Height - Height) / 2);
-        SourceInitialized += MainWindow_SourceInitialized;
         ProgressSlider.AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(ProgressSlider_MouseDown), true);
         AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler(ProgressSlider_MouseUp), true);
         TrackList.ItemsSource = tracks;
@@ -51,12 +59,19 @@ public partial class MainWindow : Window
         timer.Tick += (_, _) => RefreshProgress();
         timer.Start();
         notificationTimer.Tick += (_, _) => HideNotification();
+        try
+        {
+            silenceSettings = settingsStore.LoadOrCreate();
+            settingsFileReady = true;
+        }
+        catch (Exception ex) when (IsSettingsFileError(ex))
+        {
+            ShowNotification($"配置读取或初始化失败，暂用默认参数：{ex.Message}", true);
+        }
     }
 
-    private void MainWindow_SourceInitialized(object? sender, EventArgs e)
-    {
-        WindowStyleHelper.DisableMaximizeButton(this);
-    }
+    private static bool IsSettingsFileError(Exception exception)
+        => exception is IOException or UnauthorizedAccessException or JsonException or ArgumentException;
 
     private async void OpenButton_Click(object sender, RoutedEventArgs e)
     {
@@ -119,6 +134,8 @@ public partial class MainWindow : Window
     {
         ranges.Clear();
         analysisReady = false;
+        // OpenAsync releases the previous reader even if the replacement cannot open.
+        loadedTrack = null;
         await player.OpenAsync(track.FilePath);
         loadedTrack = track;
         if (closing) return;
@@ -169,9 +186,20 @@ public partial class MainWindow : Window
     {
         if (analyzing || operationBusy || closing) return;
 
+        if (!settingsFileReady)
+        {
+            ShowNotification("配置文件不可用，请修复文件或目录权限后重新启动程序。", true);
+            return;
+        }
         var dialog = new SilenceSettingsWindow(silenceSettings) { Owner = this };
         if (dialog.ShowDialog() != true) return;
 
+        try { settingsStore.Save(dialog.Settings); }
+        catch (Exception ex) when (IsSettingsFileError(ex))
+        {
+            ShowNotification($"配置保存失败，参数未更改：{ex.Message}", true);
+            return;
+        }
         silenceSettings = dialog.Settings;
         if (loadedTrack is null) return;
 

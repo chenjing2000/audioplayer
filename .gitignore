@@ -1,7 +1,8 @@
 # .NET build output
 **/bin/
 **/obj/
-artifacts/
+dist/
+*.settings.json
 TestResults/
 
 # Local SDK / IDE state
