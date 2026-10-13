@@ -149,7 +149,7 @@ Check("Empty navigation", () =>
     Assert(SilenceDetector.FindNext(empty, TimeSpan.Zero) is null && SilenceDetector.FindPrevious(empty, TimeSpan.Zero) is null);
 });
 
-string audioFolder = Path.GetFullPath("audio");
+string audioFolder = Path.GetFullPath(Environment.GetEnvironmentVariable("AUDIOPLAYER_TEST_AUDIO_DIRECTORY") ?? "audio");
 string? sampleMp3 = Directory.Exists(audioFolder)
     ? Directory.GetFiles(audioFolder, "*.mp3").FirstOrDefault()
     : null;
