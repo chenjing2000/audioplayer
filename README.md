@@ -152,7 +152,7 @@ dotnet run --project tests/AudioPausePlayer.Tests --no-restore -- --ui
 采用 Windows x64、framework-dependent 单文件发布，不包含 .NET 运行时：
 
 ```powershell
-dotnet publish EnglishAudioPlayer/AudioPausePlayer.csproj -p:PublishProfile=SingleFile
+.\tools\Publish.ps1
 ```
 
 输出为 `dist/EnglishAudioPlayer.exe`。目标电脑需要 .NET 10 Desktop Runtime x64，缺少时由 .NET 启动器提示安装。首次运行会在 exe 同目录自动创建 `<主程序名>.settings.json`，保存当前四项停顿参数；更新时保留已有配置。`dist/` 已加入 `.gitignore`。
@@ -160,3 +160,7 @@ dotnet publish EnglishAudioPlayer/AudioPausePlayer.csproj -p:PublishProfile=Sing
 主窗口保留最小尺寸，解除最大尺寸限制并支持系统最大化。完整发布命令、配置处理和更新方法见 [程序说明](docs/program-overview.md)。
 
 模块设计检查、必要异步机制的理由及本次整改记录也见程序说明第 8 节。当前回归检查为 35 项核心检查、58 项 WPF 检查；没有本地 MP3 时跳过教材音频相关检查。
+
+## 统一发布与本次体检
+
+发布入口统一为 `.\tools\Publish.ps1`，参数统一保存在主项目的 `Properties/PublishProfiles/Portable.pubxml`。详见[统一发布流程](docs/Publishing.md)、[2026-10-13 体检报告](docs/Health-Check-2026-10-13.md)和[发布说明](docs/Release-Notes.md)。

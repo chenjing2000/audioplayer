@@ -58,16 +58,12 @@
 在项目根目录执行（需要 Windows 和 .NET 10 SDK）：
 
 ```powershell
-dotnet publish EnglishAudioPlayer/AudioPausePlayer.csproj -p:PublishProfile=SingleFile
+.\tools\Publish.ps1
 ```
 
-发布配置位于 `EnglishAudioPlayer/Properties/PublishProfiles/SingleFile.pubxml`：Release、Windows x64、framework-dependent、单文件、不包含 .NET 运行时、不裁剪代码、不输出独立调试符号。默认输出目录为当前项目的 `dist/`。
+发布配置位于 `EnglishAudioPlayer/Properties/PublishProfiles/Portable.pubxml`：Release、Windows x64、framework-dependent、单文件、不包含 .NET 运行时、不裁剪代码、不输出独立调试符号。默认输出目录为当前项目的 `dist/`。
 
-等价的显式命令：
-
-```powershell
-dotnet publish EnglishAudioPlayer/AudioPausePlayer.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -o dist
-```
+正式发布统一使用上面的脚本，先验证单文件产物再替换 EXE。详细流程见 [统一发布](Publishing.md)。
 
 分发 `dist/EnglishAudioPlayer.exe` 即可。目标电脑必须安装 **.NET 10 Desktop Runtime x64**（普通 .NET Runtime 不足以运行 WPF）；缺少运行时时由 .NET 启动器显示安装提示，这发生在程序启动之前。官方安装入口：https://dotnet.microsoft.com/download/dotnet/10.0 。
 
@@ -85,14 +81,14 @@ dotnet publish EnglishAudioPlayer/AudioPausePlayer.csproj -c Release -r win-x64 
 
 ## 7. 构建输出与临时文件
 
-构建和测试使用 .NET 默认的项目 `bin/`、`obj/`，不再设置额外的 `BaseOutputPath` 或使用 `artifacts/`。正式发布只输出到 `dist/`；测试报告保留在 `docs/test-results/`。
+常规构建和测试使用项目 `bin/`、`obj/`；Portable 发布的中间编译输出位于主项目 `obj/publish-build/`，临时发布目录完成后删除。正式发布只输出到 `dist/`；测试报告保留在 `docs/test-results/`。
 
 在项目根目录执行：
 
 ```powershell
 dotnet build EnglishAudioPlayer/AudioPausePlayer.csproj -c Release
 dotnet run --project tests/AudioPausePlayer.Tests -c Release -- --ui --playback --report
-dotnet publish EnglishAudioPlayer/AudioPausePlayer.csproj -p:PublishProfile=SingleFile
+.\tools\Publish.ps1
 ```
 
 临时验证副本放在临时目录，用完立即清理。不要为了验证额外保留完整的构建或发布副本；更新时保留 `dist/` 中的用户配置。
