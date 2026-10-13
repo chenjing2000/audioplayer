@@ -140,13 +140,15 @@ public partial class MainWindow : Window
         loadedTrack = track;
         if (closing) return;
         await player.PlayAsync();
-        analyzing = true;
         analysisTask = AnalyzeAsync(track, silenceSettings);
-        UpdateControls();
     }
 
     private async Task AnalyzeAsync(AudioTrack track, SilenceSettings settings)
     {
+        ranges.Clear();
+        analysisReady = false;
+        analyzing = true;
+        UpdateControls();
         try
         {
             var result = await Task.Run(() => SilenceDetector.Detect(track.FilePath, settings));
@@ -203,11 +205,7 @@ public partial class MainWindow : Window
         silenceSettings = dialog.Settings;
         if (loadedTrack is null) return;
 
-        ranges.Clear();
-        analysisReady = false;
-        analyzing = true;
         analysisTask = AnalyzeAsync(loadedTrack, silenceSettings);
-        UpdateControls();
         await analysisTask;
     }
 

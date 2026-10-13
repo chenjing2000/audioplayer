@@ -11,25 +11,28 @@ public static class AudioLibrary
         Array.Sort(files, (left, right) => CompareNames(Path.GetFileName(left), Path.GetFileName(right)));
         var tracks = new List<AudioTrack>();
         foreach (string path in files)
-        {
-            string fallback = Path.GetFileNameWithoutExtension(path);
-            try
-            {
-                using var file = TagLib.File.Create(path);
-                tracks.Add(new AudioTrack
-                {
-                    FilePath = Path.GetFullPath(path),
-                    Title = string.IsNullOrWhiteSpace(file.Tag.Title) ? fallback : file.Tag.Title,
-                    Album = file.Tag.Album ?? "",
-                    Duration = file.Properties.Duration
-                });
-            }
-            catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is TagLib.CorruptFileException || ex is TagLib.UnsupportedFormatException)
-            {
-                tracks.Add(new AudioTrack { FilePath = Path.GetFullPath(path), Title = fallback, LoadError = ex.Message });
-            }
-        }
+            tracks.Add(ReadTrack(path));
         return tracks;
+    }
+
+    private static AudioTrack ReadTrack(string path)
+    {
+        string fallback = Path.GetFileNameWithoutExtension(path);
+        try
+        {
+            using var file = TagLib.File.Create(path);
+            return new AudioTrack
+            {
+                FilePath = Path.GetFullPath(path),
+                Title = string.IsNullOrWhiteSpace(file.Tag.Title) ? fallback : file.Tag.Title,
+                Album = file.Tag.Album ?? "",
+                Duration = file.Properties.Duration
+            };
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is TagLib.CorruptFileException || ex is TagLib.UnsupportedFormatException)
+        {
+            return new AudioTrack { FilePath = Path.GetFullPath(path), Title = fallback, LoadError = ex.Message };
+        }
     }
 
     private static int CompareNames(string left, string right)

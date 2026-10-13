@@ -55,24 +55,20 @@ public partial class SilenceSettingsWindow : Window
         if (!int.TryParse(NavigationToleranceTextBox.Text.Trim(), out int navigationToleranceMilliseconds))
             return ShowValueError("前后跳转容差必须是整数。");
 
-        var value = new SilenceSettings
-        {
-            FrameMilliseconds = frameMilliseconds,
-            MinimumSilenceMilliseconds = minimumSilenceMilliseconds,
-            SilenceThresholdDb = silenceThresholdDb,
-            NavigationToleranceMilliseconds = navigationToleranceMilliseconds
-        };
+        settings.FrameMilliseconds = frameMilliseconds;
+        settings.MinimumSilenceMilliseconds = minimumSilenceMilliseconds;
+        settings.SilenceThresholdDb = silenceThresholdDb;
+        settings.NavigationToleranceMilliseconds = navigationToleranceMilliseconds;
 
         try
         {
-            value.Validate();
+            settings.Validate();
         }
         catch (ArgumentOutOfRangeException ex)
         {
             return ShowValueError(ex.Message.Split('\n')[0]);
         }
 
-        settings = value;
         return true;
     }
 

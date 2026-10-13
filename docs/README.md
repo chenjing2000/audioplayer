@@ -1,6 +1,6 @@
 # AudioPlayer documentation
 
-All four applications use the following document responsibilities. Application-specific formats and architecture remain separate reference pages.
+These pages describe AudioPlayer. The documentation categories follow the shared project convention; application behavior and modules are documented here specifically for this player.
 
 | Document | Responsibility |
 | --- | --- |
@@ -11,6 +11,7 @@ All four applications use the following document responsibilities. Application-s
 | [Publishing](Publishing.md) | Portable profile, staged updates, and GitHub Release workflow |
 | [Release Notes](Release-Notes.md) | Distribution changes and runtime requirements |
 | [Health Check](Health-Check-2026-10-13.md) | Dated verification evidence and limitations |
+| [Code Review](Code-Review-2026-10-13.md) | Module boundaries, local simplification, retained complexity, and current regression evidence |
 
 ## Application-specific references
 

@@ -129,7 +129,7 @@ internal static class UiChecks
                     Assert(slider.VerticalAlignment == VerticalAlignment.Center && timeText.VerticalAlignment == VerticalAlignment.Center, "Progress slider and time display are vertically centered");
                     Assert(list.RowHeight == 25, "List row height is 25");
                     Assert(list.ColumnHeaderHeight == 32, "List header height is 32");
-                    window.Dispatcher.BeginInvoke(new Action(() =>
+                    _ = window.Dispatcher.BeginInvoke(new Action(() =>
                     {
                         var editWindow = app.Windows.OfType<SilenceSettingsWindow>().Single(w => w.IsVisible);
                         ((TextBox)editWindow.FindName("FrameMillisecondsTextBox")).Text = "25";

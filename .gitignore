@@ -3,6 +3,7 @@
 **/obj/
 dist/
 *.settings.json
+*.settings.json.bak
 TestResults/
 
 # Local SDK / IDE state
@@ -24,6 +25,7 @@ docs/test-results/
 *.pdb
 *.zip
 *.tmp
+*.cache
 
 # OS files
 .DS_Store
