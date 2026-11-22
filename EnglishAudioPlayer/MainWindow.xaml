@@ -20,6 +20,7 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button x:Name="OpenButton" ToolTip="打开文件夹" AutomationProperties.Name="打开文件夹" VerticalAlignment="Center" Click="OpenButton_Click">
                 <Image Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform" Source="{StaticResource OpenFolderIcon}"/>
@@ -38,7 +39,12 @@
                     VerticalAlignment="Center" Margin="0,0,10,0" Click="StopButton_Click">
                 <Image Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform" Source="{StaticResource StopIcon}"/>
             </Button>
-            <Button x:Name="SettingsButton" Grid.Column="5" Style="{StaticResource CircleButtonStyle}"
+            <Button x:Name="TrimButton" Grid.Column="5" ToolTip="压缩长静音" AutomationProperties.Name="压缩长静音"
+                    VerticalAlignment="Center" Margin="0,0,10,0" Click="TrimButton_Click">
+                <Image Width="30" Height="30" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Source="{StaticResource TrimIcon}"/>
+            </Button>
+            <Button x:Name="SettingsButton" Grid.Column="6" Style="{StaticResource CircleButtonStyle}"
                     ToolTip="停顿检测设置" AutomationProperties.Name="停顿检测设置"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Click="SettingsButton_Click">
                 <Image Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"
@@ -118,7 +124,9 @@
             </DataGrid.Columns>
             </DataGrid>
         </Border>
-        <Border x:Name="NotificationBar" Grid.Row="2" Visibility="Collapsed" Padding="12,9" CornerRadius="4" Margin="0,12,0,0">
+        <Border x:Name="NotificationBar" Grid.Row="2" Visibility="Collapsed" Padding="14,11"
+                CornerRadius="8" Margin="0,12,0,0" BorderThickness="1" BorderBrush="#DCE2EA"
+                HorizontalAlignment="Right" MaxWidth="480">
             <TextBlock x:Name="NotificationText" TextWrapping="Wrap"/>
         </Border>
     </Grid>

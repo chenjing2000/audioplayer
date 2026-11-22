@@ -26,6 +26,10 @@ public partial class MainWindow : Window
     private AudioTrack? loadedTrack;
     private bool operationBusy;
     private bool analyzing;
+    private bool trimming;
+    private string? currentFolder;
+    private CancellationTokenSource? trimCancellation;
+    private Task? trimTask;
     private bool analysisReady;
     private bool dragging;
     private bool closing;
@@ -86,6 +90,7 @@ public partial class MainWindow : Window
         var files = await Task.Run(() => AudioLibrary.LoadFolder(path));
         if (closing) return;
         await player.CloseAsync();
+        currentFolder = Path.GetFullPath(path);
         loadedTrack = null;
         ranges.Clear();
         analysisReady = false;
@@ -93,7 +98,7 @@ public partial class MainWindow : Window
         foreach (var file in files) tracks.Add(file);
         int errors = files.Count(file => file.LoadError is not null);
         if (errors > 0) ShowNotification($"{errors} 个文件的标签读取失败，悬停对应行可查看原因。", false);
-        else if (files.Count == 0) ShowNotification("此文件夹中没有 MP3 文件。", false);
+        else if (files.Count == 0) ShowNotification("此文件夹中没有 WAV、MP3 或 M4A 音频文件。", false);
         RefreshProgress();
         UpdateControls();
     }
@@ -167,6 +172,72 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void TrimButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (trimming || closing) return;
+        AudioTrack? track = TrackList.SelectedItem as AudioTrack;
+        if (track is null && TrackList.IsKeyboardFocusWithin)
+            track = TrackList.CurrentItem as AudioTrack;
+        if (track is null)
+        {
+            ShowNotification("请先在列表中选择需要裁剪的音频文件。", false);
+            return;
+        }
+
+        var settings = new SilenceSettings
+        {
+            FrameMilliseconds = silenceSettings.FrameMilliseconds,
+            MinimumSilenceMilliseconds = silenceSettings.MinimumSilenceMilliseconds,
+            SilenceThresholdDb = silenceSettings.SilenceThresholdDb,
+            NavigationToleranceMilliseconds = silenceSettings.NavigationToleranceMilliseconds,
+            AllowedSilenceSeconds = silenceSettings.AllowedSilenceSeconds
+        };
+        string source = track.FilePath;
+        trimming = true;
+        trimCancellation = new CancellationTokenSource();
+        UpdateControls();
+        ShowNotification("正在分析并压缩长静音：" + Path.GetFileName(source), false, TimeSpan.Zero);
+        Task<SilenceTrimResult> work = SilenceTrimmer.TrimAsync(source, settings, trimCancellation.Token);
+        trimTask = work;
+        try
+        {
+            SilenceTrimResult result = await work;
+            if (closing) return;
+            if (currentFolder is not null &&
+                string.Equals(currentFolder, Path.GetDirectoryName(result.OutputPath), StringComparison.OrdinalIgnoreCase))
+            {
+                var added = AudioLibrary.ReadTrack(result.OutputPath);
+                int index = 0;
+                while (index < tracks.Count &&
+                    AudioLibrary.CompareNames(Path.GetFileName(tracks[index].FilePath),
+                        Path.GetFileName(result.OutputPath)) < 0)
+                    index++;
+                tracks.Insert(index, added);
+            }
+            string message = result.CopiedUnchanged
+                ? "未发现超过允许时长的静音区间，已复制原文件。"
+                : $"已压缩 {result.TrimmedRangeCount} 段静音，累计删除 {result.RemovedDuration.TotalSeconds:F3} 秒。";
+            ShowNotification($"裁剪完成：{result.OutputPath}\n原时长 {result.OriginalDuration:hh\:mm\:ss}，" +
+                $"新时长 {result.OutputDuration:hh\:mm\:ss}。{message}", false, TimeSpan.FromSeconds(15));
+        }
+        catch (OperationCanceledException)
+        {
+            if (!closing) ShowNotification("长静音裁剪已取消。", false);
+        }
+        catch (Exception ex)
+        {
+            if (!closing) ShowNotification("裁剪失败：" + ex.Message, true, TimeSpan.FromSeconds(15));
+        }
+        finally
+        {
+            trimTask = null;
+            trimCancellation?.Dispose();
+            trimCancellation = null;
+            trimming = false;
+            if (!closing) UpdateControls();
+        }
+    }
+
     private async Task TogglePlaybackAsync()
     {
         if (player.IsLoaded)
@@ -202,8 +273,11 @@ public partial class MainWindow : Window
             ShowNotification($"配置保存失败，参数未更改：{ex.Message}", true);
             return;
         }
+        bool detectionChanged = silenceSettings.FrameMilliseconds != dialog.Settings.FrameMilliseconds
+            || silenceSettings.MinimumSilenceMilliseconds != dialog.Settings.MinimumSilenceMilliseconds
+            || silenceSettings.SilenceThresholdDb != dialog.Settings.SilenceThresholdDb;
         silenceSettings = dialog.Settings;
-        if (loadedTrack is null) return;
+        if (!detectionChanged || loadedTrack is null) return;
 
         analysisTask = AnalyzeAsync(loadedTrack, silenceSettings);
         await analysisTask;
@@ -305,6 +379,7 @@ public partial class MainWindow : Window
         bool available = !operationBusy && !closing;
         OpenButton.IsEnabled = available && !analyzing;
         SettingsButton.IsEnabled = available && !analyzing;
+        TrimButton.IsEnabled = !closing && !trimming;
         TrackList.IsEnabled = available && !analyzing;
         PlayButton.IsEnabled = available && (player.IsLoaded || tracks.Count > 0);
         StopButton.IsEnabled = available && player.IsLoaded;
@@ -337,7 +412,7 @@ public partial class MainWindow : Window
         PlaylistBorder.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 8, 8);
     }
 
-    internal void ShowNotification(string message, bool isError)
+    internal void ShowNotification(string message, bool isError, TimeSpan? duration = null)
     {
         if (closing) return;
         notificationTimer.Stop();
@@ -345,7 +420,11 @@ public partial class MainWindow : Window
         NotificationBar.Background = new SolidColorBrush(isError ? Color.FromRgb(253, 232, 232) : Color.FromRgb(255, 244, 214));
         NotificationText.Foreground = new SolidColorBrush(isError ? Color.FromRgb(153, 27, 27) : Color.FromRgb(146, 64, 14));
         NotificationBar.Visibility = Visibility.Visible;
-        notificationTimer.Start();
+        if (duration != TimeSpan.Zero)
+        {
+            notificationTimer.Interval = duration ?? TimeSpan.FromSeconds(5);
+            notificationTimer.Start();
+        }
     }
 
     private void HideNotification()
@@ -405,6 +484,13 @@ public partial class MainWindow : Window
             if (activeOperation is not null) await activeOperation;
             await navigationTask;
             if (analysisTask is not null) await analysisTask;
+            trimCancellation?.Cancel();
+            if (trimTask is not null)
+            {
+                try { await trimTask; }
+                catch (OperationCanceledException) { }
+                catch (Exception) { /* TrimButton_Click handles task errors unless closing. */ }
+            }
             await player.CloseAsync();
             await Dispatcher.Yield(DispatcherPriority.Background);
         }

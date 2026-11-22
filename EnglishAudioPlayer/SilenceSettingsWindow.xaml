@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="停顿检测设置"
-        Width="324" Height="350"
+        Width="324" Height="390"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
@@ -11,6 +11,7 @@
         FontSize="12">
     <Grid Margin="24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -29,7 +30,8 @@
 
         <TextBlock Grid.Row="1" Text="最短停顿时长（ms）" VerticalAlignment="Center" Margin="0,0,16,14"/>
         <TextBox x:Name="MinimumSilenceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="1" Grid.Column="1" Margin="0,0,0,14" Padding="6,4"
-                 PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"/>
+                 PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"
+                 PreviewKeyDown="MinimumSilenceTextBox_PreviewKeyDown" LostKeyboardFocus="SilenceInput_LostKeyboardFocus"/>
 
         <TextBlock Grid.Row="2" Text="静音阈值（dBFS）" VerticalAlignment="Center" Margin="0,0,16,14"/>
         <TextBox x:Name="SilenceThresholdTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="2" Grid.Column="1" Margin="0,0,0,14" Padding="6,4"
@@ -39,14 +41,20 @@
         <TextBox x:Name="NavigationToleranceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="3" Grid.Column="1" Margin="0,0,0,14" Padding="6,4"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"/>
 
-        <TextBlock x:Name="HelpText" Grid.Row="4" Grid.ColumnSpan="2" Foreground="#6B7280" TextWrapping="Wrap"
-                   Text="默认值：10 ms、300 ms、-45 dBFS、200 ms。参数修改后，当前已加载音频会重新分析停顿位置。"/>
-        <Border x:Name="ValidationBar" Grid.Row="4" Grid.ColumnSpan="2" Visibility="Collapsed"
+        <TextBlock Grid.Row="4" Text="允许静音时长 (s)" VerticalAlignment="Center" Margin="0,0,16,14"/>
+        <TextBox x:Name="AllowedSilenceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center"
+                 AllowDrop="False" Grid.Row="4" Grid.Column="1" Margin="0,0,0,14" Padding="6,4"
+                 PreviewTextInput="AllowedSilenceTextBox_PreviewTextInput" DataObject.Pasting="AllowedSilenceTextBox_Pasting"
+                 PreviewKeyDown="AllowedSilenceTextBox_PreviewKeyDown" LostKeyboardFocus="SilenceInput_LostKeyboardFocus"/>
+
+        <TextBlock x:Name="HelpText" Grid.Row="5" Grid.ColumnSpan="2" Foreground="#6B7280" TextWrapping="Wrap"
+                   Text="默认：10 ms、300 ms、-45 dBFS、200 ms、2.000 s。允许静音时长只影响裁剪，不影响左右跳转。"/>
+        <Border x:Name="ValidationBar" Grid.Row="5" Grid.ColumnSpan="2" Visibility="Collapsed"
                 Background="#FFF4D6" CornerRadius="6" Padding="8" VerticalAlignment="Bottom">
             <TextBlock x:Name="ValidationText" Foreground="#92400E" TextWrapping="Wrap"/>
         </Border>
 
-        <Grid Grid.Row="5" Grid.ColumnSpan="2" Margin="0,20,0,0">
+        <Grid Grid.Row="6" Grid.ColumnSpan="2" Margin="0,20,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
