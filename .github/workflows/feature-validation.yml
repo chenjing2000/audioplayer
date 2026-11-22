@@ -1,0 +1,30 @@
+name: Feature validation
+
+on:
+  push:
+    branches:
+      - feature/long-silence-trimming
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Core tests
+        shell: powershell
+        run: .\tools\Test.ps1 -Suite Core
+      - name: Publish portable EXE
+        shell: powershell
+        run: .\tools\Publish.ps1
+      - name: Published EXE checks
+        shell: powershell
+        run: .\tools\Test-PublishedApp.ps1
