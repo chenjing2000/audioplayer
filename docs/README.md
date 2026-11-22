@@ -4,6 +4,9 @@ These pages describe AudioPlayer. The documentation categories follow the shared
 
 | Document | Responsibility |
 | --- | --- |
+| [Long-silence trimming specification](specs/Long-Silence-Trimming.md) | Confirmed UI, trimming, codec and safety behavior |
+| [Trimming implementation plan](guides/Long-Silence-Implementation.md) | Implementation stages and acceptance requirements |
+| [Project contract](project-contract.md) | Current application-specific standards and exceptions |
 | [Getting Started](Getting-Started.md) | Runtime requirements, launch, and first use |
 | [Application Overview](Application-Overview.md) | Purpose, modules, and application-specific architecture |
 | [Configuration](Configuration.md) | Settings location, ownership, preservation, and recovery |

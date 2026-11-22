@@ -47,3 +47,7 @@ Detailed PCM/navigation and playback behavior is described in [Program Overview]
 ## CI and results
 
 The tag-triggered GitHub Release workflow runs Core, publishes the EXE, and then runs Test-PublishedApp.ps1 before uploading it. It cannot access private local recordings or dictionaries, so it does not certify Full real-content checks. Dated local results and remaining limitations are recorded in [Health Check](Health-Check-2026-10-13.md).
+
+## Long-silence trimming acceptance
+
+Before release, verify WAV, MP3 and AAC-in-M4A inputs/outputs on a real Windows 10/11 computer using the installed Media Foundation codecs. Include PCM-generated fixtures for: no silence; short, equal and longer-than-allowed silence; multiple segments; silence at both ends; stereo; fractional seconds; 10-ms fading; and old/new settings validation. Check the generated output can be decoded, has the expected length (allowing compressed-codec padding), and does not overwrite an existing or source file. Test cancellation on shutdown and selection without focus. Automated tests alone do not establish that the system AAC/MP3 encoder is available; report real-device tests separately.
