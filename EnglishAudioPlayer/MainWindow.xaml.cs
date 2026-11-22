@@ -416,7 +416,7 @@ public partial class MainWindow : Window
     {
         if (closing) return;
         notificationTimer.Stop();
-        NotificationText.Text = (isError ? "错误：" : "警告：") + message;
+        NotificationText.Text = (isError ? "错误：" : "提示：") + message;
         NotificationBar.Background = new SolidColorBrush(isError ? Color.FromRgb(253, 232, 232) : Color.FromRgb(255, 244, 214));
         NotificationText.Foreground = new SolidColorBrush(isError ? Color.FromRgb(153, 27, 27) : Color.FromRgb(146, 64, 14));
         NotificationBar.Visibility = Visibility.Visible;

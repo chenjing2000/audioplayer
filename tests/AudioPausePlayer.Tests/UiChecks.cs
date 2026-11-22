@@ -76,19 +76,20 @@ internal static class UiChecks
                     var playButton = (Button)window.FindName("PlayButton");
                     var stopButton = (Button)window.FindName("StopButton");
                     var settingsButton = (Button)window.FindName("SettingsButton");
+                     var trimButton = (Button)window.FindName("TrimButton");
                     settingsButton.ApplyTemplate();
                     var settingsBorder = (Border)settingsButton.Template.FindName("ButtonBorder", settingsButton);
                     var settingsImage = FindVisual<Image>(settingsButton)!;
                     Assert(Math.Abs(settingsButton.Width - 36) < 0.01 && Math.Abs(settingsButton.Height - 36) < 0.01 &&
                            Math.Abs(settingsBorder.CornerRadius.TopLeft - 18) < 0.01, "Settings button is circular");
                     Assert(Math.Abs(settingsImage.Width - 22) < 0.01 && Math.Abs(settingsImage.Height - 22) < 0.01, "Settings icon is 22x22");
-                    Assert(Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(settingsButton) == 5, "Settings button is immediately to the right of stop button");
+                    Assert(Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 && Grid.GetColumn(settingsButton) == 6, "Trim button is between stop and settings buttons");
                     Assert(settingsButton.HorizontalAlignment == HorizontalAlignment.Center && settingsButton.VerticalAlignment == VerticalAlignment.Center, "Settings button is centered in the top row");
                     Assert(settingsButton.FocusVisualStyle is null, "Settings button has no focus visual");
                     var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
                     Assert(Math.Abs(settingsWindow.Width - 324) < 0.01, "Settings window width is 324");
-                    Assert(Math.Abs(settingsWindow.Height - 350) < 0.01, "Settings window height is 350");
-                    foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox" })
+                    Assert(Math.Abs(settingsWindow.Height - 390) < 0.01, "Settings window height is 390");
+                    foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox" })
                     {
                         var textBox = (TextBox)settingsWindow.FindName(textBoxName);
                         Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop, textBoxName + " is 80 wide, centers its value, and blocks drag/drop text");
@@ -97,7 +98,15 @@ internal static class UiChecks
                     MethodInfo signedInput = typeof(SilenceSettingsWindow).GetMethod("IsSignedIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
                     Assert((bool)positiveInput.Invoke(null, new object[] { "+123" })! && !(bool)positiveInput.Invoke(null, new object[] { "-1" })! && !(bool)positiveInput.Invoke(null, new object[] { "1.5" })! && !(bool)positiveInput.Invoke(null, new object[] { "abc" })!, "Positive parameter boxes accept only digits and optional leading plus sign");
                     Assert((bool)signedInput.Invoke(null, new object[] { "-45" })! && (bool)signedInput.Invoke(null, new object[] { "+45" })! && !(bool)signedInput.Invoke(null, new object[] { "4-5" })! && !(bool)signedInput.Invoke(null, new object[] { "-4.5" })!, "Silence threshold box accepts digits and one leading sign only");
-                    var restoreButton = (Button)settingsWindow.FindName("RestoreDefaultsButton");
+                    MethodInfo editableSeconds = typeof(SilenceSettingsWindow).GetMethod("IsEditableSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     MethodInfo completeSeconds = typeof(SilenceSettingsWindow).GetMethod("IsCompleteSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     Assert((bool)editableSeconds.Invoke(null, new object[] { "0." })!
+                         && (bool)editableSeconds.Invoke(null, new object[] { "" })!
+                         && !(bool)editableSeconds.Invoke(null, new object[] { "2.1234" })!
+                         && !(bool)editableSeconds.Invoke(null, new object[] { "2,4" })!, "Trim seconds input rejects invalid characters and precision");
+                     Assert((bool)completeSeconds.Invoke(null, new object[] { "2.500" })!
+                         && !(bool)completeSeconds.Invoke(null, new object[] { "2." })!, "Trim seconds requires complete decimal at confirmation");
+                     var restoreButton = (Button)settingsWindow.FindName("RestoreDefaultsButton");
                     var cancelButton = (Button)settingsWindow.FindName("CancelButton");
                     var okButton = (Button)settingsWindow.FindName("OkButton");
                     Assert(Math.Abs(restoreButton.Width - 76) < 0.01, "Restore defaults button width is 76");

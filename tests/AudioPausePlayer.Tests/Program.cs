@@ -143,16 +143,39 @@ Check("Legacy config without trim setting respects previous minimum", () =>
     string path = Path.Combine(Path.GetTempPath(), "legacy-audio-" + Guid.NewGuid().ToString("N") + ".json");
     try
     {
-        File.WriteAllText(path, "{\\"MinimumSilenceMilliseconds\\":3000}");
+        File.WriteAllText(path, """{"MinimumSilenceMilliseconds":3000}""");
         var settings = new SettingsStore(path).LoadOrCreate();
         Assert(settings.MinimumSilenceMilliseconds == 3000 && settings.AllowedSilenceSeconds == 3.000m);
-        File.WriteAllText(path, "{\\"MinimumSilenceMilliseconds\\":3000,\\"AllowedSilenceSeconds\\":2}");
+        File.WriteAllText(path, """{"MinimumSilenceMilliseconds":3000,"AllowedSilenceSeconds":2}""");
         bool rejected = false;
         try { new SettingsStore(path).LoadOrCreate(); }
         catch (ArgumentOutOfRangeException) { rejected = true; }
         Assert(rejected);
     }
     finally { if (File.Exists(path)) File.Delete(path); }
+});
+Check("Trim WAV output is separately saved, validated, and never overwritten", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "audio-trim-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    string source = Path.Combine(folder, "sample.wav");
+    try
+    {
+        float[] input = Signal(100, 7000, 100);
+        WaveFileWriter.CreateWaveFile16(source, new Samples(input, 1000, 1, int.MaxValue));
+        long originalLength = new FileInfo(source).Length;
+        SilenceTrimResult trimmed = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
+        Assert(trimmed.TrimmedRangeCount == 1 && Math.Abs(trimmed.RemovedDuration.TotalSeconds - 5) < 0.01);
+        Assert(trimmed.OutputPath == Path.Combine(folder, "sample.lesssilence.wav"));
+        Assert(new FileInfo(source).Length == originalLength, "Original source modified");
+        using (var output = new AudioFileReader(trimmed.OutputPath))
+            Assert(Math.Abs(output.TotalTime.TotalSeconds - 2.2) < 0.02);
+        bool conflict = false;
+        try { SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult(); }
+        catch (IOException) { conflict = true; }
+        Assert(conflict && Directory.GetFiles(folder).Length == 2, "Existing result should be protected");
+    }
+    finally { Directory.Delete(folder, true); }
 });
 Check("Trim plan keeps equal sides and drops only middle", () =>
 {
