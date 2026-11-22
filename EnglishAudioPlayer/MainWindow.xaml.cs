@@ -217,8 +217,8 @@ public partial class MainWindow : Window
             string message = result.CopiedUnchanged
                 ? "未发现超过允许时长的静音区间，已复制原文件。"
                 : $"已压缩 {result.TrimmedRangeCount} 段静音，累计删除 {result.RemovedDuration.TotalSeconds:F3} 秒。";
-            ShowNotification($"裁剪完成：{result.OutputPath}\n原时长 {result.OriginalDuration:hh\:mm\:ss}，" +
-                $"新时长 {result.OutputDuration:hh\:mm\:ss}。{message}", false, TimeSpan.FromSeconds(15));
+            ShowNotification($"裁剪完成：{result.OutputPath}\n原时长 {AudioTrack.FormatTime(result.OriginalDuration)}，" +
+                $"新时长 {AudioTrack.FormatTime(result.OutputDuration)}。{message}", false, TimeSpan.FromSeconds(15));
         }
         catch (OperationCanceledException)
         {
