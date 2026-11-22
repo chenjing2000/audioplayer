@@ -6,11 +6,13 @@ public sealed class SilenceSettings
     public const int DefaultMinimumSilenceMilliseconds = 300;
     public const int DefaultSilenceThresholdDb = -45;
     public const int DefaultNavigationToleranceMilliseconds = 200;
+    public const decimal DefaultAllowedSilenceSeconds = 2.000m;
 
     public int FrameMilliseconds { get; set; } = DefaultFrameMilliseconds;
     public int MinimumSilenceMilliseconds { get; set; } = DefaultMinimumSilenceMilliseconds;
     public int SilenceThresholdDb { get; set; } = DefaultSilenceThresholdDb;
     public int NavigationToleranceMilliseconds { get; set; } = DefaultNavigationToleranceMilliseconds;
+    public decimal AllowedSilenceSeconds { get; set; } = DefaultAllowedSilenceSeconds;
 
     public void Validate()
     {
@@ -22,5 +24,9 @@ public sealed class SilenceSettings
             throw new ArgumentOutOfRangeException(nameof(SilenceThresholdDb), "静音阈值必须在 -100 到 0 dBFS 之间。");
         if (NavigationToleranceMilliseconds < 1 || NavigationToleranceMilliseconds > 5000)
             throw new ArgumentOutOfRangeException(nameof(NavigationToleranceMilliseconds), "导航容差必须在 1 到 5000 ms 之间。");
+        if (AllowedSilenceSeconds < MinimumSilenceMilliseconds / 1000m
+            || decimal.Round(AllowedSilenceSeconds, 3) != AllowedSilenceSeconds)
+            throw new ArgumentOutOfRangeException(nameof(AllowedSilenceSeconds),
+                $"允许静音时长不得低于 {MinimumSilenceMilliseconds / 1000m:0.000} 秒，且最多三位小数。");
     }
 }

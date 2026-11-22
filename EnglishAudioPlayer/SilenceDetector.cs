@@ -11,10 +11,13 @@ public static class SilenceDetector
     }
 
     public static List<SilenceRange> Detect(string filePath, SilenceSettings settings)
+        => Detect(filePath, settings, CancellationToken.None);
+
+    public static List<SilenceRange> Detect(string filePath, SilenceSettings settings, CancellationToken cancellationToken)
     {
         settings.Validate();
         using var reader = new AudioFileReader(filePath);
-        return DetectSamples(reader, settings);
+        return DetectSamples(reader, settings, cancellationToken);
     }
 
     internal static List<SilenceRange> DetectSamples(ISampleProvider source)
@@ -23,6 +26,9 @@ public static class SilenceDetector
     }
 
     internal static List<SilenceRange> DetectSamples(ISampleProvider source, SilenceSettings settings)
+        => DetectSamples(source, settings, CancellationToken.None);
+
+    internal static List<SilenceRange> DetectSamples(ISampleProvider source, SilenceSettings settings, CancellationToken cancellationToken)
     {
         settings.Validate();
         int rate = source.WaveFormat.SampleRate;
@@ -40,6 +46,7 @@ public static class SilenceDetector
 
         while (true)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             // Derive boundaries from the absolute frame index to avoid rounding drift.
             long nextBoundary = (++frameIndex * rate * frameMilliseconds) / 1000;
             int requested = checked((int)(nextBoundary - processedGroups) * channels);

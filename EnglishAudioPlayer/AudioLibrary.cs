@@ -7,7 +7,7 @@ public static class AudioLibrary
     public static List<AudioTrack> LoadFolder(string folderPath)
     {
         string[] files = Directory.GetFiles(folderPath).Where(path =>
-            string.Equals(Path.GetExtension(path), ".mp3", StringComparison.OrdinalIgnoreCase)).ToArray();
+            new[] { ".mp3", ".m4a", ".wav" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)).ToArray();
         Array.Sort(files, (left, right) => CompareNames(Path.GetFileName(left), Path.GetFileName(right)));
         var tracks = new List<AudioTrack>();
         foreach (string path in files)
@@ -15,7 +15,7 @@ public static class AudioLibrary
         return tracks;
     }
 
-    private static AudioTrack ReadTrack(string path)
+    internal static AudioTrack ReadTrack(string path)
     {
         string fallback = Path.GetFileNameWithoutExtension(path);
         try
@@ -35,7 +35,7 @@ public static class AudioLibrary
         }
     }
 
-    private static int CompareNames(string left, string right)
+    internal static int CompareNames(string left, string right)
     {
         int a = 0, b = 0;
         while (a < left.Length && b < right.Length)

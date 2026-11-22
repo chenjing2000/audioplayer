@@ -121,6 +121,77 @@ Check("Stereo duration", () => { var r = Detect(new float[800], channels: 2, max
 Check("Non integral frame sampling rate", () => { var r = Detect(new float[11025], rate: 11025, maxRead: 17); Assert(r.Count == 1 && r[0].End == TimeSpan.FromSeconds(1)); });
 Check("Low energy below threshold", () => Assert(Detect(Enumerable.Repeat(0.005f, 400).ToArray()).Count == 1));
 Check("Energy above threshold", () => Assert(Detect(Enumerable.Repeat(0.006f, 400).ToArray()).Count == 0));
+Check("Allowed silence default and linked minimum", () =>
+{
+    var settings = new SilenceSettings();
+    Assert(settings.AllowedSilenceSeconds == 2.000m);
+    settings.MinimumSilenceMilliseconds = 5000;
+    bool rejected = false;
+    try { settings.Validate(); }
+    catch (ArgumentOutOfRangeException) { rejected = true; }
+    Assert(rejected);
+    settings.AllowedSilenceSeconds = 5.000m;
+    settings.Validate();
+    settings.AllowedSilenceSeconds = 5.0001m;
+    rejected = false;
+    try { settings.Validate(); }
+    catch (ArgumentOutOfRangeException) { rejected = true; }
+    Assert(rejected);
+});
+Check("Legacy config without trim setting respects previous minimum", () =>
+{
+    string path = Path.Combine(Path.GetTempPath(), "legacy-audio-" + Guid.NewGuid().ToString("N") + ".json");
+    try
+    {
+        File.WriteAllText(path, "{\\"MinimumSilenceMilliseconds\\":3000}");
+        var settings = new SettingsStore(path).LoadOrCreate();
+        Assert(settings.MinimumSilenceMilliseconds == 3000 && settings.AllowedSilenceSeconds == 3.000m);
+        File.WriteAllText(path, "{\\"MinimumSilenceMilliseconds\\":3000,\\"AllowedSilenceSeconds\\":2}");
+        bool rejected = false;
+        try { new SettingsStore(path).LoadOrCreate(); }
+        catch (ArgumentOutOfRangeException) { rejected = true; }
+        Assert(rejected);
+    }
+    finally { if (File.Exists(path)) File.Delete(path); }
+});
+Check("Trim plan keeps equal sides and drops only middle", () =>
+{
+    var silence = new List<SilenceRange> { new() { Start = TimeSpan.FromSeconds(1), End = TimeSpan.FromSeconds(8) } };
+    var cuts = SilenceTrimmer.PlanCuts(silence, 1000, 2.000m);
+    Assert(cuts.Count == 1 && cuts[0].SilenceStart == 1000
+        && cuts[0].CutStart == 2000 && cuts[0].CutEnd == 7000 && cuts[0].SilenceEnd == 8000);
+    Assert(SilenceTrimmer.PlanCuts(silence, 1000, 7.000m).Count == 0);
+    Assert(SilenceTrimmer.PlanCuts(silence, 1000, 8.000m).Count == 0);
+});
+Check("Trim output keeps all speech and frame count", () =>
+{
+    const int rate = 1000;
+    float[] samples = Signal(100, 7000, 100);
+    var silence = Detect(samples, rate);
+    var cuts = SilenceTrimmer.PlanCuts(silence, rate, 2m);
+    var provider = new TrimSampleProvider(new Samples(samples, rate, 1, 8192), cuts, CancellationToken.None);
+    var result = new List<float>();
+    float[] block = new float[257];
+    int read;
+    while ((read = provider.Read(block, 0, block.Length)) > 0)
+        result.AddRange(block.Take(read));
+    Assert(result.Count == 2200, "Unexpected output sample length");
+    Assert(result.Take(100).All(x => x == 0.5f));
+    Assert(result.Skip(2100).All(x => x == 0.5f));
+});
+Check("Fade reaches zero at both sides of the join", () =>
+{
+    float[] input = Enumerable.Repeat(0.001f, 7000).ToArray();
+    var ranges = new List<SilenceRange> { new() { Start = TimeSpan.Zero, End = TimeSpan.FromSeconds(7) } };
+    var cuts = SilenceTrimmer.PlanCuts(ranges, 1000, 2m);
+    var provider = new TrimSampleProvider(new Samples(input, 1000, 1, 8192), cuts, CancellationToken.None);
+    float[] result = new float[2000];
+    int written = 0, n;
+    while (written < result.Length && (n = provider.Read(result, written, result.Length - written)) > 0) written += n;
+    Assert(written == 2000);
+    Assert(result[989] > result[995] && result[999] == 0f);
+    Assert(result[1000] == 0f && result[1005] > result[1001] && result[1010] > 0f);
+});
 var ranges = new List<SilenceRange> { new() { Start = TimeSpan.FromSeconds(1), End = TimeSpan.FromSeconds(2) }, new() { Start = TimeSpan.FromSeconds(3), End = TimeSpan.FromSeconds(4) } };
 Check("Next excludes exactly 200 ms", () => Assert(SilenceDetector.FindNext(ranges, TimeSpan.FromMilliseconds(1300)) == TimeSpan.FromMilliseconds(3500)));
 Check("Next outside tolerance", () => Assert(SilenceDetector.FindNext(ranges, TimeSpan.FromMilliseconds(1299)) == TimeSpan.FromMilliseconds(1500)));
