@@ -196,7 +196,7 @@ public partial class MainWindow : Window
         trimming = true;
         trimCancellation = new CancellationTokenSource();
         UpdateControls();
-        ShowNotification("正在分析并压缩长静音：" + Path.GetFileName(source), false, TimeSpan.Zero);
+        ShowNotification("正在分析并压缩长静音：" + Path.GetFileName(source), false, TimeSpan.Zero, informational: true);
         Task<SilenceTrimResult> work = SilenceTrimmer.TrimAsync(source, settings, trimCancellation.Token);
         trimTask = work;
         try
@@ -218,11 +218,11 @@ public partial class MainWindow : Window
                 ? "未发现超过允许时长的静音区间，已复制原文件。"
                 : $"已压缩 {result.TrimmedRangeCount} 段静音，累计删除 {result.RemovedDuration.TotalSeconds:F3} 秒。";
             ShowNotification($"裁剪完成：{result.OutputPath}\n原时长 {AudioTrack.FormatTime(result.OriginalDuration)}，" +
-                $"新时长 {AudioTrack.FormatTime(result.OutputDuration)}。{message}", false, TimeSpan.FromSeconds(15));
+                $"新时长 {AudioTrack.FormatTime(result.OutputDuration)}。{message}", false, TimeSpan.FromSeconds(15), informational: true);
         }
         catch (OperationCanceledException)
         {
-            if (!closing) ShowNotification("长静音裁剪已取消。", false);
+            if (!closing) ShowNotification("长静音裁剪已取消。", false, informational: true);
         }
         catch (Exception ex)
         {
@@ -412,11 +412,11 @@ public partial class MainWindow : Window
         PlaylistBorder.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 8, 8);
     }
 
-    internal void ShowNotification(string message, bool isError, TimeSpan? duration = null)
+    internal void ShowNotification(string message, bool isError, TimeSpan? duration = null, bool informational = false)
     {
         if (closing) return;
         notificationTimer.Stop();
-        NotificationText.Text = (isError ? "错误：" : "警告：") + message;
+        NotificationText.Text = (isError ? "错误：" : informational ? "提示：" : "警告：") + message;
         NotificationBar.Background = new SolidColorBrush(isError ? Color.FromRgb(253, 232, 232) : Color.FromRgb(255, 244, 214));
         NotificationText.Foreground = new SolidColorBrush(isError ? Color.FromRgb(153, 27, 27) : Color.FromRgb(146, 64, 14));
         NotificationBar.Visibility = Visibility.Visible;

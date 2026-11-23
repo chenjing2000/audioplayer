@@ -59,6 +59,9 @@ internal static class UiChecks
                     var notification = (Border)window.FindName("NotificationBar");
                     var notificationText = (TextBlock)window.FindName("NotificationText");
                     Assert(notification.Visibility == Visibility.Collapsed, "Notification normally collapsed");
+                    window.ShowNotification("测试信息", false, TimeSpan.Zero, informational: true);
+                    Assert(notification.Visibility == Visibility.Visible && notificationText.Text == "提示：测试信息",
+                        "Informational notice has its own prefix");
                     window.ShowNotification("测试警告", false);
                     Assert(notification.Visibility == Visibility.Visible && notificationText.Text == "警告：测试警告", "Warning appears inline");
                     await Task.Delay(2000);
