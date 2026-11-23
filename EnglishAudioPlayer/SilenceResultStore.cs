@@ -67,6 +67,15 @@ internal static class SilenceResultStore
     public static bool IsUnchanged(string audioPath, AudioFingerprint expected, CancellationToken cancellation = default)
         => Capture(audioPath, cancellation) == expected;
 
+    // Decoder sample counts may round one PCM sample past the container's reported duration.
+    // Clamp only this sub-sample boundary difference; larger overflows remain invalid.
+    private static long NormalizeEndTicks(long endTicks, AudioFingerprint fingerprint)
+    {
+        long extra = endTicks - fingerprint.DurationTicks;
+        long oneSampleTicks = (TimeSpan.TicksPerSecond + fingerprint.SampleRate - 1L) / fingerprint.SampleRate;
+        return extra > 0 && extra <= oneSampleTicks ? fingerprint.DurationTicks : endTicks;
+    }
+
     public static IReadOnlyList<SilenceRange>? TryLoad(string audioPath, SilenceSettings settings,
         CancellationToken cancellation = default)
     {
@@ -103,15 +112,17 @@ internal static class SilenceResultStore
         long previous = 0;
         foreach (StoredRange item in stored.Ranges)
         {
-            if (item is null || item.StartTicks < previous || item.StartTicks < 0
-                || item.EndTicks <= item.StartTicks || item.EndTicks > fingerprint.DurationTicks)
+            if (item is null) return null;
+            long endTicks = NormalizeEndTicks(item.EndTicks, fingerprint);
+            if (item.StartTicks < previous || item.StartTicks < 0
+                || endTicks <= item.StartTicks || endTicks > fingerprint.DurationTicks)
                 return null;
             result.Add(new SilenceRange
             {
                 Start = TimeSpan.FromTicks(item.StartTicks),
-                End = TimeSpan.FromTicks(item.EndTicks)
+                End = TimeSpan.FromTicks(endTicks)
             });
-            previous = item.EndTicks;
+            previous = endTicks;
         }
         cancellation.ThrowIfCancellationRequested();
         if (!IsUnchanged(audioPath, fingerprint, cancellation)) return null;
@@ -157,7 +168,8 @@ internal static class SilenceResultStore
                 FrameMilliseconds = settings.FrameMilliseconds,
                 MinimumSilenceMilliseconds = settings.MinimumSilenceMilliseconds,
                 SilenceThresholdDb = settings.SilenceThresholdDb,
-                Ranges = ranges.Select(r => new StoredRange(r.Start.Ticks, r.End.Ticks)).ToList()
+                Ranges = ranges.Select(r => new StoredRange(r.Start.Ticks,
+                    NormalizeEndTicks(r.End.Ticks, fingerprint))).ToList()
             };
             File.WriteAllText(temporary, JsonSerializer.Serialize(result, JsonOptions));
             cancellation.ThrowIfCancellationRequested();
