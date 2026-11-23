@@ -195,13 +195,13 @@ public partial class SilenceSettingsWindow : Window
     private bool IsFieldValid(TextBox box)
     {
         if (ReferenceEquals(box, FrameMillisecondsTextBox))
-            return int.TryParse(box.Text, out int value) && value is >= 1 and <= 100;
+            return int.TryParse(box.Text, out int frameValue) && frameValue is >= 1 and <= 100;
         if (ReferenceEquals(box, MinimumSilenceTextBox))
-            return int.TryParse(box.Text, out int value) && value is >= 50 and <= 5000;
+            return int.TryParse(box.Text, out int minimumValue) && minimumValue is >= 50 and <= 5000;
         if (ReferenceEquals(box, SilenceThresholdTextBox))
-            return int.TryParse(box.Text, out int value) && value is >= -100 and <= 0;
+            return int.TryParse(box.Text, out int thresholdValue) && thresholdValue is >= -100 and <= 0;
         if (ReferenceEquals(box, NavigationToleranceTextBox))
-            return int.TryParse(box.Text, out int value) && value is >= 1 and <= 5000;
+            return int.TryParse(box.Text, out int toleranceValue) && toleranceValue is >= 1 and <= 5000;
         string input = box.Text.Trim();
         return IsCompleteSilenceSeconds(input)
             && decimal.TryParse(input, NumberStyles.AllowDecimalPoint,
