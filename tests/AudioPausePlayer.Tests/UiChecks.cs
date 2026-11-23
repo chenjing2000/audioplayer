@@ -210,10 +210,10 @@ internal static class UiChecks
                     var sliderTrack = FindVisual<System.Windows.Controls.Primitives.Track>(slider);
                     double buttonCenterY = playButton.TranslatePoint(new Point(0, playButton.ActualHeight / 2), window).Y;
                     double sliderCenterY = slider.TranslatePoint(new Point(0, slider.ActualHeight / 2), window).Y;
-                    Assert(slider.RenderTransform is TranslateTransform { Y: 5 },
-                        "Progress slider has a 5-DIP downward visual offset");
-                    Assert(Math.Abs(sliderCenterY - buttonCenterY - 5) < 1.5,
-                        "Progress slider center is 5 DIP below the button centers");
+                    Assert(slider.RenderTransform is TranslateTransform { Y: 7 },
+                        "Progress slider has a 7-DIP downward visual offset");
+                    Assert(Math.Abs(sliderCenterY - buttonCenterY - 7) < 1.5,
+                        "Progress slider center is 7 DIP below the button centers");
                     Assert(sliderTrack is not null, "Progress slider exposes a visible WPF track");
                     Assert(settingsButton.ToolTip?.ToString() == "设置", "Settings gear has the updated name");
                     Assert(settingsButton.HorizontalAlignment == HorizontalAlignment.Center && settingsButton.VerticalAlignment == VerticalAlignment.Center, "Settings button is centered in the top row");
