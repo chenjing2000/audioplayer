@@ -113,7 +113,7 @@ internal static class FfmpegM4aTrimmer
             catch (Exception ex) when (ex is InvalidOperationException or Win32Exception) { }
         });
         Task stdout = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null);
-        Task<string> stderr = process.StandardError.ReadToEndAsync();
+        Task stderr = process.StandardError.BaseStream.CopyToAsync(Stream.Null);
         process.WaitForExit();
         Task.WhenAll(stdout, stderr).GetAwaiter().GetResult();
         token.ThrowIfCancellationRequested();

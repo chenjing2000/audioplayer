@@ -443,6 +443,24 @@ try
         Assert(string.Join(",", tracks.Select(t => Path.GetFileName(t.FilePath))) == "01.mp3,2.MP3,3.mp3,10.mp3");
     });
 
+    Check("Folder scans ignore only in-progress trim audio", () =>
+    {
+        string id = Guid.NewGuid().ToString("N");
+        foreach (string extension in new[] { ".wav", ".mp3", ".m4a" })
+            File.WriteAllText(Path.Combine(fixture, ".lesson.new." + id + extension), "unfinished");
+        string ordinary = "lesson.new." + id + ".wav";
+        string unusual = ".lesson.new.not-a-guid.wav";
+        File.WriteAllText(Path.Combine(fixture, ordinary), "ordinary audio name");
+        File.WriteAllText(Path.Combine(fixture, unusual), "dot-prefixed audio name");
+
+        var names = AudioLibrary.LoadFolder(fixture)
+            .Select(track => Path.GetFileName(track.FilePath)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert(!names.Contains(".lesson.new." + id + ".wav")
+            && !names.Contains(".lesson.new." + id + ".mp3")
+            && !names.Contains(".lesson.new." + id + ".m4a")
+            && names.Contains(ordinary) && names.Contains(unusual));
+    });
+
     Check("Broken file retained with error and unknown duration", () =>
     {
         var track = AudioLibrary.LoadFolder(fixture).Single(t => Path.GetFileName(t.FilePath) == "3.mp3");

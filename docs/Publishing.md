@@ -36,9 +36,9 @@ The [M4A FFmpeg stream-copy feature](specs/FFmpeg-M4A-Stream-Copy.md) copies **o
 
 FFmpeg GPL Shared executables/DLLs are **not bundled**, and ordinary publish/CI must not require downloading them. The user installs the optional dependency relative to the EXE at `runtimes/ffmpeg/win-x64/bin/`. This optional dependency was integrated in PR #8 and the publish workflow passed feature-branch Windows checks.
 
-MSBuild copies `FFmpeg-Setup.txt` to development output; `Publish.ps1` copies it to `dist/`. The EXE remains framework-dependent and single-file; FFmpeg binaries are not bundled. Windows feature-branch acceptance verified the setup TXT and prior publish safeguards. The GitHub Release workflow currently uploads the EXE asset; distributing the TXT to Release users is a separate packaging consideration, not an assertion that a TXT asset is attached to existing releases.
+MSBuild copies `FFmpeg-Setup.txt` to development output; `Publish.ps1` copies it to `dist/`. The EXE remains framework-dependent and single-file; FFmpeg binaries are not bundled. Windows feature-branch acceptance verified the setup TXT and prior publish safeguards. The GitHub Release workflow now attaches both `AudioPlayer.exe` and `FFmpeg-Setup.txt` as separate assets. Release users should download both into the same directory; no FFmpeg binary is bundled. Existing older tags are not retroactively updated.
 
 
 ## Rename to AudioPlayer (PR #10)
 
-The current development branch publishes `dist/AudioPlayer.exe` from `AudioPlayer/AudioPlayer.csproj`. Older `旧版 EXE` files in `dist/` are not automatically removed or migrated. After acceptance, close any old instance, optionally copy the previous settings JSON to `AudioPlayer.settings.json` if the new file is absent, and manually remove the obsolete executable if desired. The release workflow publishes the single built EXE from a clean checkout.
+The merged `main` publishes `dist/AudioPlayer.exe` from `AudioPlayer/AudioPlayer.csproj`. Older EXE files in `dist/` are not automatically removed or migrated. After acceptance, close any old instance, optionally copy previous settings to `AudioPlayer.settings.json` if the new file is absent, and manually remove obsolete executables if desired. The release workflow builds the EXE from a clean checkout.

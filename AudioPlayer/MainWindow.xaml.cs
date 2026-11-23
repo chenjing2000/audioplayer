@@ -231,7 +231,7 @@ public partial class MainWindow : Window
             if (toast is not null)
             {
                 if (!result.Saved)
-                    ToastMessages.CompleteTask(toast, "检测完成，但无法保存 silence.json；本次仍可导航，裁剪不可用。", ToastLevel.Warning);
+                    ToastMessages.CompleteTask(toast, "检测完成，但无法保存静音检测结果；本次仍可导航，裁剪不可用。", ToastLevel.Warning);
                 else
                 {
                     var cuts = SilenceTrimmer.PlanCuts(result.Ranges, result.Fingerprint.SampleRate,
