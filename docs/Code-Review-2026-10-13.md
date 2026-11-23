@@ -70,7 +70,7 @@
 | --- | --- |
 | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/Test.ps1 -Suite Core`（修改前、修改后） | 两次均为 35 项核心检查通过、0 失败；5 项发布保护用例通过；统一入口 3 项通过 |
 | `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/Test-Workflow.ps1` | 成功摘要、失败退出和缺少可选媒体的显式跳过共 3 项通过 |
-| `dotnet build EnglishAudioPlayer/AudioPausePlayer.csproj -c Release --no-restore --nologo` | 0 警告、0 错误 |
+| `dotnet build AudioPlayer/AudioPlayer.csproj -c Release --no-restore --nologo` | 0 警告、0 错误 |
 | 统一入口的全部 `.ps1` ASCII 与 PowerShell 语法检查 | 通过 |
 | `git diff --check` | 通过 |
 

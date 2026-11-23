@@ -6,7 +6,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using AudioPausePlayer;
+using AudioPlayer;
+using PlayerEngine = global::AudioPlayer.AudioPlayer;
 using NAudio.Wave;
 
 internal static class UiChecks
@@ -20,7 +21,7 @@ internal static class UiChecks
         var thread = new Thread(() =>
         {
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-            var appXml = System.Xml.Linq.XDocument.Load(Path.GetFullPath("EnglishAudioPlayer/App.xaml"));
+            var appXml = System.Xml.Linq.XDocument.Load(Path.GetFullPath("AudioPlayer/App.xaml"));
             var dictionary = appXml.Root!.Elements().Single().Elements().Single();
             dictionary.SetAttributeValue(System.Xml.Linq.XNamespace.Xmlns + "x", "http://schemas.microsoft.com/winfx/2006/xaml");
             string resourceXml = dictionary.ToString();
@@ -122,7 +123,7 @@ internal static class UiChecks
                         Assert(list.Items.Count == 2 &&
                             list.Items.OfType<AudioTrack>().Select(track => Path.GetFileName(track.FilePath))
                                 .SequenceEqual(new[] { "added.wav", "renamed.wav" }) &&
-                            list.SelectedItem is null && !Field<AudioPlayer>(window, "player")!.IsLoaded,
+                            list.SelectedItem is null && !Field<PlayerEngine>(window, "player")!.IsLoaded,
                             "Refresh reloads added and renamed files, clears selection and closes playback");
                         Assert(refreshButton.IsEnabled, "Refresh button re-enables after folder load");
                         File.Delete(added);
@@ -406,7 +407,7 @@ internal static class UiChecks
                     MethodInfo playTrack = typeof(MainWindow).GetMethod("PlayTrackAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
                     await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
                     if (Field<Task>(window, "analysisTask") is Task recoveryAnalysis) await recoveryAnalysis;
-                    await Field<AudioPlayer>(window, "player")!.StopAsync();
+                    await Field<PlayerEngine>(window, "player")!.StopAsync();
                     string brokenPath = Path.Combine(audioFolder, "broken.wav");
                     File.WriteAllText(brokenPath, "not an audio file");
                     bool failedOpen = false;
@@ -414,9 +415,9 @@ internal static class UiChecks
                     catch (Exception) { failedOpen = true; }
                     Assert(failedOpen, "Broken replacement track is rejected");
                     await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
-                    Assert(Field<AudioPlayer>(window, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
+                    Assert(Field<PlayerEngine>(window, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
                     if (Field<Task>(window, "analysisTask") is Task recoveredAnalysis) await recoveredAnalysis;
-                    await Field<AudioPlayer>(window, "player")!.CloseAsync();
+                    await Field<PlayerEngine>(window, "player")!.CloseAsync();
                     if (Directory.GetFiles(audioFolder, "*.mp3").Length == 0)
                     {
                         Console.WriteLine("SKIP audio-dependent UI checks: no local MP3 available.");
@@ -434,7 +435,7 @@ internal static class UiChecks
                     await window.HandleShortcutAsync(Key.Space);
                     Task? analysis = Field<Task>(window, "analysisTask");
                     if (analysis is not null) await analysis;
-                    var player = Field<AudioPlayer>(window, "player")!;
+                    var player = Field<PlayerEngine>(window, "player")!;
                     Assert(player.PlaybackState == PlaybackState.Playing, "Space opens selected track and plays");
                     playButton.Focus();
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
@@ -579,7 +580,7 @@ internal static class UiChecks
                     window.Closed += (_, _) => closed.TrySetResult();
                     window.Close();
                     await closed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-                    Assert(!Field<AudioPlayer>(window, "player")!.IsLoaded, "Close during analysis releases player");
+                    Assert(!Field<PlayerEngine>(window, "player")!.IsLoaded, "Close during analysis releases player");
                     using (var file = new FileStream(Directory.GetFiles(audioFolder, "*.mp3")[0], FileMode.Open, FileAccess.Read, FileShare.None))
                         Assert(file.Length > 0, "Close during analysis releases analysis reader");
                 }

@@ -2,7 +2,7 @@ using NAudio.Wave;
 using System.IO;
 using System.Text.Json;
 
-namespace AudioPausePlayer;
+namespace AudioPlayer;
 
 internal sealed record AudioFingerprint(
     string FileName, long SizeBytes, DateTime LastWriteTimeUtc,

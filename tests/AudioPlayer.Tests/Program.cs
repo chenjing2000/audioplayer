@@ -1,4 +1,5 @@
-using AudioPausePlayer;
+using AudioPlayer;
+using PlayerEngine = global::AudioPlayer.AudioPlayer;
 using NAudio.Wave;
 using System.IO;
 
@@ -577,7 +578,7 @@ if (!string.IsNullOrWhiteSpace(realTrimInput))
 
 try
 {
-    using var player = new AudioPlayer();
+    using var player = new PlayerEngine();
     await player.StopAsync(); await player.SeekAsync(TimeSpan.Zero); await player.PlayAsync(); player.Pause();
     Assert(!player.IsLoaded && player.PlaybackState == PlaybackState.Stopped);
     Console.WriteLine("PASS Unloaded playback actions"); passed++;
@@ -601,7 +602,7 @@ if (args.Contains("--playback"))
             File.Copy(sampleMp3, path);
             File.Copy(sampleMp3, secondPath);
 
-            using var player = new AudioPlayer();
+            using var player = new PlayerEngine();
             await player.OpenAsync(path);
             Assert(player.IsLoaded && player.GetDuration() > TimeSpan.Zero);
 

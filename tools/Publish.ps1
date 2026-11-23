@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
-$projectPath = 'EnglishAudioPlayer\AudioPausePlayer.csproj'
-$exeName = 'EnglishAudioPlayer.exe'
+$projectPath = 'AudioPlayer\AudioPlayer.csproj'
+$exeName = 'AudioPlayer.exe'
 $workspace = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $publishDirectory = Join-Path $workspace 'dist'
 $stagingDirectory = Join-Path $publishDirectory ('.publish-' + [Guid]::NewGuid().ToString('N'))

@@ -1,7 +1,7 @@
 using NAudio.Wave;
 using System.IO;
 
-namespace AudioPausePlayer;
+namespace AudioPlayer;
 
 public sealed record SilenceTrimResult(
     string OutputPath,

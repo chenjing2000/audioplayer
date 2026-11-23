@@ -1,5 +1,5 @@
 using System.Windows;
 
-namespace AudioPausePlayer;
+namespace AudioPlayer;
 
 public partial class App : Application { }

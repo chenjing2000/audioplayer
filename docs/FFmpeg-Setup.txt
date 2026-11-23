@@ -13,12 +13,12 @@ Installation:
   2. Open the extracted package's bin folder.
   3. Copy ffmpeg.exe, ffprobe.exe and ALL DLL files from bin into the folder:
        runtimes\ffmpeg\win-x64\bin\
-     This folder is relative to EnglishAudioPlayer.exe. Create missing
+     This folder is relative to AudioPlayer.exe. Create missing
      directories if necessary.
   4. Return to AudioPlayer and click M4A trim again. No restart is needed.
 
 Expected layout:
-  EnglishAudioPlayer.exe
+  AudioPlayer.exe
   FFmpeg-Setup.txt
   runtimes\ffmpeg\win-x64\bin\ffmpeg.exe
   runtimes\ffmpeg\win-x64\bin\ffprobe.exe
@@ -31,7 +31,7 @@ ffplay.exe, the include folder, and developer .lib files are not required.
 Do not copy ffmpeg.exe without its DLLs: this is a shared-library build.
 Keep all files from the same downloaded build together.
 
-To verify in PowerShell, from the folder containing EnglishAudioPlayer.exe:
+To verify in PowerShell, from the folder containing AudioPlayer.exe:
   & ".\runtimes\ffmpeg\win-x64\bin\ffmpeg.exe" -version
 
 The URL above points to a moving 'latest' build; the version can change.

@@ -39,7 +39,7 @@ try {
     Invoke-TestCheck 'Publishing safeguards' {
         Invoke-TestCommand 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'tools/Test-Publish.ps1')
     }
-    $arguments = @('run', '--project', 'tests/AudioPausePlayer.Tests', '-c', 'Release')
+    $arguments = @('run', '--project', 'tests/AudioPlayer.Tests', '-c', 'Release')
     if ($Suite -ne 'Core') { $arguments += @('--', '--ui') }
     if ($Suite -eq 'Full') {
         if ($AudioDirectory) { $arguments += '--playback' }

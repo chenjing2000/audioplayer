@@ -1,10 +1,10 @@
-# EnglishAudioPlayer 项目契约卡
+# AudioPlayer 项目契约卡
 
 参考：[WindowsAppPlaybook](https://github.com/chenjing2000/windowsappplaybook)。
 
 - **用途**：Windows 英语学习音频播放器，提供基于 RMS 的静音导航与长静音压缩。
 - **技术**：C#、WPF、.NET 10、NAudio 2.2.1、TagLibSharp 2.3.0；AAC/M4A 裁剪可选使用用户安装的 FFmpeg stream copy。
-- **工程入口**：`EnglishAudioPlayer/AudioPausePlayer.csproj`；测试：`tests/AudioPausePlayer.Tests/`；发布：`tools/Publish.ps1`，正式产物 `dist/EnglishAudioPlayer.exe`。
+- **工程入口**：`AudioPlayer/AudioPlayer.csproj`；测试：`tests/AudioPlayer.Tests/`；发布：`tools/Publish.ps1`，正式产物 `dist/AudioPlayer.exe`。
 - **运行时**：Windows x64，要求 .NET 10 Desktop Runtime；现有 framework-dependent single-file 形态保留。
 - **配置**：`<实际EXE名>.settings.json` 位于 EXE 同目录，作为原有应用约定保留（区别于 Playbook 的默认 `userdata` 路径）；保存失败不覆盖旧配置。
 - **音频素材**：由用户选择的外部文件夹拥有，源音频只读；长静音处理的新文件放在源文件同目录 `<stem>.new.<ext>`，如果目标文件已存在则自动避让；按 ` (1)`、` (2)` 等递增命名并始终禁止覆盖。

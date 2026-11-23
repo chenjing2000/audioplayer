@@ -1,4 +1,4 @@
-# English Audio Player 程序说明
+# AudioPlayer 程序说明
 
 > 本文包含播放器当前功能和部分历史验证记录；[results/Toast 重构规格](specs/Results-Cache-Toast-Refactor.md) 已通过 Windows 验收并经 PR #2 合并到 `main`。历史测试数据不代表当前版本的新验证结果，详见 [Testing](Testing.md)。
 
@@ -51,7 +51,7 @@
 
 ## 5. 用户配置
 
-配置文件位于 exe 同一文件夹，名称为 `<主程序名>.settings.json`，默认是 `EnglishAudioPlayer.settings.json`。程序重命名后使用对应名称的配置文件。首次启动若文件不存在，自动写入五项停顿/裁剪参数的默认值；以后启动读取并校验，设置窗口点击“确定”后先保存再应用。取消不保存。
+配置文件位于 exe 同一文件夹，名称为 `<主程序名>.settings.json`，默认是 `AudioPlayer.settings.json`。程序重命名后使用对应名称的配置文件。首次启动若文件不存在，自动写入五项停顿/裁剪参数的默认值；以后启动读取并校验，设置窗口点击“确定”后先保存再应用。取消不保存。
 
 保存采用同目录临时文件和文件替换。读取失败时保留原配置、暂用默认参数并通过错误 Toast 提示；此时不允许修改设置，修复文件或目录权限后重新启动。保存失败时保留原参数并通过错误 Toast 提示。配置不会转存到 AppData；程序应放在当前用户可写的文件夹。
 
@@ -65,11 +65,11 @@
 .\tools\Publish.ps1
 ```
 
-发布配置位于 `EnglishAudioPlayer/Properties/PublishProfiles/Portable.pubxml`：Release、Windows x64、framework-dependent、单文件、不包含 .NET 运行时、不裁剪代码、不输出独立调试符号。默认输出目录为当前项目的 `dist/`。
+发布配置位于 `AudioPlayer/Properties/PublishProfiles/Portable.pubxml`：Release、Windows x64、framework-dependent、单文件、不包含 .NET 运行时、不裁剪代码、不输出独立调试符号。默认输出目录为当前项目的 `dist/`。
 
 正式发布统一使用上面的脚本，先验证单文件产物再替换 EXE。详细流程见 [统一发布](Publishing.md)。
 
-分发 `dist/EnglishAudioPlayer.exe` 即可。目标电脑必须安装 **.NET 10 Desktop Runtime x64**（普通 .NET Runtime 不足以运行 WPF）；缺少运行时时由 .NET 启动器显示安装提示，这发生在程序启动之前。官方安装入口：https://dotnet.microsoft.com/download/dotnet/10.0 。
+分发 `dist/AudioPlayer.exe` 即可。目标电脑必须安装 **.NET 10 Desktop Runtime x64**（普通 .NET Runtime 不足以运行 WPF）；缺少运行时时由 .NET 启动器显示安装提示，这发生在程序启动之前。官方安装入口：https://dotnet.microsoft.com/download/dotnet/10.0 。
 
 配置文件在首次运行时自动创建，不包含在 exe 内；更新发布时保留用户已有的 `.settings.json`。如之前在 `dist/` 使用过多文件发布，只移除旧版本的程序依赖文件，不要删除用户配置或整个目录。验证发布结果时应看到单个 exe，以及可能已有的配置文件。
 
@@ -90,8 +90,8 @@
 在项目根目录执行：
 
 ```powershell
-dotnet build EnglishAudioPlayer/AudioPausePlayer.csproj -c Release
-dotnet run --project tests/AudioPausePlayer.Tests -c Release -- --ui --playback --report
+dotnet build AudioPlayer/AudioPlayer.csproj -c Release
+dotnet run --project tests/AudioPlayer.Tests -c Release -- --ui --playback --report
 .\tools\Publish.ps1
 ```
 

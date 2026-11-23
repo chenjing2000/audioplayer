@@ -12,7 +12,7 @@
 ## 最小实现分层
 
 1. **检测层**：继续复用 `SilenceDetector.cs` 和 `SilenceRange.cs`，仅按需增加取消支持；不混入输出编码逻辑。
-2. **核心裁剪层**：在 `EnglishAudioPlayer/SilenceTrimmer.cs` 计算采样帧级删除区间、逐块流式读取与跳过、10ms 淡化、按扩展名编码、验证及临时文件安全提交。与播放输出设备和 UI 脱耦。
+2. **核心裁剪层**：在 `AudioPlayer/SilenceTrimmer.cs` 计算采样帧级删除区间、逐块流式读取与跳过、10ms 淡化、按扩展名编码、验证及临时文件安全提交。与播放输出设备和 UI 脱耦。
 3. **配置层**：在 `SilenceSettings.cs` 添加 decimal 属性并校验其与最短停顿时长的关系；`SettingsStore.cs` 对缺失字段的旧 JSON 做安全默认处理；设置窗口 XAML/后台增加文本输入与联动验证。
 4. **列表/UI 层**：`AudioLibrary.cs` 扩展文件类型；`MainWindow.xaml` 新增剪刀按钮与提示视觉；`MainWindow.xaml.cs` 管理裁剪任务、提示、完成后列表更新以及关闭安全释放；`ui/Icons.xaml` 新增剪刀图标。原有音频播放控制独立不变。
 5. **规范接入**：简明 `AGENTS.md` 和 `docs/project-contract.md` 明确当前项目真实位置、依赖、测试入口和已有配置路径例外；更新文档索引与配置、测试说明，避免新增重复规格。

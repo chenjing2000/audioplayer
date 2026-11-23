@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace AudioPausePlayer;
+namespace AudioPlayer;
 
 internal sealed class SettingsStore
 {
@@ -19,7 +19,7 @@ internal sealed class SettingsStore
     {
         string? executablePath = Environment.ProcessPath;
         if (executablePath is null || Path.GetFileNameWithoutExtension(executablePath).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
-            return Path.Combine(AppContext.BaseDirectory, "EnglishAudioPlayer.exe");
+            return Path.Combine(AppContext.BaseDirectory, "AudioPlayer.exe");
         return executablePath;
     }
 

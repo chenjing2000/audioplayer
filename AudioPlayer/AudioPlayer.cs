@@ -1,6 +1,6 @@
 using NAudio.Wave;
 
-namespace AudioPausePlayer;
+namespace AudioPlayer;
 
 public sealed class AudioPlayer : IDisposable
 {
