@@ -43,7 +43,7 @@
 - Project and test directories/files are now `AudioPlayer/AudioPlayer.csproj` and `tests/AudioPlayer.Tests/AudioPlayer.Tests.csproj`. C# namespaces, XAML `x:Class` declarations, resource pack URIs and friend-assembly references are unified under `AudioPlayer` / `AudioPlayer.Tests`; the playback implementation class is `AudioPlayer.PlaybackEngine` (renamed from the class that conflicted with the new namespace in WPF-generated markup).
 - The window, assembly and portable executable are named `AudioPlayer` / `AudioPlayer.exe`. Default settings are stored in `AudioPlayer.settings.json`; renamed executables still use their own name. Old settings are **not auto-migrated**: if desired, manually copy settings after closing the old program and before first launch, without overwriting existing new settings.
 - The publishing script produces `dist/AudioPlayer.exe` and leaves any old `旧版 EXE` or settings files untouched; delete the obsolete EXE manually only after acceptance. No automatic deletion or compatibility logic.
-- Validate Core, UI, publishing safeguards, published EXE, optional FFmpeg and real-device playback on the renamed build. Historical acceptance counts refer to their original branches.
+- Renamed-build Windows CI [#45178109384](https://github.com/chenjing2000/audioplayer/actions/runs/45178109384) **passed**: 47 Core, 125 UI, 5 publishing safeguards, and 4 published-EXE checks. Audio-device playback was skipped on the CI runner; real-device playback, taskbar appearance, configuration preservation and optional FFmpeg M4A acceptance remain pending. Historical test counts refer to their original branches.
 
 ## Next development session
 
