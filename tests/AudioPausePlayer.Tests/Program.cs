@@ -258,6 +258,10 @@ Check("Trim WAV output is separately saved, validated, and never overwritten", (
         Assert(third.OutputPath == Path.Combine(folder, "sample.lesssilence (2).wav"));
         Assert(second.OutputSilenceSaved && third.OutputSilenceSaved && Directory.GetFiles(folder).Length == 4,
             "Numbered files coexist with independent results");
+        File.Delete(second.OutputPath);
+        var reusedSlot = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
+        Assert(reusedSlot.OutputPath == second.OutputPath && reusedSlot.OutputSilenceSaved,
+            "Smallest available numbered slot is used without preserving stale coordinates");
     }
     finally { Directory.Delete(folder, true); }
 });
