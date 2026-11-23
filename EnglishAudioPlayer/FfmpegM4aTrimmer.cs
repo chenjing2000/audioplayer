@@ -21,7 +21,7 @@ internal static class FfmpegM4aTrimmer
     {
         if (sampleRate <= 0 || !double.IsFinite(durationSeconds) || durationSeconds <= 0)
             throw new InvalidDataException("音频时长或采样率无效。");
-        if (source.IndexOfAny(['\r', '\n']) >= 0)
+        if (source.IndexOfAny(new[] { '\r', '\n' }) >= 0)
             throw new InvalidDataException("音频文件名包含不支持的换行字符。");
 
         string escaped = Path.GetFullPath(source).Replace('\\', '/').Replace("'", "'\\''");
@@ -52,7 +52,7 @@ internal static class FfmpegM4aTrimmer
         if (!File.Exists(executable)) throw new FfmpegUnavailableException();
 
         // Probe the executable lazily: broken shared-library deployments also fail here.
-        if (Run(executable, ["-hide_banner", "-version"], token, missingIsDependency: true) != 0)
+        if (Run(executable, ["-hide_banner", "-version"], token) != 0)
             throw new FfmpegUnavailableException();
 
         // ADTS supports AAC, not ALAC. Reject other M4A codecs instead of transcoding.
@@ -85,7 +85,7 @@ internal static class FfmpegM4aTrimmer
     }
 
     private static int Run(string executable, IReadOnlyList<string> arguments,
-        CancellationToken token, bool missingIsDependency = false)
+        CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         using var process = new Process();

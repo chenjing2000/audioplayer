@@ -45,7 +45,7 @@ public static class SilenceTrimmer
         TimeSpan removed = TimeSpan.FromSeconds((double)removedFrames / sampleRate);
         double expectedSeconds = Math.Max(0, duration.TotalSeconds - removed.TotalSeconds);
 
-        // The temporary extension is chosen for Media Foundation's container selection.
+        // Write the stream-copy result to an M4A temporary file; leave other formats unchanged.
         string temporaryExtension = type;
         string temporary = Path.Combine(directory,
             "." + stem + ".lesssilence." + Guid.NewGuid().ToString("N") + temporaryExtension);
