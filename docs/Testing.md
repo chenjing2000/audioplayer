@@ -134,3 +134,14 @@ This cleanup has **not** yet received a new Windows physical-device listening ch
 - This round changes only icon geometry and documentation. The prior real-M4A and playback listening evidence remains historical evidence; real MP3/WAV long-pause acceptance remains deferred.
 
 For the latest handoff and next development baseline, read [HANDOFF](HANDOFF.md).
+
+## Approved next feature: FFmpeg AAC/M4A stream-copy acceptance (pending)
+
+The [approved design](specs/FFmpeg-M4A-Stream-Copy.md) is **not yet implemented**, so none of the checks below is claimed as passed. Future branch acceptance must cover:
+
+- Launch, play, seek, detect, cache and MP3/WAV trim without FFmpeg; only M4A trimming checks the dependency. Missing EXE or its DLLs gives an **error Toast referring to `FFmpeg-Setup.txt`**, no MessageBox, fallback encoding, source alteration or committed output.
+- AAC/M4A trim from multiple silence intervals with BtbN Windows x64 GPL Shared: `-c:a copy` without AAC re-encoding or 10 ms fades; reject unsupported M4A codecs. Verify AAC codec, sample rate, channels, packet timestamps, complete decoding, realistic duration/accumulated drift and listening at joins. Do not assume concat `inpoint`/`outpoint` is sample-exact.
+- Real long recording with many cuts; Unicode/space/apostrophe file paths; source modification during trim; cancel/FFmpeg failure; existing destination collisions; temporary manifest/output cleanup and final output-cache behavior.
+- Local build and published portable EXE each contain **only the user-facing setup TXT `FFmpeg-Setup.txt`** as added deployment documentation, not a copied repository README or bundled FFmpeg. Check the published runtime can find the TXT irrespective of working directory and that normal CI requires no downloaded FFmpeg.
+
+Use a **pinned and recorded** FFmpeg build (version and package SHA-256) for actual Windows media testing; the downloadable `latest` URL is not a reproducible version. Existing historical Windows acceptance does not cover this forthcoming change.
