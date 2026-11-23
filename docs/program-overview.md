@@ -15,13 +15,13 @@
 - **MainWindow**：负责主界面、用户操作、播放列表显示以及各模块之间的协调；不直接解码音频或读写 JSON。
 - **AudioPlayer**：基于 NAudio 负责音频打开、播放、暂停、停止、Seek、播放位置及资源释放。
 - **SilenceDetector**：读取 PCM 音频数据，计算 RMS/dBFS，识别有效停顿，并查找前后停顿位置。
-- **SilenceResultStore**：校验和原子更新每个音频独有的 `results/<完整文件名>/silence.json`，仅在缓存无效时重扫，不计算 SHA。
+- **SilenceResultStore**：校验和原子更新每个音频独有的 `results/<完整文件名>.silent_segments.json`，仅在缓存无效时重扫，不计算 SHA。
 - **ToastHost**：主窗口和设置窗口共享的 WPF 非模态通知。
 - **SilenceRange**：保存一个停顿区间的开始、结束和中间位置。
 - **SilenceSettings**：保存停顿检测及跳转参数、默认值和有效范围。
 - **SettingsStore**：定位主程序同目录的配置文件，并负责初始化、读取、验证和保存用户配置。
 - **SilenceSettingsWindow**：提供停顿参数设置、恢复默认、确定和取消操作。
-- **AudioLibrary**：扫描指定文件夹中的 MP3、M4A 和 WAV，进行自然排序并读取标题、专辑和时长等信息。
+- **AudioLibrary**：扫描指定文件夹中的 MP3、M4A 和 WAV，进行自然排序并读取标题、专辑和时长等信息。刷新按钮直接重新调用现有文件夹加载方法，成功后关闭播放，不恢复进度。
 - **AudioTrack**：表示播放列表中的一条音频及其播放状态。
 主窗口允许手动缩放和系统最大化，最小尺寸为 `520 × 420`，没有应用层面的最大尺寸限制。初始宽度为屏幕工作区宽度的 50%，初始高度为工作区高度的 60%，受最小尺寸约束，居中显示。
 
@@ -138,9 +138,9 @@ dotnet run --project tests/AudioPausePlayer.Tests -c Release -- --ui --playback 
 
 ## 9. 长静音压缩与自动结果持久化
 
-播放音频后自动校验和复用 `silence.json`，缺失/无效时后台运行原有 RMS 检测。方向键只使用当前播放会话的内存区间；选中列表条目的有效结果用于判断裁剪按钮是否可用。`SilenceTrimmer` 在点击时重新验证源元数据及结果，直接调用原有 `PlanCuts` 帧级裁剪、10 ms 淡化和 WAV/MP3/M4A 系统编码，不对有效缓存重复扫描源 PCM。
+播放音频后自动校验和复用对应的 `<完整文件名>.silent_segments.json`，缺失/无效时后台运行原有 RMS 检测。方向键只使用当前播放会话的内存区间；选中列表条目的有效结果用于判断裁剪按钮是否可用。`SilenceTrimmer` 在点击时重新验证源元数据及结果：WAV/MP3 使用原有 PCM 裁剪与 10 ms 淡化；AAC/M4A 通过可选 FFmpeg `-c:a copy` 拼接，不重新编码。不对有效缓存重复扫描源 PCM。
 
-新输出按 `<stem>.lesssilence.<ext>`、` (1)`、` (2)` 自动避让同名文件，重新编码后为其实际音频重新检测并保存独立 `silence.json`。不产生无意义复制，不迁移旧 `cache/` 或旧 JSON、不做 SHA。详细要求见 [新规格](specs/Results-Cache-Toast-Refactor.md)，实测记录见 [Testing](Testing.md)。
+新输出按 `<stem>.new.<ext>`、` (1)`、` (2)` 自动避让同名文件，为其实际音频重新检测并保存独立结果到 `results/<完整文件名>.silent_segments.json`。不迁移、自动删除旧的嵌套 `silence.json` 或旧 `cache/`，不做 SHA。历史规则见 [PR #2 规格](specs/Results-Cache-Toast-Refactor.md)，验收状态见 [Testing](Testing.md)。
 
 ## 10. 当前图标与验收基线（2026-11-23）
 

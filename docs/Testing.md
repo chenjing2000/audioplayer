@@ -180,3 +180,12 @@ The user's separate `ffprobe.exe` inspection of the actual IELTS listening sourc
 Duration reduced by **1673.472646 seconds** (27 min 53.473 s) and file size by **20,472,205 bytes** (approximately **20.1%**). AAC-LC, 48-kHz and 2-channel parameters were unchanged; the increased *average* audio bitrate is compatible with removing highly compressible silence while retaining AAC packets. Stream copy is specified via `-c:a copy` in the code. The user's comparison with the old trimmed output found a nearly identical resulting duration; this alone does not prove packet-perfect timing.
 
 **Not yet verified by Windows real-media acceptance:** defective/missing shared DLLs beyond the absent-executable Toast, active-process cancellation, source changes during trimming, detailed timestamp checks at joins, or every pathological path spelling. The exact downloaded BtbN build and ZIP SHA-256 were not supplied, so its binary version is **not** recorded as pinned. The earlier long-pause MP3/WAV listening work remains deferred. Final feature-branch Windows PR CI [#45164533459](https://github.com/chenjing2000/audioplayer/actions/runs/45164533459) passed. This is not a claim of an additional post-merge `main` CI run.
+
+
+## 2026-11-23: toolbar refresh and result naming feature branch
+
+Branch: `feature/toolbar-refresh-and-output-naming` (not merged). The new refresh button reuses `LoadFolderAsync`; it scans before closing the player, and a failed scan preserves the existing list/playback. Right-side button gaps are reduced from 10 to 5. Progress Slider height matches the 36-unit buttons. The refresh symbol is native WPF geometry derived from the user's SVG with the existing teal/white palette.
+
+Trimming now generates `<stem>.new[ (N)].<ext>`, and the single result per audio lives at `results/<full filename>.silent_segments.json`. No legacy directory migration or deletion; original media and collision protections remain unchanged. Core test expectations and WPF UI assertions have been updated, including add/rename/delete/failed-refresh scenarios.
+
+**Verification status:** Windows feature-branch CI and subsequent local real-window acceptance must be recorded separately. The original 47/113/5/4 checks above belong to PR #8 only. The repository ICO has teal/white 16/32/48 pixel layers plus a 256 pixel image, but pinned-taskbar icon caching and exact progress-track visual alignment require Windows checks. Real long-pause MP3/WAV listening and the previously listed FFmpeg edge cases remain deferred.

@@ -1,5 +1,7 @@
 # AudioPlayer：统一通知与停顿结果持久化重构规格
 
+**历史规格说明：** 本文件记录 PR #2 时的路径和命名约定；在新功能分支 `feature/toolbar-refresh-and-output-naming` 中，后续规则改为 `<stem>.new[ (N)].<ext>` 与 `results/<完整音频文件名>.silent_segments.json`，旧缓存不兼容、不迁移也不删除。下面保留历史设计及验收记录。
+
 状态：**2026-11-23 已经 PR #2 合并到 `main`，Windows 实机 M4A、交互及听感验收通过；真实长停顿 MP3/WAV 测试按约定暂缓**。历史开发基线：`main@c7b92ce`；历史实现分支：`feature/results-cache-toast-refactor`（已合并、已清理）。
 
 本文件是本轮破坏性改造的权威规格；既有 [长静音压缩规格](Long-Silence-Trimming.md) 的 PCM 裁剪、淡化、格式/输出安全规则继续有效，但本文件对通知、结果存储、输出重名、参数精度与任务状态的规定优先。实施步骤见 [实施与验收方案](../guides/Results-Cache-Toast-Implementation.md)。
