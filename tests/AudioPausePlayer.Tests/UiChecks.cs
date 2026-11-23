@@ -206,6 +206,11 @@ internal static class UiChecks
                         "Invalid configuration is preserved and reported inline");
                     invalidWindow.Close();
                     settingsStore.Save(saved);
+                    if (WaveOut.DeviceCount == 0)
+                    {
+                        Console.WriteLine("SKIP UI audio-device playback checks: no waveOut device is available.");
+                        return;
+                    }
                     string recoveryPath = Path.Combine(audioFolder, "recovery.wav");
                     using (var writer = new WaveFileWriter(recoveryPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                         writer.WriteSamples(new float[44100], 0, 44100);
