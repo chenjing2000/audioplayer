@@ -144,7 +144,7 @@ The following [approved design](specs/FFmpeg-M4A-Stream-Copy.md) checklist was w
 - Real long recording with many cuts; Unicode/space/apostrophe file paths; source modification during trim; cancel/FFmpeg failure; existing destination collisions; temporary manifest/output cleanup and final output-cache behavior.
 - Local build and published portable EXE each contain **only the user-facing setup TXT `FFmpeg-Setup.txt`** as added deployment documentation, not a copied repository README or bundled FFmpeg. Check the published runtime can find the TXT irrespective of working directory and that normal CI requires no downloaded FFmpeg.
 
-Use a **pinned and recorded** FFmpeg build (version and package SHA-256) for actual Windows media testing; the downloadable `latest` URL is not a reproducible version. Existing historical Windows acceptance does not cover this forthcoming change.
+Use a **pinned and recorded** FFmpeg build (version and package SHA-256) for actual Windows media testing; the downloadable `latest` URL is not a reproducible version. Earlier historical Windows acceptance does not cover the then-forthcoming change; the later PR #8 evidence is recorded below.
 
 ## Original feature-branch implementation note (before Windows acceptance)
 
@@ -152,7 +152,7 @@ The initial implementation branch added deterministic concat manifest and option
 
 ## 2026-11-23: PR #8 Windows AAC/M4A stream-copy acceptance evidence
 
-**Core feature accepted by user on Windows; PR #8 remains unmerged.** The user ran the feature branch in Windows PowerShell 5.1 and reported these results:
+**Core feature accepted by user on Windows; PR #8 subsequently merged into `main@4b4afc6`.** The user ran the feature branch in Windows PowerShell 5.1 and reported these results:
 
 | Test | User-reported outcome |
 | --- | --- |
@@ -179,4 +179,4 @@ The user's separate `ffprobe.exe` inspection of the actual IELTS listening sourc
 
 Duration reduced by **1673.472646 seconds** (27 min 53.473 s) and file size by **20,472,205 bytes** (approximately **20.1%**). AAC-LC, 48-kHz and 2-channel parameters were unchanged; the increased *average* audio bitrate is compatible with removing highly compressible silence while retaining AAC packets. Stream copy is specified via `-c:a copy` in the code. The user's comparison with the old trimmed output found a nearly identical resulting duration; this alone does not prove packet-perfect timing.
 
-**Not yet verified by Windows real-media acceptance:** defective/missing shared DLLs beyond the absent-executable Toast, active-process cancellation, source changes during trimming, detailed timestamp checks at joins, or every pathological path spelling. The exact downloaded BtbN build and ZIP SHA-256 were not supplied, so its binary version is **not** recorded as pinned. The earlier long-pause MP3/WAV listening work remains deferred. Latest post-review CI must be checked separately.
+**Not yet verified by Windows real-media acceptance:** defective/missing shared DLLs beyond the absent-executable Toast, active-process cancellation, source changes during trimming, detailed timestamp checks at joins, or every pathological path spelling. The exact downloaded BtbN build and ZIP SHA-256 were not supplied, so its binary version is **not** recorded as pinned. The earlier long-pause MP3/WAV listening work remains deferred. Final feature-branch Windows PR CI [#45164533459](https://github.com/chenjing2000/audioplayer/actions/runs/45164533459) passed. This is not a claim of an additional post-merge `main` CI run.

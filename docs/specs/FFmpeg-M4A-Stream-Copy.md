@@ -1,6 +1,6 @@
-# M4A AAC stream-copy trimming — approved implementation specification
+# M4A AAC stream-copy trimming — implemented specification
 
-**Status: approved design, not implemented or validated.** Approved on 2026-11-23. This document describes a proposed change to M4A trimming only; the implementation on current `main` still uses NAudio/Media Foundation re-encoding. The historical [long-silence trimming specification](Long-Silence-Trimming.md) describes the previously accepted implementation; for the forthcoming M4A change, this document takes precedence.
+**Status: implemented and merged to `main` via [PR #8](https://github.com/chenjing2000/audioplayer/pull/8), squash commit `4b4afc6` (2026-11-23).** The historical [long-silence trimming specification](Long-Silence-Trimming.md) describes the earlier NAudio/Media Foundation implementation. This document supersedes it for AAC/M4A, while WAV/MP3 retain their existing behavior. Windows real-recording and core feature checks passed; certain failure-path cases are still unverified.
 
 ## Goal and unchanged behavior
 
@@ -39,12 +39,12 @@ Terminate the **specific** FFmpeg child process on cancellation; avoid leaving o
 4. Long AAC file with many cuts, Unicode/space/apostrophe paths, cancellation, source-change, collision and cleanup verification. Regression tests for MP3/WAV and existing cache, UI and publish checks.
 5. Build and publish must place `FFmpeg-Setup.txt` beside the *actual* development/published EXE; published-EXE tests check it. Do not require an FFmpeg download in ordinary CI or publishing.
 
-Code changes are permitted only on a feature branch; do not merge to `main` without explicit approval. This specification is not evidence that code, CI or real-media tests have passed.
+The original pre-merge checklist above is retained as a specification, not a claim that every edge-case test has passed. See the dated acceptance evidence below and in Testing for verified results and remaining gaps.
 
 ## Implementation tracking
 
-Development branch `feature/ffmpeg-m4a-stream-copy` is implementing this specification. No Windows CI result or real BtbN listening acceptance is asserted by this document update. Keep actual implementation status separate from approval.
+[PR #8](https://github.com/chenjing2000/audioplayer/pull/8) merged the stream-copy implementation into `main@4b4afc6`. The remote feature and earlier design branches have been cleaned up; only `main` remains. Feature-branch Windows CI and user-reported M4A listening/ffprobe acceptance passed. Do not confuse these with unperformed failure-path tests or a new post-merge CI run.
 
 ## Feature-branch verification (2026-11-23)
 
-The user verified Windows Core/UI/publish/published-EXE tests (47/113/5/4 passed). The real AAC-LC stereo 48-kHz recording changed from 7142.442667 s / 102033724 bytes to 5468.970021 s / 81561519 bytes, retaining its codec, profile, sample rate and channels. Playback and join listening were accepted by the user. See [Testing](../Testing.md#2026-11-23-pr-8-windows-aacm4a-stream-copy-acceptance-evidence). Exact BtbN binary hash, incomplete-DLL, active cancellation and source-change edge cases remain to be separately checked. PR #8 is not merged.
+The user verified Windows Core/UI/publish/published-EXE tests (47/113/5/4 passed). The real AAC-LC stereo 48-kHz recording changed from 7142.442667 s / 102033724 bytes to 5468.970021 s / 81561519 bytes, retaining its codec, profile, sample rate and channels. Playback and join listening were accepted by the user. See [Testing](../Testing.md#2026-11-23-pr-8-windows-aacm4a-stream-copy-acceptance-evidence). Exact BtbN binary hash, incomplete-DLL, active cancellation and source-change edge cases remain to be separately checked. PR #8 is merged.
