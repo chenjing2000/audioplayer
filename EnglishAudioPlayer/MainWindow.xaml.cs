@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private int selectionGeneration;
     private CancellationTokenSource? selectionCancellation;
     private Task? selectionTask;
+    private readonly List<Task> runningSelectionChecks = new();
     private readonly List<Task> runningAnalyses = new();
     private ToastHost.ToastMessage? analysisToast;
     private ToastHost.ToastMessage? trimToast;
@@ -199,16 +200,14 @@ public partial class MainWindow : Window
         try
         {
             // A hit must not generate an imaginary progress notification or run the PCM detector.
-            IReadOnlyList<SilenceRange>? cached = await Task.Run(
-                () => SilenceResultStore.TryLoad(track.FilePath, settings, cancellation.Token),
+            SilenceAnalysis? cached = await Task.Run(
+                () => SilenceResultStore.TryLoadVerified(track.FilePath, settings, cancellation.Token),
                 cancellation.Token);
             if (!IsCurrentAnalysis(track, generation, cancellation)) return;
             SilenceAnalysis result;
             if (cached is not null)
             {
-                result = new SilenceAnalysis(cached, true, true,
-                    await Task.Run(() => SilenceResultStore.Capture(track.FilePath, cancellation.Token),
-                        cancellation.Token));
+                result = cached;
             }
             else
             {
@@ -282,7 +281,10 @@ public partial class MainWindow : Window
         var cancellation = new CancellationTokenSource();
         selectionCancellation = cancellation;
         int generation = selectionGeneration;
-        selectionTask = CheckSelectedCacheAsync(track, SnapshotSettings(silenceSettings), generation, cancellation);
+        Task work = CheckSelectedCacheAsync(track, SnapshotSettings(silenceSettings), generation, cancellation);
+        selectionTask = work;
+        runningSelectionChecks.RemoveAll(task => task.IsCompleted);
+        runningSelectionChecks.Add(work);
     }
 
     private async Task CheckSelectedCacheAsync(AudioTrack track, SilenceSettings settings, int generation,
@@ -292,11 +294,10 @@ public partial class MainWindow : Window
         {
             bool available = await Task.Run(() =>
             {
-                IReadOnlyList<SilenceRange>? cached =
-                    SilenceResultStore.TryLoad(track.FilePath, settings, cancellation.Token);
-                if (cached is null) return false;
-                int sampleRate = SilenceResultStore.Capture(track.FilePath, cancellation.Token).SampleRate;
-                return SilenceTrimmer.PlanCuts(cached, sampleRate, settings.AllowedSilenceSeconds).Count > 0;
+                SilenceAnalysis? cached =
+                    SilenceResultStore.TryLoadVerified(track.FilePath, settings, cancellation.Token);
+                return cached is not null && SilenceTrimmer.PlanCuts(
+                    cached.Ranges, cached.Fingerprint.SampleRate, settings.AllowedSilenceSeconds).Count > 0;
             }, cancellation.Token);
             if (!closing && !cancellation.IsCancellationRequested && generation == selectionGeneration
                 && ReferenceEquals(track, TrackList.SelectedItem))
@@ -610,7 +611,7 @@ public partial class MainWindow : Window
             if (activeOperation is not null) await activeOperation;
             await navigationTask;
             await Task.WhenAll(runningAnalyses);
-            if (selectionTask is not null) await selectionTask;
+            await Task.WhenAll(runningSelectionChecks);
             if (trimTask is not null)
             {
                 try { await trimTask; }
