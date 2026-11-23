@@ -473,7 +473,7 @@ if (!string.IsNullOrWhiteSpace(realTrimInput))
         Assert(File.Exists(source) && File.Exists(trim.OutputPath));
         Assert(new FileInfo(source).Length == initialLength, "Original test input was changed");
         Assert(Path.GetExtension(trim.OutputPath).Equals(Path.GetExtension(source), StringComparison.OrdinalIgnoreCase));
-        Assert(trim.CopiedUnchanged == (trim.TrimmedRangeCount == 0));
+        Assert(trim.TrimmedRangeCount > 0, "Real trimming input must contain compressible silence");
         Assert(trim.RemovedDuration >= TimeSpan.Zero);
         using var reader = new AudioFileReader(trim.OutputPath);
         Assert(reader.TotalTime > TimeSpan.Zero);
