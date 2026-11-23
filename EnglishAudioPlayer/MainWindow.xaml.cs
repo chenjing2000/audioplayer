@@ -427,8 +427,11 @@ public partial class MainWindow : Window
             || silenceSettings.MinimumSilenceMilliseconds != dialog.Settings.MinimumSilenceMilliseconds
             || silenceSettings.SilenceThresholdDb != dialog.Settings.SilenceThresholdDb;
         silenceSettings = dialog.Settings;
-        if (detectionChanged && loadedTrack is not null && !trimming)
-            StartAnalysis(loadedTrack);
+        if (detectionChanged && loadedTrack is not null)
+        {
+            if (trimming) CancelAnalysis(); // Defer the new settings' analysis until trimming ends.
+            else StartAnalysis(loadedTrack);
+        }
         RefreshSelectedCache();
     }
 
