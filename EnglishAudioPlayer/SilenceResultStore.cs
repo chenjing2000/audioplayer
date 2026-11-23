@@ -43,7 +43,7 @@ internal static class SilenceResultStore
     public static string GetPath(string audioPath)
     {
         string full = Path.GetFullPath(audioPath);
-        return Path.Combine(Path.GetDirectoryName(full)!, "results", Path.GetFileName(full), "silence.json");
+        return Path.Combine(Path.GetDirectoryName(full)!, "results", Path.GetFileName(full) + ".silent_segments.json");
     }
 
     public static AudioFingerprint Capture(string audioPath, CancellationToken cancellation = default)

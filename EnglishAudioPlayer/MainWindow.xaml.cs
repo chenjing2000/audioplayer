@@ -111,6 +111,13 @@ public partial class MainWindow : Window
         UpdateControls();
     }
 
+    private async void RefreshButton_Click(object sender, RoutedEventArgs e)
+    {
+        string? folder = currentFolder;
+        if (folder is null || operationBusy || trimming || closing) return;
+        await RunActionAsync(() => LoadFolderAsync(folder));
+    }
+
     private async void TrackList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (operationBusy || closing || e.ChangedButton != MouseButton.Left) return;
@@ -532,6 +539,7 @@ public partial class MainWindow : Window
         bool available = !operationBusy && !closing;
         OpenButton.IsEnabled = available;
         SettingsButton.IsEnabled = available;
+        RefreshButton.IsEnabled = available && !trimming && currentFolder is not null;
         TrimButton.IsEnabled = !closing && !operationBusy && !analyzing && !trimming && selectedCanTrim;
         TrackList.IsEnabled = available;
         PlayButton.IsEnabled = available && (player.IsLoaded || tracks.Count > 0);

@@ -48,7 +48,7 @@ public static class SilenceTrimmer
         // Write the stream-copy result to an M4A temporary file; leave other formats unchanged.
         string temporaryExtension = type;
         string temporary = Path.Combine(directory,
-            "." + stem + ".lesssilence." + Guid.NewGuid().ToString("N") + temporaryExtension);
+            "." + stem + ".new." + Guid.NewGuid().ToString("N") + temporaryExtension);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -77,7 +77,7 @@ public static class SilenceTrimmer
             for (int index = 0; ; index++)
             {
                 string suffix = index == 0 ? "" : " (" + index + ")";
-                destination = Path.Combine(directory, stem + ".lesssilence" + suffix + extension);
+                destination = Path.Combine(directory, stem + ".new" + suffix + extension);
                 try
                 {
                     File.Move(temporary, destination);
