@@ -38,6 +38,21 @@ internal sealed class SettingsStore
         string json = File.ReadAllText(FilePath);
         var settings = JsonSerializer.Deserialize<SilenceSettings>(json)
             ?? throw new JsonException("配置文件不能为 null。");
+        using (var document = JsonDocument.Parse(json))
+        {
+            foreach (string name in new[]
+            {
+                nameof(SilenceSettings.FrameMilliseconds),
+                nameof(SilenceSettings.MinimumSilenceMilliseconds),
+                nameof(SilenceSettings.SilenceThresholdDb),
+                nameof(SilenceSettings.NavigationToleranceMilliseconds),
+                nameof(SilenceSettings.AllowedSilenceSeconds)
+            })
+            {
+                if (!document.RootElement.TryGetProperty(name, out _))
+                    throw new JsonException("配置文件缺少必填参数：" + name);
+            }
+        }
         settings.Validate();
         return settings;
     }
