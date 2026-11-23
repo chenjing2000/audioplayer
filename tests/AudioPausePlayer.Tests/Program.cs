@@ -108,6 +108,19 @@ Check("Minimum threshold detects digital silence and very quiet samples", () =>
     Assert(Detect(Enumerable.Repeat(1e-8f, 400).ToArray(), settings: settings).Count == 1);
     Assert(Detect(Enumerable.Repeat(0.0001f, 400).ToArray(), settings: settings).Count == 0);
 });
+Check("Cancel PCM silence scan", () =>
+{
+    using var cancellation = new CancellationTokenSource();
+    cancellation.Cancel();
+    bool cancelled = false;
+    try
+    {
+        SilenceDetector.DetectSamples(new Samples(new float[1000], 1000, 1, 1000),
+            new SilenceSettings(), cancellation.Token);
+    }
+    catch (OperationCanceledException) { cancelled = true; }
+    Assert(cancelled);
+});
 Check("299 ms is too short", () => Assert(Detect(new float[299]).Count == 0));
 Check("300 ms qualifies at EOF", () => { var r = Detect(new float[300]); Assert(r.Count == 1 && r[0].Start == TimeSpan.Zero && r[0].End == TimeSpan.FromMilliseconds(300)); });
 Check("No silence", () => Assert(Detect(Enumerable.Repeat(0.5f, 1000).ToArray()).Count == 0));
@@ -372,6 +385,29 @@ else if (args.Contains("--report"))
         });
     }
     File.WriteAllText(Path.Combine(reportFolder, "silence-report.md"), report.ToString());
+}
+
+string? realTrimInput = Environment.GetEnvironmentVariable("AUDIOPLAYER_TEST_TRIM_FILE");
+if (!string.IsNullOrWhiteSpace(realTrimInput))
+{
+    Check("Real WAV/MP3/M4A trim retains its source and output format", () =>
+    {
+        string source = Path.GetFullPath(realTrimInput);
+        long initialLength = new FileInfo(source).Length;
+        SilenceTrimResult trim = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
+        Assert(File.Exists(source) && File.Exists(trim.OutputPath));
+        Assert(new FileInfo(source).Length == initialLength, "Original test input was changed");
+        Assert(Path.GetExtension(trim.OutputPath).Equals(Path.GetExtension(source), StringComparison.OrdinalIgnoreCase));
+        Assert(trim.CopiedUnchanged == (trim.TrimmedRangeCount == 0));
+        Assert(trim.RemovedDuration >= TimeSpan.Zero);
+        using var reader = new AudioFileReader(trim.OutputPath);
+        Assert(reader.TotalTime > TimeSpan.Zero);
+        Assert(Math.Abs((reader.TotalTime - trim.OutputDuration).TotalMilliseconds) < 10);
+        Console.WriteLine($"REAL TRIM: {Path.GetFileName(source)}, sections={trim.TrimmedRangeCount}, " +
+            $"removed={trim.RemovedDuration.TotalSeconds:F3}s, " +
+            $"source={trim.OriginalDuration.TotalSeconds:F3}s, " +
+            $"output={trim.OutputDuration.TotalSeconds:F3}s");
+    });
 }
 
 try

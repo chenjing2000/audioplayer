@@ -36,11 +36,17 @@ External data paths are passed as arguments; scripts do not hard-code a develope
 
 ### AudioPlayer
 
-Use -AudioDirectory with UI or Full (or Core metadata checks). The script searches its subdirectories, copies one representative MP3, and passes the temporary folder through AUDIOPLAYER_TEST_AUDIO_DIRECTORY. Full enables the existing --ui and --playback checks. Without the argument, Full explicitly skips real playback; the existing runner also identifies missing MP3 checks.
+Use `-AudioDirectory` with a **folder containing actual MP3 files**. It copies one MP3 into a temporary directory and runs the legacy MP3 metadata, playback, and UI checks. A standalone M4A file must not be passed as an MP3 directory.
+
+Use `-AudioFile` for a **single WAV, MP3, or M4A file**. The runner copies the media to a temporary directory with its **original extension**, runs the real long-silence trimming pipeline and verifies the output extension, that it can be decoded and that the source remains unchanged. This does not pretend that an M4A is MP3; the old MP3-specific playback/UI tests are skipped unless `-AudioDirectory` is also supplied. Large recordings may take extra time to decode and encode.
 
 ```powershell
 .\tools\Test.ps1 -Suite Full -AudioDirectory '<local MP3 directory>'
+.\tools\Test.ps1 -Suite Full -AudioFile '<local recording.m4a>'
+.\tools\Test.ps1 -Suite Full -AudioDirectory '<local MP3 directory>' -AudioFile '<local recording.m4a>'
 ```
+
+All supplied media is copied to a task-owned temporary directory; the user's originals are never modified. The test script rejects file paths passed to `-AudioDirectory` and recommends `-AudioFile` instead.
 
 Detailed PCM/navigation and playback behavior is described in [Program Overview](program-overview.md).
 

@@ -36,6 +36,7 @@ public partial class MainWindow : Window
     private bool allowClose;
     private Task? activeOperation;
     private Task? analysisTask;
+    private CancellationTokenSource? analysisCancellation;
     private readonly Queue<Key> navigationKeys = new();
     private bool navigating;
     private Task navigationTask = Task.CompletedTask;
@@ -150,16 +151,24 @@ public partial class MainWindow : Window
 
     private async Task AnalyzeAsync(AudioTrack track, SilenceSettings settings)
     {
+        using var cancellation = new CancellationTokenSource();
+        analysisCancellation = cancellation;
         ranges.Clear();
         analysisReady = false;
         analyzing = true;
         UpdateControls();
         try
         {
-            var result = await Task.Run(() => SilenceDetector.Detect(track.FilePath, settings));
+            var result = await Task.Run(
+                () => SilenceDetector.Detect(track.FilePath, settings, cancellation.Token),
+                cancellation.Token);
             if (closing || !ReferenceEquals(track, loadedTrack)) return;
             ranges = result;
             analysisReady = true;
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            // An unfinished scan is abandoned when the window is closing.
         }
         catch (Exception ex)
         {
@@ -167,6 +176,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            if (ReferenceEquals(analysisCancellation, cancellation)) analysisCancellation = null;
             analyzing = false;
             if (!closing) UpdateControls();
         }
@@ -476,6 +486,8 @@ public partial class MainWindow : Window
         e.Cancel = true;
         if (closing) return;
         closing = true;
+        analysisCancellation?.Cancel();
+        trimCancellation?.Cancel();
         timer.Stop();
         HideNotification();
         UpdateControls();
@@ -484,7 +496,6 @@ public partial class MainWindow : Window
             if (activeOperation is not null) await activeOperation;
             await navigationTask;
             if (analysisTask is not null) await analysisTask;
-            trimCancellation?.Cancel();
             if (trimTask is not null)
             {
                 try { await trimTask; }
