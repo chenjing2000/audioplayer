@@ -11,6 +11,6 @@ The unified tooling wraps the existing test runners and portable publishing conf
 See [program-overview.md](program-overview.md) for operations and algorithm details, [Code Review](Code-Review-2026-10-13.md) for the current maintenance assessment, [Configuration](Configuration.md) for settings, [Testing](Testing.md) for verification, and [Publishing](Publishing.md) for distribution.
 
 
-## Long-silence trimming (feature branch)
+## Long-silence trimming (merged to main on 2026-11-23)
 
-`SilenceTrimmer` uses `SilenceDetector` results, deletes central intervals on the source PCM timeline, independently fades the kept sides, and writes a validated WAV/MP3/AAC-M4A result without modifying the source. The UI keeps trimming and playback tasks separate. See [specification](specs/Long-Silence-Trimming.md) and [implementation plan](guides/Long-Silence-Implementation.md). Real Windows codec testing is still required.
+`SilenceTrimmer` uses `SilenceDetector` results, deletes central intervals on the source PCM timeline, independently fades the kept sides, and writes a validated WAV/MP3/AAC-M4A result without modifying the source. The UI keeps trimming and playback tasks separate. See [specification](specs/Long-Silence-Trimming.md) and [implementation plan](guides/Long-Silence-Implementation.md). M4A real-device trimming and listening acceptance passed; real long-pause MP3/WAV checks remain deferred. The [approved next-iteration refactor](specs/Results-Cache-Toast-Refactor.md) (single results store, WPF Toast and UI/settings cleanup) is documented but **not yet implemented**.

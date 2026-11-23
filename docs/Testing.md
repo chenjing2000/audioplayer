@@ -74,3 +74,10 @@ Evidence supplied by the user from Windows PowerShell on `feature/long-silence-t
 | Real MP3 and WAV long-pause recordings | **Deferred at user request**: no suitable recordings available |
 
 The M4A end-to-end test and listening confirmation are **real-machine acceptance evidence**, not evidence that every system codec, sample rate, MP3 file or WAV file has been tested. Synthetic WAV/PCM regression tests remain in Core. Do not change MP3/WAV real-media coverage from deferred to passed without a separate test.
+
+
+## Planned next-iteration tests: results cache, Toast and settings (NOT YET RUN)
+
+The approved [refactor specification](specs/Results-Cache-Toast-Refactor.md) and [implementation checklist](guides/Results-Cache-Toast-Implementation.md) require updated Core/UI/Full tests for the single `results/<full audio filename>/silence.json` store, metadata-based invalidation without SHA-256, automatic detection/cancellation, navigation from verified in-memory ranges, cache-based trimming without a second scan, numbered non-overwriting outputs, independent results for newly encoded media, Toast behavior, one-decimal settings validation, and playlist alignment.
+
+These cases are **planned only**; the 2026-11-23 M4A/Windows and CI evidence above belongs to the previous implementation and must not be presented as proof of this refactor. Use temporary synthetic WAV/PCM fixtures where possible. Real long-pause MP3/WAV testing remains deferred until suitable files exist; do not turn a Skip into Pass.
