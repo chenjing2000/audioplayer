@@ -195,6 +195,11 @@ Check("Silence results reuse verified metadata and ignore navigation and trim pa
             NavigationToleranceMilliseconds = 500, AllowedSilenceSeconds = 3.0m
         });
         Assert(reused.FromCache && reused.Ranges.Count == 1);
+        var verified = SilenceResultStore.TryLoadVerified(source, settings);
+        Assert(verified is not null && verified.FromCache && verified.Saved
+            && verified.Fingerprint.SampleRate == 1000
+            && verified.Ranges.Count == 1,
+            "Verified cache exposes its original metadata without re-opening the reader");
         Assert(File.ReadAllText(path) == original, "Cache hit did not rewrite JSON");
 
         settings.FrameMilliseconds = 20;
