@@ -40,7 +40,7 @@
                     VerticalAlignment="Center" Margin="0,0,10,0" Click="StopButton_Click">
                 <Image Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform" Source="{StaticResource StopIcon}"/>
             </Button>
-            <Button x:Name="TrimButton" Grid.Column="5" ToolTip="压缩长静音" AutomationProperties.Name="压缩长静音"
+            <Button x:Name="TrimButton" Grid.Column="5" IsEnabled="False" ToolTip="压缩长静音" AutomationProperties.Name="压缩长静音"
                     VerticalAlignment="Center" Margin="0,0,10,0" Click="TrimButton_Click">
                 <Image Width="30" Height="30" HorizontalAlignment="Center" VerticalAlignment="Center"
                        Source="{StaticResource TrimIcon}"/>
