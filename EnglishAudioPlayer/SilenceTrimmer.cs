@@ -99,8 +99,7 @@ public static class SilenceTrimmer
             {
                 outputSaved = SilenceResultStore.LoadOrDetect(destination, settings, cancellationToken).Saved;
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
-                or InvalidDataException or OperationCanceledException)
+            catch (Exception)
             {
                 outputSaved = false; // Do not remove successfully committed audio.
             }
