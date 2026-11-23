@@ -2,7 +2,7 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Test.Common.ps1')
 $workspace = Split-Path -Parent $PSScriptRoot
-$exeName = 'EnglishAudioPlayer.exe'
+$exeName = 'AudioPlayer.exe'
 $settingsName = 'Renamed App.settings.json'
 if (-not $ExePath) { $ExePath = Join-Path $workspace "dist\$exeName" }
 $ExePath = (Resolve-Path -LiteralPath $ExePath).Path

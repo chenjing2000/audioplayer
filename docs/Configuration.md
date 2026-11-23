@@ -1,6 +1,6 @@
 # Configuration
 
-The configuration file is named after the executable (normally EnglishAudioPlayer.settings.json) and lives alongside it, not in the working directory. Renaming the EXE changes the settings filename stem.
+The configuration file is named after the executable (normally AudioPlayer.settings.json) and lives alongside it, not in the working directory. Renaming the EXE changes the settings filename stem.
 
 SettingsStore uses the actual EXE name. Invalid settings are reported and retained; failed writes preserve the previous file.
 

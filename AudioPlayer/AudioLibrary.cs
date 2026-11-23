@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace AudioPausePlayer;
+namespace AudioPlayer;
 
 public static class AudioLibrary
 {

@@ -8,14 +8,14 @@
 
 | 现有位置 | 修改目标 |
 | --- | --- |
-| \`EnglishAudioPlayer/MainWindow.xaml\` | 删除 \`NotificationBar\` 及其布局行；将 Toast 覆盖层放在主窗口内容之上；保持播放工具栏、不添加检测按钮；四列表头与指定单元格对齐 |
-| \`EnglishAudioPlayer/MainWindow.xaml.cs\` | 删除旧 \`notificationTimer\`/\`ShowNotification\` 直接操作旧 TextBlock 的实现；统一通知调用；重组后台检测、会话取消、控制按钮、缓存加载、裁剪触发与结果更新 |
-| \`EnglishAudioPlayer/SilenceDetector.cs\` / \`SilenceRange.cs\` | 复用既有静音区间和导航运算，不重写 RMS/dBFS 数学规则；必要时增加安全的序列化映射 |
-| \`EnglishAudioPlayer/SilenceTrimmer.cs\` | 接收已验证静音区间并计算 \`PlanCuts\`，移除裁剪入口对源文件的第二次静音扫描；实现递增输出文件名及并发占名保护；保留编码和输出复检 |
-| \`EnglishAudioPlayer/SilenceSettings.cs\` / \`SilenceSettingsWindow.xaml(.cs)\` | \`AllowedSilenceSeconds\` 一位小数、\`2.\` 标准化、空值红框、圆角 TextBox、标题“设置”、统一 Toast 验证 |
-| \`EnglishAudioPlayer/SettingsStore.cs\` | 保持安全读写/错误保留，不增加旧格式迁移；验证新精度与当前参数规则 |
-| \`EnglishAudioPlayer/AudioLibrary.cs\` / \`AudioTrack.cs\` | 保留元数据、自然排序；必要时为列表选中项的结果有效性与按钮状态提供最小支持 |
-| \`tests/AudioPausePlayer.Tests/\` | 修改依赖旧消息条/自动分析阻塞/旧裁剪复制逻辑的断言；新增结果一致性、输入边界、通知、命名及并发回归 |
+| \`AudioPlayer/MainWindow.xaml\` | 删除 \`NotificationBar\` 及其布局行；将 Toast 覆盖层放在主窗口内容之上；保持播放工具栏、不添加检测按钮；四列表头与指定单元格对齐 |
+| \`AudioPlayer/MainWindow.xaml.cs\` | 删除旧 \`notificationTimer\`/\`ShowNotification\` 直接操作旧 TextBlock 的实现；统一通知调用；重组后台检测、会话取消、控制按钮、缓存加载、裁剪触发与结果更新 |
+| \`AudioPlayer/SilenceDetector.cs\` / \`SilenceRange.cs\` | 复用既有静音区间和导航运算，不重写 RMS/dBFS 数学规则；必要时增加安全的序列化映射 |
+| \`AudioPlayer/SilenceTrimmer.cs\` | 接收已验证静音区间并计算 \`PlanCuts\`，移除裁剪入口对源文件的第二次静音扫描；实现递增输出文件名及并发占名保护；保留编码和输出复检 |
+| \`AudioPlayer/SilenceSettings.cs\` / \`SilenceSettingsWindow.xaml(.cs)\` | \`AllowedSilenceSeconds\` 一位小数、\`2.\` 标准化、空值红框、圆角 TextBox、标题“设置”、统一 Toast 验证 |
+| \`AudioPlayer/SettingsStore.cs\` | 保持安全读写/错误保留，不增加旧格式迁移；验证新精度与当前参数规则 |
+| \`AudioPlayer/AudioLibrary.cs\` / \`AudioTrack.cs\` | 保留元数据、自然排序；必要时为列表选中项的结果有效性与按钮状态提供最小支持 |
+| \`tests/AudioPlayer.Tests/\` | 修改依赖旧消息条/自动分析阻塞/旧裁剪复制逻辑的断言；新增结果一致性、输入边界、通知、命名及并发回归 |
 
 如果独立的 \`SilenceResultStore.cs\` / \`ToastNotificationService.cs\` 有助于单一职责和测试，可以各增加一个很小的模块；否则留在现有类中。**不要**同时开发多套状态管理、持久化中间文件或抽象仓储接口。
 

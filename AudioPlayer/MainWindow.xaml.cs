@@ -11,11 +11,11 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
 
-namespace AudioPausePlayer;
+namespace AudioPlayer;
 
 public partial class MainWindow : Window
 {
-    private readonly AudioPlayer player = new();
+    private readonly PlaybackEngine player = new();
     private readonly ObservableCollection<AudioTrack> tracks = new();
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private SilenceSettings silenceSettings = new();
@@ -109,6 +109,13 @@ public partial class MainWindow : Window
         else if (files.Count == 0) ToastMessages.Show("此文件夹中没有 WAV、MP3 或 M4A 音频文件。", ToastLevel.Warning);
         RefreshProgress();
         UpdateControls();
+    }
+
+    private async void RefreshButton_Click(object sender, RoutedEventArgs e)
+    {
+        string? folder = currentFolder;
+        if (folder is null || operationBusy || trimming || closing) return;
+        await RunActionAsync(() => LoadFolderAsync(folder));
     }
 
     private async void TrackList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -532,6 +539,7 @@ public partial class MainWindow : Window
         bool available = !operationBusy && !closing;
         OpenButton.IsEnabled = available;
         SettingsButton.IsEnabled = available;
+        RefreshButton.IsEnabled = available && !trimming && currentFolder is not null;
         TrimButton.IsEnabled = !closing && !operationBusy && !analyzing && !trimming && selectedCanTrim;
         TrackList.IsEnabled = available;
         PlayButton.IsEnabled = available && (player.IsLoaded || tracks.Count > 0);

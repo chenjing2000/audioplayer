@@ -21,9 +21,9 @@
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Test-Publish.ps1
-dotnet run --project tests/AudioPausePlayer.Tests -c Release -- --ui
-dotnet run --project tests/AudioPausePlayer.Tests -c Release -- --playback
-dotnet list EnglishAudioPlayer/AudioPausePlayer.csproj package --vulnerable --include-transitive
+dotnet run --project tests/AudioPlayer.Tests -c Release -- --ui
+dotnet run --project tests/AudioPlayer.Tests -c Release -- --playback
+dotnet list AudioPlayer/AudioPlayer.csproj package --vulnerable --include-transitive
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish.ps1
 ```
 

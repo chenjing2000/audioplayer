@@ -1,4 +1,4 @@
-namespace AudioPausePlayer;
+namespace AudioPlayer;
 
 public sealed class SilenceSettings
 {

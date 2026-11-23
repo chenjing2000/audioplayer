@@ -1,7 +1,7 @@
 using NAudio.Wave;
 using System.IO;
 
-namespace AudioPausePlayer;
+namespace AudioPlayer;
 
 public static class SilenceDetector
 {

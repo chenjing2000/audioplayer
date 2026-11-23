@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace AudioPausePlayer;
+namespace AudioPlayer;
 
 public sealed class AudioTrack : INotifyPropertyChanged
 {

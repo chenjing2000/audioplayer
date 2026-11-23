@@ -6,7 +6,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using AudioPausePlayer;
+using AudioPlayer;
+using PlayerEngine = global::AudioPlayer.PlaybackEngine;
 using NAudio.Wave;
 
 internal static class UiChecks
@@ -20,7 +21,7 @@ internal static class UiChecks
         var thread = new Thread(() =>
         {
             var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
-            var appXml = System.Xml.Linq.XDocument.Load(Path.GetFullPath("EnglishAudioPlayer/App.xaml"));
+            var appXml = System.Xml.Linq.XDocument.Load(Path.GetFullPath("AudioPlayer/App.xaml"));
             var dictionary = appXml.Root!.Elements().Single().Elements().Single();
             dictionary.SetAttributeValue(System.Xml.Linq.XNamespace.Xmlns + "x", "http://schemas.microsoft.com/winfx/2006/xaml");
             string resourceXml = dictionary.ToString();
@@ -86,6 +87,8 @@ internal static class UiChecks
                     toasts.CompleteTask(active, "检测完成", ToastLevel.Info, TimeSpan.FromMilliseconds(150));
                     await Task.Delay(350);
                     Assert(toastStack.Children.Count == 0, "Completed task expires in the same slot");
+                    var refreshButton = (Button)window.FindName("RefreshButton");
+                    Assert(!refreshButton.IsEnabled, "Refresh is disabled until a folder is opened");
                     await window.LoadFolderAsync(audioFolder);
                     var list = (DataGrid)window.FindName("TrackList");
                     var slider = (Slider)window.FindName("ProgressSlider");
@@ -94,7 +97,57 @@ internal static class UiChecks
                     var playButton = (Button)window.FindName("PlayButton");
                     var stopButton = (Button)window.FindName("StopButton");
                     var settingsButton = (Button)window.FindName("SettingsButton");
-                     var trimButton = (Button)window.FindName("TrimButton");
+                    var trimButton = (Button)window.FindName("TrimButton");
+                    Assert(refreshButton.IsEnabled && refreshButton.ToolTip?.ToString() == "刷新文件列表",
+                        "Refresh becomes available after opening a folder");
+
+                    // Refresh must reuse the full folder-load path without preserving selection.
+                    string refreshFolder = Path.Combine(audioFolder, "ui-refresh-" + Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(refreshFolder);
+                    try
+                    {
+                        string original = Path.Combine(refreshFolder, "original.wav");
+                        string renamed = Path.Combine(refreshFolder, "renamed.wav");
+                        string added = Path.Combine(refreshFolder, "added.wav");
+                        using (var writer = new WaveFileWriter(original, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                            writer.WriteSamples(new float[44100], 0, 44100);
+                        await window.LoadFolderAsync(refreshFolder);
+                        Assert(list.Items.Count == 1 && refreshButton.IsEnabled, "Refresh fixture loads one track");
+                        list.SelectedIndex = 0;
+                        File.Move(original, renamed);
+                        using (var writer = new WaveFileWriter(added, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                            writer.WriteSamples(new float[44100], 0, 44100);
+                        refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        if (Field<Task>(window, "activeOperation") is Task refreshAction) await refreshAction;
+                        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                        Assert(list.Items.Count == 2 &&
+                            list.Items.OfType<AudioTrack>().Select(track => Path.GetFileName(track.FilePath))
+                                .SequenceEqual(new[] { "added.wav", "renamed.wav" }) &&
+                            list.SelectedItem is null && !Field<PlayerEngine>(window, "player")!.IsLoaded,
+                            "Refresh reloads added and renamed files, clears selection and closes playback");
+                        Assert(refreshButton.IsEnabled, "Refresh button re-enables after folder load");
+                        File.Delete(added);
+                        refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        if (Field<Task>(window, "activeOperation") is Task removedAction) await removedAction;
+                        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                        Assert(list.Items.Count == 1 &&
+                            Path.GetFileName(((AudioTrack)list.Items[0]).FilePath) == "renamed.wav",
+                            "Refresh drops deleted audio files");
+
+                        Directory.Delete(refreshFolder, true);
+                        refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        if (Field<Task>(window, "activeOperation") is Task failedAction) await failedAction;
+                        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                        Assert(list.Items.Count == 1 && refreshButton.IsEnabled,
+                            "Failed refresh retains the old list and folder selection");
+                        toasts.Clear();
+                        await window.LoadFolderAsync(audioFolder);
+                    }
+                    finally
+                    {
+                        if (Directory.Exists(refreshFolder)) Directory.Delete(refreshFolder, true);
+                    }
+
 
                     // Selection must inspect only existing results and never analyze an unopened audio file.
                     string resultFolder = Path.Combine(audioFolder, "ui-results-" + Guid.NewGuid().ToString("N"));
@@ -147,11 +200,26 @@ internal static class UiChecks
                     Assert(Math.Abs(settingsImage.Width - 28) < 0.01 && Math.Abs(settingsImage.Height - 28) < 0.01, "Settings icon is 28x28");
                     Assert(settingsBorder.BorderThickness == new Thickness(0) && ColorOf(settingsBorder.Background) == "#00FFFFFF",
                         "Settings button has no border or visible background");
-                    Assert(Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 && Grid.GetColumn(settingsButton) == 6, "Trim button is between stop and settings buttons");
+                    Assert(Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 &&
+                        Grid.GetColumn(refreshButton) == 6 && Grid.GetColumn(settingsButton) == 7,
+                        "Refresh button is placed between trim and settings");
+                    Assert(new[] { playButton, stopButton, trimButton, refreshButton }
+                        .All(button => Math.Abs(button.Margin.Right - 5) < 0.01),
+                        "Five right toolbar buttons use 5-unit gaps");
+                    Assert(Math.Abs(slider.Height - 36) < 0.01, "Progress slider has the same control height as the buttons");
+                    window.UpdateLayout();
+                    var sliderTrack = FindVisual<System.Windows.Controls.Primitives.Track>(slider);
+                    double buttonCenterY = playButton.TranslatePoint(new Point(0, playButton.ActualHeight / 2), window).Y;
+                    double sliderCenterY = slider.TranslatePoint(new Point(0, slider.ActualHeight / 2), window).Y;
+                    Assert(slider.RenderTransform is TranslateTransform { Y: 10 },
+                        "Progress slider has a 10-DIP downward visual offset");
+                    Assert(Math.Abs(sliderCenterY - buttonCenterY - 10) < 1.5,
+                        "Progress slider center is 10 DIP below the button centers");
+                    Assert(sliderTrack is not null, "Progress slider exposes a visible WPF track");
                     Assert(settingsButton.ToolTip?.ToString() == "设置", "Settings gear has the updated name");
                     Assert(settingsButton.HorizontalAlignment == HorizontalAlignment.Center && settingsButton.VerticalAlignment == VerticalAlignment.Center, "Settings button is centered in the top row");
                     Assert(settingsButton.FocusVisualStyle is null, "Settings button has no focus visual");
-                    foreach (string key in new[] { "OpenFolderIcon", "PlayIcon", "PauseIcon", "StopIcon", "TrimIcon", "SettingsIcon" })
+                    foreach (string key in new[] { "OpenFolderIcon", "PlayIcon", "PauseIcon", "StopIcon", "TrimIcon", "RefreshIcon", "SettingsIcon" })
                     {
                         var drawing = (DrawingGroup)((DrawingImage)window.FindResource(key)).Drawing;
                         var background = (GeometryDrawing)drawing.Children[1];
@@ -339,7 +407,7 @@ internal static class UiChecks
                     MethodInfo playTrack = typeof(MainWindow).GetMethod("PlayTrackAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
                     await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
                     if (Field<Task>(window, "analysisTask") is Task recoveryAnalysis) await recoveryAnalysis;
-                    await Field<AudioPlayer>(window, "player")!.StopAsync();
+                    await Field<PlayerEngine>(window, "player")!.StopAsync();
                     string brokenPath = Path.Combine(audioFolder, "broken.wav");
                     File.WriteAllText(brokenPath, "not an audio file");
                     bool failedOpen = false;
@@ -347,9 +415,9 @@ internal static class UiChecks
                     catch (Exception) { failedOpen = true; }
                     Assert(failedOpen, "Broken replacement track is rejected");
                     await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
-                    Assert(Field<AudioPlayer>(window, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
+                    Assert(Field<PlayerEngine>(window, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
                     if (Field<Task>(window, "analysisTask") is Task recoveredAnalysis) await recoveredAnalysis;
-                    await Field<AudioPlayer>(window, "player")!.CloseAsync();
+                    await Field<PlayerEngine>(window, "player")!.CloseAsync();
                     if (Directory.GetFiles(audioFolder, "*.mp3").Length == 0)
                     {
                         Console.WriteLine("SKIP audio-dependent UI checks: no local MP3 available.");
@@ -367,7 +435,7 @@ internal static class UiChecks
                     await window.HandleShortcutAsync(Key.Space);
                     Task? analysis = Field<Task>(window, "analysisTask");
                     if (analysis is not null) await analysis;
-                    var player = Field<AudioPlayer>(window, "player")!;
+                    var player = Field<PlayerEngine>(window, "player")!;
                     Assert(player.PlaybackState == PlaybackState.Playing, "Space opens selected track and plays");
                     playButton.Focus();
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
@@ -512,7 +580,7 @@ internal static class UiChecks
                     window.Closed += (_, _) => closed.TrySetResult();
                     window.Close();
                     await closed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-                    Assert(!Field<AudioPlayer>(window, "player")!.IsLoaded, "Close during analysis releases player");
+                    Assert(!Field<PlayerEngine>(window, "player")!.IsLoaded, "Close during analysis releases player");
                     using (var file = new FileStream(Directory.GetFiles(audioFolder, "*.mp3")[0], FileMode.Open, FileAccess.Read, FileShare.None))
                         Assert(file.Length > 0, "Close during analysis releases analysis reader");
                 }

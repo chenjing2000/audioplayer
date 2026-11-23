@@ -1,6 +1,6 @@
 ﻿$ErrorActionPreference = 'Stop'
-$exeName = 'EnglishAudioPlayer.exe'
-$settingsName = 'EnglishAudioPlayer.settings.json'
+$exeName = 'AudioPlayer.exe'
+$settingsName = 'AudioPlayer.settings.json'
 $testRoot = Join-Path ([IO.Path]::GetTempPath()) ('publish-tests-' + [Guid]::NewGuid().ToString('N'))
 $scriptPath = Join-Path $PSScriptRoot 'Publish.ps1'
 $script:passed = 0

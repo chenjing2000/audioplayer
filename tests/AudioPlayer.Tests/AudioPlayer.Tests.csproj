@@ -7,7 +7,7 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../EnglishAudioPlayer/AudioPausePlayer.csproj" />
+    <ProjectReference Include="../../AudioPlayer/AudioPlayer.csproj" />
   </ItemGroup>
 </Project>
 

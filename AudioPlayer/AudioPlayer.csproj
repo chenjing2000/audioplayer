@@ -5,7 +5,6 @@
     <UseWPF>true</UseWPF>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>EnglishAudioPlayer</AssemblyName>
     <Version>0.1.7</Version>
     <ApplicationIcon>ui/main.ico</ApplicationIcon>
   </PropertyGroup>
@@ -14,6 +13,6 @@
     <Content Include="../docs/FFmpeg-Setup.txt" Link="FFmpeg-Setup.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
-    <InternalsVisibleTo Include="AudioPausePlayer.Tests" />
+    <InternalsVisibleTo Include="AudioPlayer.Tests" />
   </ItemGroup>
 </Project>
