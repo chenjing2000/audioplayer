@@ -155,6 +155,18 @@ internal static class UiChecks
                             Field<string>(window, "currentFolder") is null &&
                             !refreshButton.IsEnabled && !playButton.IsEnabled,
                             "Failed folder load clears previously loaded folder");
+                        // A successfully scanned empty folder is not a scan failure.
+                        string emptyFolder = Path.Combine(audioFolder, "ui-empty-" + Guid.NewGuid().ToString("N"));
+                        Directory.CreateDirectory(emptyFolder);
+                        try
+                        {
+                            await window.LoadFolderAsync(emptyFolder);
+                            Assert(list.Items.Count == 0 &&
+                                Field<string>(window, "currentFolder") == Path.GetFullPath(emptyFolder) &&
+                                refreshButton.IsEnabled,
+                                "Empty valid folder retains folder path and Refresh");
+                        }
+                        finally { Directory.Delete(emptyFolder); }
                         toasts.Clear();
                         await window.LoadFolderAsync(audioFolder);
                     }
