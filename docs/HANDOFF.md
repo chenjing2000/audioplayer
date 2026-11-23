@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-23 (FFmpeg M4A design merged; feature development ongoing)  
+**Updated:** 2026-11-23 (PR #8 final review, not merged)  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Latest merged feature baseline:** `main@8aa15b1` (PR #5, Play/Stop icon balance). This SHA describes the last functional change; later documentation-only commits may advance `main`.
@@ -34,7 +34,7 @@
 - [Approved FFmpeg/M4A specification](specs/FFmpeg-M4A-Stream-Copy.md): NAudio stays responsible for playback, navigation, and RMS detection; only AAC/M4A trimming changes to optional BtbN Windows x64 GPL Shared FFmpeg, with no AAC re-encoding and no 10 ms fades. Start with one concat demuxer process; validate timing, joins and real recordings rather than assuming exact packet cuts.
 - Only check the FFmpeg dependency on an M4A trim request. If missing/broken, use an existing error Toast referring to **`FFmpeg-Setup.txt`**, not a MessageBox; no startup check, automatic download, fallback encoder or unrelated MP3/WAV changes.
 - Maintain [`docs/FFmpeg-Setup.txt`](FFmpeg-Setup.txt) as the **only** installation-instructions file copied beside the development/published EXE. Do not copy the repository README or bundle FFmpeg binaries.
-- Do not mistake this approved plan for delivered functionality or tested results; keep the existing working implementation on `main` intact until the new branch passes real-media tests.
+- **Windows feature-branch evidence:** Core 47/47, UI 113/113, publishing safeguards 5/5 and published-EXE checks 4/4; AAC-LC stereo 48-kHz source 7142.442667 s / 102,033,724 bytes -> trimmed 5468.970021 s / 81,561,519 bytes. User confirmed playback and natural joins. See [Testing](Testing.md#2026-11-23-pr-8-windows-aacm4a-stream-copy-acceptance-evidence). Edge cases (missing DLL, active cancellation, source mutation) and exact FFmpeg build hash remain unverified; `main` unchanged.
 
 ## Next development session
 
@@ -56,4 +56,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Test-PublishedApp.ps1
 ```
 
-**The FFmpeg M4A stream-copy feature is in development on a feature branch; it is not merged to `main` and has not passed Windows media acceptance yet.** Do not merge the feature branch without authorization. Do not start unrelated refactoring.
+**The FFmpeg M4A stream-copy feature is in development on a feature branch; it is not merged to `main` and has passed the user's real AAC recording playback/ffprobe core checks; some failure-path cases remain unverified.** Do not merge the feature branch without authorization. Do not start unrelated refactoring.

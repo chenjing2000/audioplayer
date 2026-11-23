@@ -110,7 +110,7 @@ internal static class FfmpegM4aTrimmer
         using var registration = token.Register(() =>
         {
             try { if (!process.HasExited) process.Kill(entireProcessTree: true); }
-            catch (InvalidOperationException) { }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception) { }
         });
         Task stdout = process.StandardOutput.BaseStream.CopyToAsync(Stream.Null);
         Task<string> stderr = process.StandardError.ReadToEndAsync();

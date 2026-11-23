@@ -44,3 +44,7 @@ Code changes are permitted only on a feature branch; do not merge to `main` with
 ## Implementation tracking
 
 Development branch `feature/ffmpeg-m4a-stream-copy` is implementing this specification. No Windows CI result or real BtbN listening acceptance is asserted by this document update. Keep actual implementation status separate from approval.
+
+## Feature-branch verification (2026-11-23)
+
+The user verified Windows Core/UI/publish/published-EXE tests (47/113/5/4 passed). The real AAC-LC stereo 48-kHz recording changed from 7142.442667 s / 102033724 bytes to 5468.970021 s / 81561519 bytes, retaining its codec, profile, sample rate and channels. Playback and join listening were accepted by the user. See [Testing](../Testing.md#2026-11-23-pr-8-windows-aacm4a-stream-copy-acceptance-evidence). Exact BtbN binary hash, incomplete-DLL, active cancellation and source-change edge cases remain to be separately checked. PR #8 is not merged.

@@ -149,3 +149,34 @@ Use a **pinned and recorded** FFmpeg build (version and package SHA-256) for act
 ## Feature branch implementation note (not yet accepted)
 
 The FFmpeg M4A implementation branch adds a deterministic concat manifest unit check and optional-dependency check. Windows BtbN shared-library, source codec, long-media and join listening checks remain **required**, not yet passed. The M4A runtime dependency is intentionally not downloaded in normal CI.
+
+## 2026-11-23: PR #8 Windows AAC/M4A stream-copy acceptance evidence
+
+**Core feature accepted by user on Windows; PR #8 remains unmerged.** The user ran the feature branch in Windows PowerShell 5.1 and reported these results:
+
+| Test | User-reported outcome |
+| --- | --- |
+| Core assertions | **47 passed, 0 failed**; optional valid-MP3 metadata test skipped |
+| WPF UI assertions | **113 passed, 0 failed**; optional audio-dependent MP3 UI test skipped |
+| Publishing safeguards | **5 passed, 0 failed** |
+| Published EXE checks | **4 passed, 0 failed**, including `FFmpeg-Setup.txt` |
+| Portable EXE publish | **Succeeded** |
+
+The user provided a screenshot of the expected missing-FFmpeg error Toast referring to `FFmpeg-Setup.txt`, an output M4A appearing in the audio list, and the Windows file sizes. **The user confirmed real M4A playback is normal and that joins after removed silences sound natural, without obvious jumps.**
+
+The user's separate `ffprobe.exe` inspection of the actual IELTS listening source and new M4A output yielded:
+
+| Field | Original M4A | Trimmed M4A |
+| --- | ---: | ---: |
+| `codec_name` | `aac` | `aac` |
+| `profile` | `LC` | `LC` |
+| `sample_rate` | `48000` | `48000` |
+| `channels` | `2` | `2` |
+| Audio `bit_rate` (bps) | `112781` | `117800` |
+| Format `duration` (s) | `7142.442667` | `5468.970021` |
+| Format `size` (bytes) | `102033724` | `81561519` |
+| Format `bit_rate` (bps) | `114284` | `119308` |
+
+Duration reduced by **1673.472646 seconds** (27 min 53.473 s) and file size by **20,472,205 bytes** (approximately **20.1%**). AAC-LC, 48-kHz and 2-channel parameters were unchanged; the increased *average* audio bitrate is compatible with removing highly compressible silence while retaining AAC packets. Stream copy is specified via `-c:a copy` in the code. The user's comparison with the old trimmed output found a nearly identical resulting duration; this alone does not prove packet-perfect timing.
+
+**Not yet verified by Windows real-media acceptance:** defective/missing shared DLLs beyond the absent-executable Toast, active-process cancellation, source changes during trimming, detailed timestamp checks at joins, or every pathological path spelling. The exact downloaded BtbN build and ZIP SHA-256 were not supplied, so its binary version is **not** recorded as pinned. The earlier long-pause MP3/WAV listening work remains deferred. Latest post-review CI must be checked separately.
