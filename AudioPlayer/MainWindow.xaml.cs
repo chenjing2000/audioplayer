@@ -94,15 +94,19 @@ public partial class MainWindow : Window
 
     internal async Task LoadFolderAsync(string path)
     {
-        // Keep the current folder and player if scanning the replacement folder fails.
-        var files = await Task.Run(() => AudioLibrary.LoadFolder(path));
-        if (closing) return;
+        // A scan failure must not keep stale media or a missing folder selected.
         CancelAnalysis();
         CancelSelectionCheck();
         await player.CloseAsync();
-        currentFolder = Path.GetFullPath(path);
+        currentFolder = null;
         loadedTrack = null;
         tracks.Clear();
+        RefreshProgress();
+        UpdateControls();
+
+        var files = await Task.Run(() => AudioLibrary.LoadFolder(path));
+        if (closing) return;
+        currentFolder = Path.GetFullPath(path);
         foreach (var file in files) tracks.Add(file);
         int errors = files.Count(file => file.LoadError is not null);
         if (errors > 0) ToastMessages.Show($"{errors} 个文件的标签读取失败，悬停对应行可查看原因。", ToastLevel.Warning);
