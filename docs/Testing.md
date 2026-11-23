@@ -204,3 +204,21 @@ The first rename-only Windows CI found WPF generated-code error CS0426 because a
 PR #10 merged as `main@2be037f`; [post-merge Windows CI #45182410792](https://github.com/chenjing2000/audioplayer/actions/runs/45182410792) succeeded. The user's final Windows acceptance confirmed the refreshed toolbar, 10-DIP progress offset, settings, taskbar icon, playback and AAC/M4A trim. This is historical evidence, not a fresh test of subsequent cleanup changes.
 
 The `feature/code-and-doc-cleanup` follow-up adds a deterministic Core regression ensuring that the folder scanner excludes `.stem.new.<32-digit-GUID>.wav/.mp3/.m4a` temporary trim outputs while retaining legitimate similarly named audio files. The release workflow also attaches `FFmpeg-Setup.txt` beside the EXE asset. The code-fix commit `6c3bc3c` passed [Windows CI #45186001792](https://github.com/chenjing2000/audioplayer/actions/runs/45186001792). The full follow-up revision `225e16f` passed [Windows CI #45186558898](https://github.com/chenjing2000/audioplayer/actions/runs/45186558898): Core, workflow smoke, WPF UI, portable publish and published-EXE steps all succeeded. Hosted audio-device-dependent checks are not a manual real-media acceptance. Draft [PR #11](https://github.com/chenjing2000/audioplayer/pull/11) is not merged; real long-pause MP3/WAV and deferred FFmpeg fault/cancel checks remain unverified.
+
+### 2026-11-23: PR #11 cleanup Windows acceptance
+
+User-supplied Windows PowerShell 5.1 results for `feature/code-and-doc-cleanup`, after fetching/switching/pulling the branch:
+
+| Check | Reported result |
+| --- | --- |
+| `tools/Test.ps1 -Suite Core` | **48 Core assertions passed, 0 failed**; 5 publishing safeguards passed; all 3 wrapper groups passed (0 failed, 0 skipped) |
+| `tools/Test.ps1 -Suite UI` | **48 Core assertions and 127 WPF UI assertions passed, 0 failed**; 5 publishing safeguards passed; all 3 wrapper groups passed (0 failed, 0 skipped) |
+| `tools/Publish.ps1` | Succeeded; `dist/AudioPlayer.exe` produced |
+| `tools/Test-PublishedApp.ps1` | **4 checks passed, 0 failed, 0 skipped**, including FFmpeg setup TXT beside the published EXE |
+| Reopen the folder while trimming | **User-confirmed passed:** unfinished temporary audio is excluded from the list |
+| Refresh after trimming | **User-confirmed passed:** final output is listed and plays normally |
+| Existing M4A playback/trimming and settings persistence | **User-confirmed passed**, no observed regressions |
+
+The new `Folder scans ignore only in-progress trim audio` Core regression explicitly passed. The optional valid-MP3 metadata test and MP3-dependent UI checks printed **SKIP** because no MP3 test input was supplied; that is distinct from the test wrapper's zero skipped *groups*. The user did not report executing `-Suite Full -AudioFile` in this run. Real MP3/WAV long-pause listening and selected FFmpeg incomplete-DLL/cancellation/source-mutation failure cases remain deferred. A future tagged GitHub Release must still be inspected to verify that both downloadable assets actually appear, despite the local TXT publishing test passing.
+
+Latest code-and-documentation revision `e392114` passed [Windows PR CI #45187026289](https://github.com/chenjing2000/audioplayer/actions/runs/45187026289). The present evidence-documentation update requires its own CI result. [Draft PR #11](https://github.com/chenjing2000/audioplayer/pull/11) remains unmerged pending explicit authorization.
