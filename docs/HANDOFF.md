@@ -3,7 +3,7 @@
 **Updated:** 2026-11-23 (PR #11 merged and post-merge checks verified)  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Last verified merged main:** `c90afec` (PR #11, squash merged). [Post-merge Windows CI #45190102017](https://github.com/chenjing2000/audioplayer/actions/runs/45190102017) passed. Local `main` and `origin/main` are synchronized with a clean worktree; the former `feature/code-and-doc-cleanup` branch was deleted locally and remotely by the user.
+**Latest application-code baseline:** `c90afec` (PR #11, squash merged; subsequent documentation-only commits do not change application behavior). [Post-merge Windows CI #45190102017](https://github.com/chenjing2000/audioplayer/actions/runs/45190102017) passed. After PR #11, the user confirmed that their local `main` matched `origin/main`, the worktree was clean, and the former `feature/code-and-doc-cleanup` branch was deleted locally and remotely.
 
 ## Current application behavior
 
