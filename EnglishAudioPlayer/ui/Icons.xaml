@@ -24,7 +24,7 @@
                     <GeometryDrawing.Geometry><EllipseGeometry Center="512,512" RadiusX="480" RadiusY="480"/></GeometryDrawing.Geometry>
                 </GeometryDrawing>
                 <DrawingGroup>
-                    <DrawingGroup.Transform><MatrixTransform Matrix="1.054326923,0,0,1.057939914,-85.80336528,-29.66523632"/></DrawingGroup.Transform>
+                    <DrawingGroup.Transform><MatrixTransform Matrix="1.054326923,0,0,1.057939914,-35.80336528,-29.66523632"/></DrawingGroup.Transform>
                     <GeometryDrawing Brush="#FFFFFF" Geometry="M401.813333 744.96a42.24 42.24 0 0 1-42.186666-42.186667V321.226667a42.24 42.24 0 0 1 63.306666-36.533334l330.666667 190.773334a42.186667 42.186667 0 0 1 0 73.066666l-330.666667 190.773334a41.973333 41.973333 0 0 1-21.12 5.653333z m32.48-358.293333v250.666666a5.333333 5.333333 0 0 0 8 4.64l217.066667-125.386666a5.333333 5.333333 0 0 0 0-9.173334l-217.066667-125.386666a5.333333 5.333333 0 0 0-8 4.64z m281.706667 153.386666z"/>
                 </DrawingGroup>
             </DrawingGroup>
@@ -52,7 +52,7 @@
                     <GeometryDrawing.Geometry><EllipseGeometry Center="512,512" RadiusX="480" RadiusY="480"/></GeometryDrawing.Geometry>
                 </GeometryDrawing>
                 <DrawingGroup>
-                    <DrawingGroup.Transform><MatrixTransform Matrix="0.68,0,0,0.68,163.84,163.84"/></DrawingGroup.Transform>
+                    <DrawingGroup.Transform><MatrixTransform Matrix="0.473239437,0,0,0.473239437,269.701408,269.701408"/></DrawingGroup.Transform>
                     <GeometryDrawing Brush="#FFFFFF"><GeometryDrawing.Geometry><RectangleGeometry Rect="157,157,710,710" RadiusX="110" RadiusY="110"/></GeometryDrawing.Geometry></GeometryDrawing>
                 </DrawingGroup>
             </DrawingGroup>
