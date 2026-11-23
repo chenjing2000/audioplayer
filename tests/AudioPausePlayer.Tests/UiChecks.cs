@@ -151,6 +151,16 @@ internal static class UiChecks
                     Assert(settingsButton.ToolTip?.ToString() == "设置", "Settings gear has the updated name");
                     Assert(settingsButton.HorizontalAlignment == HorizontalAlignment.Center && settingsButton.VerticalAlignment == VerticalAlignment.Center, "Settings button is centered in the top row");
                     Assert(settingsButton.FocusVisualStyle is null, "Settings button has no focus visual");
+                    foreach (string key in new[] { "OpenFolderIcon", "PlayIcon", "PauseIcon", "StopIcon", "TrimIcon", "SettingsIcon" })
+                    {
+                        var drawing = (DrawingGroup)((DrawingImage)window.FindResource(key)).Drawing;
+                        var background = (GeometryDrawing)drawing.Children[1];
+                        var symbol = (DrawingGroup)drawing.Children[2];
+                        Assert(background.Geometry is EllipseGeometry && ColorOf(background.Brush) == "#FF26798A",
+                            key + " uses the same teal circular background");
+                        Assert(symbol.Children.OfType<GeometryDrawing>().All(part => ColorOf(part.Brush) == "#FFFFFFFF"),
+                            key + " has a uniform white foreground");
+                    }
                     var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 324) < 0.01, "Settings window width is 324");
@@ -265,6 +275,11 @@ internal static class UiChecks
                         Assert(image.HorizontalAlignment == HorizontalAlignment.Center && image.VerticalAlignment == VerticalAlignment.Center, button.Name + " icon is horizontally and vertically centered");
                         Assert(button.VerticalAlignment == VerticalAlignment.Center, button.Name + " is vertically centered in the top row");
                         Assert(button.FocusVisualStyle is null, button.Name + " has no focus visual");
+                        Assert(!button.Template.Triggers.OfType<Trigger>()
+                            .SelectMany(trigger => trigger.Setters.OfType<Setter>())
+                            .Any(setter => setter.Property == Border.BorderBrushProperty
+                                || setter.Property == Border.BorderThicknessProperty),
+                            button.Name + " never adds a hover or pressed border");
                     }
                     Assert(list.FocusVisualStyle is null && slider.FocusVisualStyle is null, "DataGrid and slider have no focus visual");
                     Assert(slider.VerticalAlignment == VerticalAlignment.Center && timeText.VerticalAlignment == VerticalAlignment.Center, "Progress slider and time display are vertically centered");
