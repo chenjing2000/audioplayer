@@ -77,6 +77,14 @@ public sealed class ToastHost : Grid
         StartTimer(item);
     }
 
+    internal void CancelTask(ToastMessage item)
+    {
+        if (!item.Task) return;
+        item.Task = false;
+        RemoveNow(item);
+        if (pending.Count > 0 && visible.Count < 3) ShowOrQueue(pending.Dequeue());
+    }
+
     internal void Clear()
     {
         foreach (var item in visible)
