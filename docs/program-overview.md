@@ -141,3 +141,13 @@ dotnet run --project tests/AudioPausePlayer.Tests -c Release -- --ui --playback 
 播放音频后自动校验和复用 `silence.json`，缺失/无效时后台运行原有 RMS 检测。方向键只使用当前播放会话的内存区间；选中列表条目的有效结果用于判断裁剪按钮是否可用。`SilenceTrimmer` 在点击时重新验证源元数据及结果，直接调用原有 `PlanCuts` 帧级裁剪、10 ms 淡化和 WAV/MP3/M4A 系统编码，不对有效缓存重复扫描源 PCM。
 
 新输出按 `<stem>.lesssilence.<ext>`、` (1)`、` (2)` 自动避让同名文件，重新编码后为其实际音频重新检测并保存独立 `silence.json`。不产生无意义复制，不迁移旧 `cache/` 或旧 JSON、不做 SHA。详细要求见 [新规格](specs/Results-Cache-Toast-Refactor.md)，实测记录见 [Testing](Testing.md)。
+
+## 10. 当前图标与验收基线（2026-11-23）
+
+- [PR #3](https://github.com/chenjing2000/audioplayer/pull/3) 完成集中代码精简，保留 WPF code-behind 和必要的异步生命周期保护。
+- [PR #4](https://github.com/chenjing2000/audioplayer/pull/4) 完成 AudioPlayer v3 图标替换：`leaf` 为主图标，工具栏以 `#26798A` 圆底、白色符号显示；图标直径 28，按钮点击区域 36；按钮无边框，悬停和按下仅调整透明度。Play/Pause 是一个按钮的两个状态。
+- [PR #5](https://github.com/chenjing2000/audioplayer/pull/5) 将 Play 三角形略向右移，并将 Stop 方块高度调整为圆形直径的 **35%**。其余图标和业务行为不变。最近一次功能合并提交为 `8aa15b1`。
+- [合并后 Windows CI](https://github.com/chenjing2000/audioplayer/actions/runs/45126656033) 通过 **45 项 Core、111 项 WPF UI** 检查，以及 Workflow、便携式发布和发布版验证。用户已确认 Windows 实机图标效果，并提供本地 `main` 同步、功能分支删除、工作区干净的日志。
+- 之前的真实 M4A、交互与听感验收保留有效；**真实 MP3/WAV 长停顿的实机验收仍暂缓**。较旧章节的历史检查数量不代表当前发布验证。
+
+下一轮开发请先阅读 [HANDOFF](HANDOFF.md) 和 [Testing](Testing.md)，从最新 `main` 开始。未经授权不要合并新功能分支。
