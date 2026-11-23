@@ -4,6 +4,7 @@ These pages describe AudioPlayer. The documentation categories follow the shared
 
 | Document | Responsibility |
 | --- | --- |
+| [Current development handoff](HANDOFF.md) | Latest merged baseline, verification, project boundaries, and next-session setup |
 | [Results/Toast refactor specification](specs/Results-Cache-Toast-Refactor.md) | Implemented and accepted: one silence.json per audio, auto-detection, WPF Toast, settings and playlist changes |
 | [Results/Toast implementation and acceptance](guides/Results-Cache-Toast-Implementation.md) | Historical implementation plan and completed acceptance checklist |
 | [Long-silence trimming specification](specs/Long-Silence-Trimming.md) | Confirmed UI, trimming, codec and safety behavior |
@@ -24,7 +25,7 @@ These pages describe AudioPlayer. The documentation categories follow the shared
 
 ## Version and implementation status
 
-Long-silence trimming and the results/Toast refactor were merged into `main` through PR #1 and PR #2 on 2026-11-23. The refactor passed Core/UI/publish CI plus user-reported real M4A and Windows interaction/listening acceptance; real long-pause MP3/WAV acceptance remains deferred. The previous trimming specification is retained as the historical baseline, with the refactor specification taking precedence where behavior changed.
+Long-silence trimming and the results/Toast refactor were merged into `main` through PR #1 and PR #2 on 2026-11-23; focused simplification through PR #3; the approved unified v3 icons and later Play/Stop balance adjustments through PR #4 and PR #5. The latest feature baseline is `main@8aa15b1` (PR #5). [Windows main CI #45126656033](https://github.com/chenjing2000/audioplayer/actions/runs/45126656033) passed 45 Core and 111 WPF UI assertions plus workflow, portable publish, and published-EXE checks. User-reported Windows M4A/interaction/listening and icon visual acceptance passed; real long-pause MP3/WAV tests remain deferred. The older trimming specification is retained as historical baseline, with the results/Toast specification taking precedence where behavior changed.
 
 ## Maintenance rules
 
