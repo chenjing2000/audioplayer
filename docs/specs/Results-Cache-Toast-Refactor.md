@@ -1,6 +1,6 @@
 # AudioPlayer：统一通知与停顿结果持久化重构规格
 
-状态：**2026-11-23 需求确认；已在功能分支编码并增加回归测试，待 Windows 实机验收；未合并 main**。基线：\`main\` 合并提交 \`c7b92ce\`。实现分支：\`feature/results-cache-toast-refactor\`。
+状态：**2026-11-23 已实现并通过 Windows 实机验收；真实长停顿 MP3/WAV 测试按约定暂缓**。基线：\`main\` 合并提交 \`c7b92ce\`。实现分支：\`feature/results-cache-toast-refactor\`。
 
 本文件是本轮破坏性改造的权威规格；既有 [长静音压缩规格](Long-Silence-Trimming.md) 的 PCM 裁剪、淡化、格式/输出安全规则继续有效，但本文件对通知、结果存储、输出重名、参数精度与任务状态的规定优先。实施步骤见 [实施与验收方案](../guides/Results-Cache-Toast-Implementation.md)。
 
@@ -87,4 +87,4 @@ Audio/
 
 - 不兼容旧 \`cache/\`、旧 \`results/<filename>.json\`、旧格式字段或三位小数输入；不自动扫描或删除旧文件。
 - 不新增独立停顿检测按钮、批量转换、音频哈希、持久化历史复件、额外数据库、FFmpeg 依赖。
-- 保留此前通过的 M4A 裁剪和听感验收证据；此重构尚未实现，不能沿用以前的通过记录声称新流程已测试通过。测试清单见 [实施方案](../guides/Results-Cache-Toast-Implementation.md) 与 [Testing](../Testing.md)。
+- 本重构的实机验收与之前版本的记录分开保存；新版本已完成 M4A 裁剪、交互及听感验收，真实长停顿 MP3/WAV 测试按约定暂缓。测试记录见 [实施方案](../guides/Results-Cache-Toast-Implementation.md) 与 [Testing](../Testing.md)。

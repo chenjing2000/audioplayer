@@ -180,10 +180,10 @@ dotnet run --project tests/AudioPausePlayer.Tests --no-restore -- --ui
 
 Use `.\tools\Test.ps1 -Suite Core`, `-Suite UI`, or `-Suite Full`. After publishing, run `.\tools\Test-PublishedApp.ps1`. External audio/article/dictionary paths are optional explicit arguments; missing optional integration data is reported as skipped. See the [documentation index](docs/README.md) and [test guide](docs/Testing.md). PowerShell source is English-only.
 
-## 长静音裁剪与结果存储（当前开发分支）
+## 长静音裁剪与结果存储
 
 选中具有有效停顿结果且存在可压缩区间的音频后，剪刀按钮可用。点击时再次验证源文件与结果；有效缓存直接供帧级裁剪使用，失效则自动检测后裁剪。音频重新编码后单独生成输出文件的 `results/<完整文件名>/silence.json`。保留 PCM 淡入淡出、源文件安全和系统编码器。
 
 输出名为 `<stem>.lesssilence.<ext>`，重名按 ` (1)`、` (2)` 递增并跳过已占用文件，绝不覆盖；无可压缩区间时不生成副本。仅使用 WAV、MP3、AAC/M4A，不引入 FFmpeg。
 
-本轮 [权威规格](docs/specs/Results-Cache-Toast-Refactor.md) 与 [实施验收](docs/guides/Results-Cache-Toast-Implementation.md) 已在 `feature/results-cache-toast-refactor` 编码，仍需 Windows 真实 M4A 和实际交互验收；未合并 `main`。
+本轮 [权威规格](docs/specs/Results-Cache-Toast-Refactor.md) 与 [实施验收](docs/guides/Results-Cache-Toast-Implementation.md) 已实现，并通过 Windows 真实 M4A、交互和听感验收。真实长停顿 MP3/WAV 测试按约定暂缓；详细记录见 [测试文档](docs/Testing.md)。

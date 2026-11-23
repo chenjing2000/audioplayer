@@ -76,7 +76,7 @@ Evidence supplied by the user from Windows PowerShell on `feature/long-silence-t
 The M4A end-to-end test and listening confirmation are **real-machine acceptance evidence**, not evidence that every system codec, sample rate, MP3 file or WAV file has been tested. Synthetic WAV/PCM regression tests remain in Core. Do not change MP3/WAV real-media coverage from deferred to passed without a separate test.
 
 
-## Feature-branch results/Toast refactor: automated coverage and outstanding acceptance
+## Results/Toast refactor: automated coverage and acceptance
 
 The approved [refactor specification](specs/Results-Cache-Toast-Refactor.md) and [implementation checklist](guides/Results-Cache-Toast-Implementation.md) require updated Core/UI/Full tests for the single `results/<full audio filename>/silence.json` store, metadata-based invalidation without SHA-256, automatic detection/cancellation, navigation from verified in-memory ranges, cache-based trimming without a second scan, numbered non-overwriting outputs, independent results for newly encoded media, Toast behavior, one-decimal settings validation, and playlist alignment.
 
@@ -98,7 +98,7 @@ Workflow: [Feature validation #45101311195](https://github.com/chenjing2000/audi
 | This refactor's real M4A cache/navigation/numbered-trim/output-result/Toast and listening acceptance | **Passed later on the user's Windows machine**; see the dated local acceptance entry below |
 | Real long-pause MP3 and WAV media acceptance | **Deferred** as previously agreed |
 
-This evidence covers compilation, synthetic WAV/PCM cache/trimming cases, WPF layout and settings validation, and published executable checks. Hardware-dependent playback and actual M4A output listening must still be accepted locally; the earlier long-silence M4A listening record cannot substitute for this refactor's acceptance. No merge to \`main\` has been authorized.
+This initial CI evidence covers compilation, synthetic WAV/PCM cache/trimming cases, WPF layout and settings validation, and published executable checks. The later local Windows evidence below independently verifies M4A playback, interaction, trimming, and listening for this refactor. Real MP3/WAV long-pause recordings remain deferred.
 
 ### 2026-11-23: feature refactor local Windows acceptance
 
