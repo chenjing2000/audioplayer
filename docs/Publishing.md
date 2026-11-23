@@ -30,10 +30,10 @@ GitHub 分发统一通过唯一的 portable-* 标签：先审查、验证并提�
 
 Run `tools/Test.ps1 -Suite Core` before publishing and `tools/Test-PublishedApp.ps1` afterward. The GitHub tag workflow now performs both steps before creating the Release. Local real-content Full checks are documented in [Testing](Testing.md).
 
-## Approved next change: optional FFmpeg setup TXT (not yet implemented)
+## Optional FFmpeg setup TXT (implemented in PR #8)
 
-When the [M4A FFmpeg stream-copy feature](specs/FFmpeg-M4A-Stream-Copy.md) is implemented, copy **only** [`FFmpeg-Setup.txt`](FFmpeg-Setup.txt) beside the real executable for both local development/build output and `dist/` publishing. Do not copy the entire repository `README.md`. Retain a framework-dependent single-file `EnglishAudioPlayer.exe`; the separate TXT is documentation, **not** an extra executable or runtime library. Update the portable publish validation to permit/verify the TXT without relaxing the check for unexpected build artifacts. Preserve replacement/rollback and user-data protections.
+The [M4A FFmpeg stream-copy feature](specs/FFmpeg-M4A-Stream-Copy.md) copies **only** [`FFmpeg-Setup.txt`](FFmpeg-Setup.txt) beside the real executable for local build output and `dist/` publishing. The repository's full `README.md` is **not** copied. The main app remains a framework-dependent single-file `EnglishAudioPlayer.exe`; the TXT is separate documentation, not a runtime dependency. Publish validation still rejects unexpected build outputs and preserves the existing EXE replacement and user-data safeguards.
 
-FFmpeg GPL Shared executables/DLLs are **not bundled**, and ordinary publish/CI must not require downloading them. The user installs the optional dependency relative to the EXE at `runtimes/ffmpeg/win-x64/bin/`. Current publishing remains unchanged until this feature is implemented and tested.
+FFmpeg GPL Shared executables/DLLs are **not bundled**, and ordinary publish/CI must not require downloading them. The user installs the optional dependency relative to the EXE at `runtimes/ffmpeg/win-x64/bin/`. This optional dependency was integrated in PR #8 and the publish workflow passed feature-branch Windows checks.
 
-Implementation branch: `FFmpeg-Setup.txt` is copied to the development output by MSBuild and to `dist/` by `Publish.ps1`. The EXE continues to publish as a single framework-dependent binary and FFmpeg is **not** bundled. Full Windows publish tests must verify the new TXT and the prior EXE replacement protections.
+MSBuild copies `FFmpeg-Setup.txt` to development output; `Publish.ps1` copies it to `dist/`. The EXE remains framework-dependent and single-file; FFmpeg binaries are not bundled. Windows feature-branch acceptance verified the setup TXT and prior publish safeguards. The GitHub Release workflow currently uploads the EXE asset; distributing the TXT to Release users is a separate packaging consideration, not an assertion that a TXT asset is attached to existing releases.
