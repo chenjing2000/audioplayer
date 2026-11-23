@@ -17,7 +17,7 @@
 
 `feature/code-and-doc-cleanup` was created from verified `main@2be037f`. It fixes exposure of in-progress trim temporary audio in folder scans, adds a regression fixture, attaches `FFmpeg-Setup.txt` to future GitHub Release assets, ignores local WAV/M4A files in Git, corrects the old cache-name Toast, and avoids buffering unused FFmpeg stderr. Documentation now consolidates the current rules and removes redundant completed implementation plans; historical specifications and dated test evidence remain available.
 
-**This cleanup branch is not merged or Windows-device-accepted.** Check its own CI and Windows tests before proposing a merge. Do not confuse PR #10 acceptance with this branch's tests.
+**This cleanup branch is not merged or Windows-device-accepted.** The final code-and-documentation revision `225e16f` passed [Windows feature CI #45186558898](https://github.com/chenjing2000/audioplayer/actions/runs/45186558898): Core, workflow smoke, WPF UI, portable publish and published-EXE checks. This hosted check does not verify real audio-device playback or manual refresh/trim interaction. Draft [PR #11](https://github.com/chenjing2000/audioplayer/pull/11) is open for review; do not merge without user authorization.
 
 ## Next steps and safety
 
