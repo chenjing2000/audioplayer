@@ -11,6 +11,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="ui/main.ico" />
+    <Content Include="../docs/FFmpeg-Setup.txt" Link="FFmpeg-Setup.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
     <InternalsVisibleTo Include="AudioPausePlayer.Tests" />

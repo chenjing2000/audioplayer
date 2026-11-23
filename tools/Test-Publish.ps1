@@ -31,7 +31,8 @@ function Run-Case($name, [scriptblock]$body) {
     $caseRoot = Join-Path $testRoot ([Guid]::NewGuid().ToString('N'))
     $tools = Join-Path $caseRoot 'tools'
     $dist = Join-Path $caseRoot 'dist'
-    New-Item -ItemType Directory -Path $tools, $dist -Force | Out-Null
+    New-Item -ItemType Directory -Path $tools, $dist, (Join-Path $caseRoot 'docs') -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'docs\FFmpeg-Setup.txt') -Destination (Join-Path $caseRoot 'docs\FFmpeg-Setup.txt')
     Copy-Item -LiteralPath $scriptPath -Destination (Join-Path $tools 'Publish.ps1')
     $release = Join-Path $dist $exeName
     $settings = Join-Path $dist $settingsName
@@ -57,6 +58,7 @@ try {
         & (Join-Path $tools 'Publish.ps1')
         Check ((Get-Content -LiteralPath $release -Raw) -eq 'new-release') 'Release was not updated in dist.'
         Check ((Get-Content -LiteralPath $settings -Raw) -eq 'user-settings') 'Settings changed.'
+        Check (Test-Path -LiteralPath (Join-Path $dist 'FFmpeg-Setup.txt')) 'FFmpeg installation instructions were not published.'
     }
     Run-Case 'reference symbols and XML documentation are excluded from distribution' {
         $global:publishTestBuildMode = 'symbols'

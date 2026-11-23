@@ -309,6 +309,47 @@ Check("Trim WAV output is separately saved, validated, and never overwritten", (
     }
     finally { Directory.Delete(folder, true); }
 });
+Check("FFmpeg concat list retains original time ranges and escapes apostrophes", () =>
+{
+    var cuts = new List<SilenceCut>
+    {
+        new(1000, 2000, 7000, 8000),
+        new(9000, 10000, 15000, 16000)
+    };
+    string source = Path.Combine(Path.GetTempPath(), "O'Brien 课程.m4a");
+    string text = FfmpegM4aTrimmer.BuildConcat(source, cuts, 1000, 18);
+    Assert(text.StartsWith("ffconcat version 1.0\n"));
+    Assert(text.Contains("O'\\''Brien 课程.m4a"));
+    Assert(text.Contains("inpoint 0\noutpoint 2\n"));
+    Assert(text.Contains("inpoint 7\noutpoint 10\n"));
+    Assert(text.Contains("inpoint 15\noutpoint 18\n"));
+    Assert(text.Split("file '").Length == 4);
+    Assert(FfmpegM4aTrimmer.ExecutablePath.EndsWith(
+        Path.Combine("runtimes", "ffmpeg", "win-x64", "bin", "ffmpeg.exe")));
+});
+Check("Missing FFmpeg reports the setup TXT without invoking an encoder", () =>
+{
+    if (File.Exists(FfmpegM4aTrimmer.ExecutablePath)) return; // local machine may have optional tools
+    string folder = Path.Combine(Path.GetTempPath(), "missing-ffmpeg-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        string source = Path.Combine(folder, "source.m4a");
+        bool missing = false;
+        try
+        {
+            FfmpegM4aTrimmer.Trim(source, Path.Combine(folder, "out.m4a"),
+                new List<SilenceCut>(), 48000, 2, CancellationToken.None);
+        }
+        catch (FfmpegUnavailableException ex)
+        {
+            missing = ex.Message.Contains("FFmpeg-Setup.txt");
+        }
+        Assert(missing && Directory.GetFiles(folder).Length == 0);
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
 Check("Trim plan keeps equal sides and drops only middle", () =>
 {
     var silence = new List<SilenceRange> { new() { Start = TimeSpan.FromSeconds(1), End = TimeSpan.FromSeconds(8) } };

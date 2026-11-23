@@ -45,32 +45,30 @@ public static class SilenceTrimmer
         TimeSpan removed = TimeSpan.FromSeconds((double)removedFrames / sampleRate);
         double expectedSeconds = Math.Max(0, duration.TotalSeconds - removed.TotalSeconds);
 
-        // The temporary extension is chosen for Media Foundation's container selection.
-        string temporaryExtension = type == ".m4a" ? ".mp4" : type;
+        // Write the stream-copy result to an M4A temporary file; leave other formats unchanged.
+        string temporaryExtension = type;
         string temporary = Path.Combine(directory,
             "." + stem + ".lesssilence." + Guid.NewGuid().ToString("N") + temporaryExtension);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using (var reader = new AudioFileReader(source))
+            if (type == ".m4a")
             {
+                FfmpegM4aTrimmer.Trim(source, temporary, cuts, sampleRate, duration.TotalSeconds,
+                    cancellationToken);
+            }
+            else
+            {
+                using var reader = new AudioFileReader(source);
                 var trimmed = new TrimSampleProvider(reader, cuts, cancellationToken);
-                switch (type)
-                {
-                    case ".wav":
-                        WaveFileWriter.CreateWaveFile16(temporary, trimmed);
-                        break;
-                    case ".mp3":
-                        MediaFoundationEncoder.EncodeToMp3(trimmed.ToWaveProvider16(), temporary);
-                        break;
-                    case ".m4a":
-                        MediaFoundationEncoder.EncodeToAac(trimmed.ToWaveProvider16(), temporary);
-                        break;
-                }
+                if (type == ".wav")
+                    WaveFileWriter.CreateWaveFile16(temporary, trimmed);
+                else
+                    MediaFoundationEncoder.EncodeToMp3(trimmed.ToWaveProvider16(), temporary);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            TimeSpan resultDuration = ValidateOutput(temporary, expectedSeconds, type);
+            TimeSpan resultDuration = ValidateOutput(temporary, expectedSeconds, type, cuts.Count);
             if (!SilenceResultStore.IsUnchanged(source, analysis.Fingerprint, cancellationToken))
                 throw new IOException("音频在裁剪期间发生变化，输出已取消。");
 
@@ -92,7 +90,7 @@ public static class SilenceTrimmer
                 }
             }
 
-            // The re-encoded output has a new PCM timeline and must be analyzed independently.
+            // The output has a new audio timeline and must be analyzed independently.
             bool outputSaved;
             try
             {
@@ -111,13 +109,13 @@ public static class SilenceTrimmer
         }
     }
 
-    private static TimeSpan ValidateOutput(string temporary, double expectedSeconds, string type)
+    private static TimeSpan ValidateOutput(string temporary, double expectedSeconds, string type, int plannedCutCount)
     {
         if (!File.Exists(temporary) || new FileInfo(temporary).Length == 0)
             throw new InvalidDataException("输出文件为空或不存在。");
         using var check = new AudioFileReader(temporary);
         TimeSpan actual = check.TotalTime;
-        double tolerance = type == ".wav" ? 0.02 : Math.Max(0.50, expectedSeconds * 0.005);
+        double tolerance = type == ".wav" ? 0.02 : type == ".m4a" ? 0.25 + 0.06 * plannedCutCount : Math.Max(0.50, expectedSeconds * 0.005);
         if (!double.IsFinite(actual.TotalSeconds) || actual <= TimeSpan.Zero
             || Math.Abs(actual.TotalSeconds - expectedSeconds) > tolerance)
             throw new InvalidDataException(

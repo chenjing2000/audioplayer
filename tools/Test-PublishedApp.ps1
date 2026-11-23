@@ -16,6 +16,11 @@ try {
     New-Item -ItemType Directory -Path $appDirectory, $workingDirectory | Out-Null
     $exe = Join-Path $appDirectory 'Renamed App.exe'
     Copy-Item -LiteralPath $ExePath -Destination $exe
+    $setup = Join-Path (Split-Path -Parent $ExePath) 'FFmpeg-Setup.txt'
+    Invoke-TestCheck 'FFmpeg setup TXT shipped beside the EXE' {
+        if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Missing FFmpeg-Setup.txt.' }
+        Copy-Item -LiteralPath $setup -Destination (Join-Path $appDirectory 'FFmpeg-Setup.txt')
+    }
     Invoke-TestCheck 'Isolated renamed EXE and configuration location' {
         $script:publishedProcess = Start-Process -FilePath $exe -WorkingDirectory $workingDirectory -WindowStyle Hidden -PassThru
         $deadline = [DateTime]::UtcNow.AddSeconds(20)

@@ -357,6 +357,11 @@ public partial class MainWindow : Window
                     $"{AudioTrack.FormatTime(result.OriginalDuration)}，新时长 {AudioTrack.FormatTime(result.OutputDuration)}。",
                     ToastLevel.Info, TimeSpan.FromSeconds(15));
         }
+        catch (FfmpegUnavailableException ex)
+        {
+            if (!closing && trimToast is not null)
+                ToastMessages.CompleteTask(trimToast, ex.Message, ToastLevel.Error, TimeSpan.FromSeconds(15));
+        }
         catch (OperationCanceledException)
         {
             if (!closing && trimToast is not null)
