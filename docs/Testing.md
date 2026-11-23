@@ -18,7 +18,7 @@ The summary reports Passed, Failed, and Skipped test groups. Existing runners pr
 
 ## Published EXE acceptance
 
-Test-PublishedApp.ps1 copies only the EXE into a temporary path with spaces, renames it, and launches it from another working directory. It checks the main window, configuration placement, clean closure, and the native missing-.NET installation instructions using an isolated runtime root. Installed runtimes and user configuration are untouched. MdictViewer also runs its existing nine application-specific published checks, covering settings, dictionary rendering, and missing WebView2.
+Test-PublishedApp.ps1 copies only the EXE into a temporary path with spaces, renames it, and launches it from another working directory. It checks the main window, configuration placement, clean closure, and the native missing-.NET installation instructions using an isolated runtime root. Installed runtimes and user configuration are untouched.
 
 Use -ExePath to verify an explicit binary. Tests do not publish automatically; an absent EXE is an error. Missing-runtime checks disable the graphical error popup and verify its text instructions rather than visually inspecting the popup. UI/audio checks do not replace listening and manual user acceptance.
 
@@ -125,3 +125,12 @@ This cleanup has **not** yet received a new Windows physical-device listening ch
 - Open, Play/Pause, Stop, Trim and Settings share 36×36 transparent hit targets with 28×28 visible images; hovering or pressing changes only the symbol's overall opacity, never its border or background.
 - Play/Pause remains a single button with two states. The application icon is the approved leaf artwork in a compact multi-size ICO (16, 32, 48, 256 pixels); no SVG runtime dependency was added.
 - WPF checks cover dimensions, resource colors, borderless button templates, and the existing playback UI. Automatic checks do not replace Windows taskbar/title-bar appearance review, hover feedback inspection, or real audio acceptance.
+
+### 2026-11-23: merged icon refinements and current main verification
+
+- [PR #4](https://github.com/chenjing2000/audioplayer/pull/4) introduced the approved v3 icon set, Windows-compatible leaf ICO and borderless 28 px vector toolbar; [PR #5](https://github.com/chenjing2000/audioplayer/pull/5) shifted the white Play triangle slightly right and resized the centered white Stop square to **35%** of the teal circle diameter.
+- The user reported running the updated app on Windows, approved the icon appearance and authorized both merges. The user also showed local `main` and `origin/main` synchronized at **`8aa15b1`**, remote/local feature branches deleted, and a clean `git status --short`.
+- [Windows post-merge main CI #45126656033](https://github.com/chenjing2000/audioplayer/actions/runs/45126656033) **passed**: **45 Core assertions, 111 WPF UI assertions**, workflow smoke checks, portable EXE publishing, and published-app verification. The WPF UI suite includes the Play position and Stop geometry regression assertions.
+- This round changes only icon geometry and documentation. The prior real-M4A and playback listening evidence remains historical evidence; real MP3/WAV long-pause acceptance remains deferred.
+
+For the latest handoff and next development baseline, read [HANDOFF](HANDOFF.md).
