@@ -144,7 +144,9 @@ internal static class UiChecks
                     var settingsImage = FindVisual<Image>(settingsButton)!;
                     Assert(Math.Abs(settingsButton.Width - 36) < 0.01 && Math.Abs(settingsButton.Height - 36) < 0.01 &&
                            Math.Abs(settingsBorder.CornerRadius.TopLeft - 18) < 0.01, "Settings button is circular");
-                    Assert(Math.Abs(settingsImage.Width - 22) < 0.01 && Math.Abs(settingsImage.Height - 22) < 0.01, "Settings icon is 22x22");
+                    Assert(Math.Abs(settingsImage.Width - 28) < 0.01 && Math.Abs(settingsImage.Height - 28) < 0.01, "Settings icon is 28x28");
+                    Assert(settingsBorder.BorderThickness == new Thickness(0) && ColorOf(settingsBorder.Background) == "#00FFFFFF",
+                        "Settings button has no border or visible background");
                     Assert(Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 && Grid.GetColumn(settingsButton) == 6, "Trim button is between stop and settings buttons");
                     Assert(settingsButton.ToolTip?.ToString() == "设置", "Settings gear has the updated name");
                     Assert(settingsButton.HorizontalAlignment == HorizontalAlignment.Center && settingsButton.VerticalAlignment == VerticalAlignment.Center, "Settings button is centered in the top row");
@@ -248,13 +250,17 @@ internal static class UiChecks
 
                     Assert(Math.Abs(window.FontSize - 12) < 0.01 && Math.Abs(timeText.FontSize - 12) < 0.01 && Math.Abs(list.FontSize - 12) < 0.01, "UI font size is 12");
                     Assert(Grid.GetColumn(slider) == 1 && Grid.GetColumn(timeText) == 2 && Grid.GetColumn(playButton) == 3, "Time display sits between progress slider and play button");
-                    foreach (Button button in new[] { openButton, playButton, stopButton })
+                    foreach (Button button in new[] { openButton, playButton, stopButton, trimButton })
                     {
                         button.ApplyTemplate();
                         var border = (Border)button.Template.FindName("ButtonBorder", button);
                         var image = FindVisual<Image>(button)!;
-                        Assert(Math.Abs(button.Width - 36) < 0.01 && Math.Abs(button.Height - 36) < 0.01 && Math.Abs(border.CornerRadius.TopLeft - 7) < 0.01, button.Name + " is a 36x36 rounded square");
-                        Assert(Math.Abs(image.Width - 34) < 0.01 && Math.Abs(image.Height - 34) < 0.01, button.Name + " icon is 34x34");
+                        Assert(Math.Abs(button.Width - 36) < 0.01 && Math.Abs(button.Height - 36) < 0.01
+                            && Math.Abs(border.CornerRadius.TopLeft - 18) < 0.01, button.Name + " has a 36x36 hit area");
+                        Assert(border.BorderThickness == new Thickness(0) && ColorOf(border.Background) == "#00FFFFFF",
+                            button.Name + " has no border or extra background");
+                        Assert(Math.Abs(image.Width - 28) < 0.01 && Math.Abs(image.Height - 28) < 0.01,
+                            button.Name + " icon is 28x28");
                         Assert(button.HorizontalContentAlignment == HorizontalAlignment.Center && button.VerticalContentAlignment == VerticalAlignment.Center, button.Name + " content is centered");
                         Assert(image.HorizontalAlignment == HorizontalAlignment.Center && image.VerticalAlignment == VerticalAlignment.Center, button.Name + " icon is horizontally and vertically centered");
                         Assert(button.VerticalAlignment == VerticalAlignment.Center, button.Name + " is vertically centered in the top row");
