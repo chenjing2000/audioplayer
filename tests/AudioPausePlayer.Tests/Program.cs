@@ -205,7 +205,7 @@ Check("Silence results reuse verified metadata and ignore navigation and trim pa
         File.WriteAllText(path, "{broken");
         Assert(!SilenceResultStore.LoadOrDetect(source, settings).FromCache, "Corrupt cache regenerates");
         var node = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
-        node["ranges"]![0]!["endTicks"] = node["durationTicks"]!.GetValue<long>() + 1000;
+        node["ranges"]![0]!["endTicks"] = node["durationTicks"]!.GetValue<long>() + 10001;
         File.WriteAllText(path, node.ToJsonString());
         Assert(!SilenceResultStore.LoadOrDetect(source, settings).FromCache, "Out-of-bounds range regenerates");
 
