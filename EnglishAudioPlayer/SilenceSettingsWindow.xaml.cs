@@ -184,7 +184,14 @@ public partial class SilenceSettingsWindow : Window
     }
 
     private void SilenceInput_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-        => TryReadValues(out _);
+    {
+        // Dialog action buttons own their own handling. Avoid validating twice on a click.
+        if (ReferenceEquals(e.NewFocus, OkButton)
+            || ReferenceEquals(e.NewFocus, CancelButton)
+            || ReferenceEquals(e.NewFocus, RestoreDefaultsButton))
+            return;
+        TryReadValues(out _);
+    }
 
     private void Field_TextChanged(object sender, TextChangedEventArgs e)
     {
