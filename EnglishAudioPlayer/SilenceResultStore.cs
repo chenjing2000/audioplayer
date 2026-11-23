@@ -162,7 +162,7 @@ internal static class SilenceResultStore
             File.WriteAllText(temporary, JsonSerializer.Serialize(result, JsonOptions));
             cancellation.ThrowIfCancellationRequested();
             if (!IsUnchanged(audioPath, fingerprint, cancellation))
-                throw new IOException("音频在保存停顿信息前发生变化。");
+                throw new InvalidOperationException("音频在保存停顿信息前发生变化，检测结果已丢弃。");
             if (File.Exists(path)) File.Replace(temporary, path, null);
             else File.Move(temporary, path);
             return true;
@@ -173,7 +173,8 @@ internal static class SilenceResultStore
         }
         finally
         {
-            if (File.Exists(temporary)) File.Delete(temporary);
+            try { if (File.Exists(temporary)) File.Delete(temporary); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }
     }
 }
