@@ -9,7 +9,7 @@ public sealed record SilenceTrimResult(
     TimeSpan OutputDuration,
     int TrimmedRangeCount,
     TimeSpan RemovedDuration,
-    bool CopiedUnchanged);
+    bool OutputSilenceSaved);
 
 internal readonly record struct SilenceCut(long SilenceStart, long CutStart, long CutEnd, long SilenceEnd);
 
@@ -30,22 +30,17 @@ public static class SilenceTrimmer
         string source = Path.GetFullPath(sourcePath);
         string directory = Path.GetDirectoryName(source)!;
         string stem = Path.GetFileNameWithoutExtension(source);
-        string destination = Path.Combine(directory, stem + ".lesssilence" + extension);
-        if (File.Exists(destination))
-            throw new IOException("输出文件已存在，请先移动或重命名已有文件：" + destination);
-
         cancellationToken.ThrowIfCancellationRequested();
-        int sampleRate;
-        TimeSpan duration;
-        using (var probe = new AudioFileReader(source))
-        {
-            sampleRate = probe.WaveFormat.SampleRate;
-            duration = probe.TotalTime;
-        }
+        SilenceAnalysis analysis = SilenceResultStore.LoadOrDetect(source, settings, cancellationToken);
+        if (!analysis.Saved)
+            throw new IOException("停顿信息无法写入 results 文件夹，请检查权限后重试。");
+        int sampleRate = analysis.Fingerprint.SampleRate;
+        TimeSpan duration = TimeSpan.FromTicks(analysis.Fingerprint.DurationTicks);
 
-        // All boundaries are based on the unmodified original timeline.
-        List<SilenceRange> silence = SilenceDetector.Detect(source, settings, cancellationToken);
-        List<SilenceCut> cuts = PlanCuts(silence, sampleRate, settings.AllowedSilenceSeconds);
+        // Use exactly the validated result of the original PCM detection.
+        List<SilenceCut> cuts = PlanCuts(analysis.Ranges, sampleRate, settings.AllowedSilenceSeconds);
+        if (cuts.Count == 0)
+            throw new InvalidOperationException("没有超过允许时长的静音区间，无需裁剪。");
         long removedFrames = cuts.Sum(cut => cut.CutEnd - cut.CutStart);
         TimeSpan removed = TimeSpan.FromSeconds((double)removedFrames / sampleRate);
         double expectedSeconds = Math.Max(0, duration.TotalSeconds - removed.TotalSeconds);
@@ -57,25 +52,18 @@ public static class SilenceTrimmer
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (cuts.Count == 0)
+            using (var reader = new AudioFileReader(source))
             {
-                File.Copy(source, temporary);
-            }
-            else
-            {
-                using var reader = new AudioFileReader(source);
                 var trimmed = new TrimSampleProvider(reader, cuts, cancellationToken);
                 switch (type)
                 {
                     case ".wav":
-                        // PCM 16-bit WAV is widely supported, regardless of original WAV bit depth.
                         WaveFileWriter.CreateWaveFile16(temporary, trimmed);
                         break;
                     case ".mp3":
                         MediaFoundationEncoder.EncodeToMp3(trimmed.ToWaveProvider16(), temporary);
                         break;
                     case ".m4a":
-                        // The encoder requires an MP4 container filename; audio-only MP4 is M4A.
                         MediaFoundationEncoder.EncodeToAac(trimmed.ToWaveProvider16(), temporary);
                         break;
                 }
@@ -83,11 +71,39 @@ public static class SilenceTrimmer
 
             cancellationToken.ThrowIfCancellationRequested();
             TimeSpan resultDuration = ValidateOutput(temporary, expectedSeconds, type);
-            // File.Move without overwrite is the atomic commitment step on the same volume.
-            // It will fail rather than overwrite if another task created the target.
-            File.Move(temporary, destination);
+            if (!SilenceResultStore.IsUnchanged(source, analysis.Fingerprint, cancellationToken))
+                throw new IOException("音频在裁剪期间发生变化，输出已取消。");
+
+            // Never overwrite. A competing creator of a candidate name simply makes us try the next.
+            string destination;
+            for (int index = 0; ; index++)
+            {
+                string suffix = index == 0 ? "" : " (" + index + ")";
+                destination = Path.Combine(directory, stem + ".lesssilence" + suffix + extension);
+                try
+                {
+                    File.Move(temporary, destination);
+                    break;
+                }
+                catch (IOException) when (File.Exists(destination))
+                {
+                    if (index == int.MaxValue - 1)
+                        throw new IOException("无法找到可用的裁剪输出文件名。");
+                }
+            }
+
+            // The re-encoded output has a new PCM timeline and must be analyzed independently.
+            bool outputSaved;
+            try
+            {
+                outputSaved = SilenceResultStore.LoadOrDetect(destination, settings, cancellationToken).Saved;
+            }
+            catch (Exception)
+            {
+                outputSaved = false; // Do not remove successfully committed audio.
+            }
             return new SilenceTrimResult(destination, duration, resultDuration,
-                cuts.Count, removed, cuts.Count == 0);
+                cuts.Count, removed, outputSaved);
         }
         finally
         {

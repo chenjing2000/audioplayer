@@ -1,5 +1,7 @@
 # English Audio Player 程序说明
 
+> 本文包含播放器基础功能和历史验证记录；当前开发分支已实现 [results/Toast 重构规格](specs/Results-Cache-Toast-Refactor.md)，仍待 Windows 实机验收及合并。历史测试数据不得当作新版本通过证据。
+
 ## 1. 开发目的
 
 本程序用于播放英语学习音频，并根据音频中的自然停顿位置进行快速前后跳转。
@@ -13,11 +15,13 @@
 - **MainWindow**：负责主界面、用户操作、播放列表显示以及各模块之间的协调；不直接解码音频或读写 JSON。
 - **AudioPlayer**：基于 NAudio 负责音频打开、播放、暂停、停止、Seek、播放位置及资源释放。
 - **SilenceDetector**：读取 PCM 音频数据，计算 RMS/dBFS，识别有效停顿，并查找前后停顿位置。
+- **SilenceResultStore**：校验和原子更新每个音频独有的 `results/<完整文件名>/silence.json`，仅在缓存无效时重扫，不计算 SHA。
+- **ToastHost**：主窗口和设置窗口共享的 WPF 非模态通知。
 - **SilenceRange**：保存一个停顿区间的开始、结束和中间位置。
 - **SilenceSettings**：保存停顿检测及跳转参数、默认值和有效范围。
 - **SettingsStore**：定位主程序同目录的配置文件，并负责初始化、读取、验证和保存用户配置。
 - **SilenceSettingsWindow**：提供停顿参数设置、恢复默认、确定和取消操作。
-- **AudioLibrary**：扫描指定文件夹中的 MP3，进行自然排序并读取标题、专辑和时长等信息。
+- **AudioLibrary**：扫描指定文件夹中的 MP3、M4A 和 WAV，进行自然排序并读取标题、专辑和时长等信息。
 - **AudioTrack**：表示播放列表中的一条音频及其播放状态。
 主窗口允许手动缩放和系统最大化，最小尺寸为 `520 × 420`，没有应用层面的最大尺寸限制。初始宽度为屏幕工作区宽度的 50%，初始高度为工作区高度的 60%，受最小尺寸约束，居中显示。
 
@@ -47,11 +51,11 @@
 
 ## 5. 用户配置
 
-配置文件位于 exe 同一文件夹，名称为 `<主程序名>.settings.json`，默认是 `EnglishAudioPlayer.settings.json`。程序重命名后使用对应名称的配置文件。首次启动若文件不存在，自动写入四项停顿参数的默认值；以后启动读取并校验，设置窗口点击“确定”后先保存再应用。取消不保存。
+配置文件位于 exe 同一文件夹，名称为 `<主程序名>.settings.json`，默认是 `EnglishAudioPlayer.settings.json`。程序重命名后使用对应名称的配置文件。首次启动若文件不存在，自动写入五项停顿/裁剪参数的默认值；以后启动读取并校验，设置窗口点击“确定”后先保存再应用。取消不保存。
 
-保存采用同目录临时文件和文件替换。读取失败时保留原配置、暂用默认参数并在底部提示；此时不允许修改设置，修复文件或目录权限后重新启动。保存失败时保留原参数并在底部提示。配置不会转存到 AppData；程序应放在当前用户可写的文件夹。
+保存采用同目录临时文件和文件替换。读取失败时保留原配置、暂用默认参数并通过错误 Toast 提示；此时不允许修改设置，修复文件或目录权限后重新启动。保存失败时保留原参数并通过错误 Toast 提示。配置不会转存到 AppData；程序应放在当前用户可写的文件夹。
 
-参数输入不合法时，设置窗口内显示提示，5 秒后收起；不弹出额外消息窗口，也不保存或应用错误参数。点击“恢复默认”会清除该提示。
+参数不合法时，设置窗口内使用 Toast 提示并保留红色输入框边框，修正前不保存也不关闭。`AllowedSilenceSeconds` 默认 `2.0`，只允许一位小数；`2.` 可标准化为 `2.0`；恢复默认清除提示。
 
 ## 6. 单文件发布
 
@@ -132,8 +136,8 @@ dotnet run --project tests/AudioPausePlayer.Tests -c Release -- --ui --playback 
 当前没有本地 MP3，MP3 元数据、真实教材停顿效果以及完整的 MP3 播放回归仍未验证；合成 WAV 检查不代表完成教材音频的听感验收。
 
 
-## 9. 长静音压缩（2026-11 功能分支）
+## 9. 长静音压缩与自动结果持久化（当前开发分支）
 
-用户选中音频后点击剪刀按钮。新模块 `SilenceTrimmer` 使用现有 `SilenceDetector` 的静音结果，以原始采样帧为坐标规划各段的中心删除区间，依次拼接原 PCM 音频，并在每个拼接点前后最多 10 ms 线性淡化。原有播放、停止、Seek、停顿跳转仍由 `AudioPlayer` 独立管理。
+播放音频后自动校验和复用 `silence.json`，缺失/无效时后台运行原有 RMS 检测。方向键只使用当前播放会话的内存区间；选中列表条目的有效结果用于判断裁剪按钮是否可用。`SilenceTrimmer` 在点击时重新验证源元数据及结果，直接调用原有 `PlanCuts` 帧级裁剪、10 ms 淡化和 WAV/MP3/M4A 系统编码，不对有效缓存重复扫描源 PCM。
 
-支持 WAV、MP3、AAC/M4A 输出；无 FFmpeg 依赖。输出为 `<stem>.lesssilence.<ext>`，原音频与已有输出均不可覆盖。新设置 `AllowedSilenceSeconds` 默认 2.000，最多三位小数，下限随最短停顿值动态变化：`AllowedSilenceSeconds * 1000 >= MinimumSilenceMilliseconds`；旧配置缺字段时使用兼容默认值。详细行为见 [权威规格](specs/Long-Silence-Trimming.md)。本功能尚需真实 Windows 编解码和听感验收。
+新输出按 `<stem>.lesssilence.<ext>`、` (1)`、` (2)` 自动避让同名文件，重新编码后为其实际音频重新检测并保存独立 `silence.json`。不产生无意义复制，不迁移旧 `cache/` 或旧 JSON、不做 SHA。详细要求见 [新规格](specs/Results-Cache-Toast-Refactor.md)，实测记录见 [Testing](Testing.md)。

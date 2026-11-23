@@ -3,13 +3,13 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Threading;
+using System.Windows.Media;
 
 namespace AudioPausePlayer;
 
 public partial class SilenceSettingsWindow : Window
 {
-    private readonly DispatcherTimer validationTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+    private TextBox? invalidField;
     public SilenceSettings Settings { get; private set; }
 
     public SilenceSettingsWindow(SilenceSettings settings)
@@ -17,15 +17,15 @@ public partial class SilenceSettingsWindow : Window
         InitializeComponent();
         Settings = settings;
         LoadValues(settings);
-        validationTimer.Tick += (_, _) => HideValueError();
-        Closed += (_, _) => validationTimer.Stop();
+
     }
 
     private void RestoreDefaultsButton_Click(object sender, RoutedEventArgs e)
     {
         var defaults = new SilenceSettings();
         LoadValues(defaults);
-        HideValueError();
+        ClearValueError();
+        ToastMessages.Clear();
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -41,7 +41,7 @@ public partial class SilenceSettingsWindow : Window
         MinimumSilenceTextBox.Text = settings.MinimumSilenceMilliseconds.ToString(CultureInfo.InvariantCulture);
         SilenceThresholdTextBox.Text = settings.SilenceThresholdDb.ToString(CultureInfo.InvariantCulture);
         NavigationToleranceTextBox.Text = settings.NavigationToleranceMilliseconds.ToString(CultureInfo.InvariantCulture);
-        AllowedSilenceTextBox.Text = settings.AllowedSilenceSeconds.ToString("0.000", CultureInfo.InvariantCulture);
+        AllowedSilenceTextBox.Text = settings.AllowedSilenceSeconds.ToString("0.0", CultureInfo.InvariantCulture);
     }
 
     private bool TryReadValues(out SilenceSettings settings)
@@ -49,18 +49,18 @@ public partial class SilenceSettingsWindow : Window
         settings = new SilenceSettings();
 
         if (!int.TryParse(FrameMillisecondsTextBox.Text.Trim(), out int frameMilliseconds))
-            return ShowValueError("分析帧长度必须是整数。");
+            return ShowValueError("分析帧长度必须是整数。", FrameMillisecondsTextBox);
         if (!int.TryParse(MinimumSilenceTextBox.Text.Trim(), out int minimumSilenceMilliseconds))
-            return ShowValueError("最短停顿时长必须是整数。");
+            return ShowValueError("最短停顿时长必须是整数。", MinimumSilenceTextBox);
         if (!int.TryParse(SilenceThresholdTextBox.Text.Trim(), out int silenceThresholdDb))
-            return ShowValueError("静音阈值必须是整数。");
+            return ShowValueError("静音阈值必须是整数。", SilenceThresholdTextBox);
         if (!int.TryParse(NavigationToleranceTextBox.Text.Trim(), out int navigationToleranceMilliseconds))
-            return ShowValueError("前后跳转容差必须是整数。");
+            return ShowValueError("前后跳转容差必须是整数。", NavigationToleranceTextBox);
         string allowedText = AllowedSilenceTextBox.Text.Trim();
         if (!IsCompleteSilenceSeconds(allowedText)
             || !decimal.TryParse(allowedText, NumberStyles.AllowDecimalPoint,
                 CultureInfo.InvariantCulture, out decimal allowedSeconds))
-            return ShowValueError("允许静音时长必须是完整的非负小数，最多三位小数。");
+            return ShowValueError("允许静音时长不能为空，且最多只能有一位小数。", AllowedSilenceTextBox);
 
         settings.FrameMilliseconds = frameMilliseconds;
         settings.MinimumSilenceMilliseconds = minimumSilenceMilliseconds;
@@ -74,9 +74,19 @@ public partial class SilenceSettingsWindow : Window
         }
         catch (ArgumentOutOfRangeException ex)
         {
-            return ShowValueError(ex.Message.Split('\n')[0]);
+            TextBox field = ex.ParamName switch
+            {
+                nameof(SilenceSettings.FrameMilliseconds) => FrameMillisecondsTextBox,
+                nameof(SilenceSettings.MinimumSilenceMilliseconds) => MinimumSilenceTextBox,
+                nameof(SilenceSettings.SilenceThresholdDb) => SilenceThresholdTextBox,
+                nameof(SilenceSettings.NavigationToleranceMilliseconds) => NavigationToleranceTextBox,
+                _ => AllowedSilenceTextBox
+            };
+            return ShowValueError(ex.Message.Split('\n')[0], field);
         }
 
+        AllowedSilenceTextBox.Text = allowedSeconds.ToString("0.0", CultureInfo.InvariantCulture);
+        ClearValueError();
         return true;
     }
 
@@ -150,10 +160,10 @@ public partial class SilenceSettingsWindow : Window
     }
 
     private static bool IsEditableSilenceSeconds(string text)
-        => Regex.IsMatch(text, @"^[0-9]*(?:\.[0-9]{0,3})?$");
+        => Regex.IsMatch(text, @"^[0-9]*(?:\.[0-9]?)?$");
 
     private static bool IsCompleteSilenceSeconds(string text)
-        => Regex.IsMatch(text, @"^[0-9]+(?:\.[0-9]{1,3})?$");
+        => Regex.IsMatch(text, @"^[0-9]+(?:\.[0-9]?)?$");
 
     private void AllowedSilenceTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         => e.Handled = !IsEditableSilenceSeconds(BuildCandidateText((TextBox)sender, e.Text));
@@ -166,62 +176,60 @@ public partial class SilenceSettingsWindow : Window
             e.CancelCommand();
     }
 
-    private void AllowedSilenceTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
-        e.Handled = true; // Prevent the dialog's IsDefault OK button from closing it.
-        ValidateLinkedSilenceValues();
-    }
-
-    private void MinimumSilenceTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter) return;
-        e.Handled = true;
-        ValidateLinkedSilenceValues();
+        e.Handled = true; // Enter checks values without accepting or closing the dialog.
+        TryReadValues(out _);
     }
 
     private void SilenceInput_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-        => ValidateLinkedSilenceValues();
-
-    private void ValidateLinkedSilenceValues()
     {
-        if (!int.TryParse(MinimumSilenceTextBox.Text.Trim(), out int minimum)
-            || minimum < 50 || minimum > 5000)
-        {
-            ShowValueError("最短停顿时长必须是 50 到 5000 ms 的整数。");
+        // Dialog action buttons own their own handling. Avoid validating twice on a click.
+        if (ReferenceEquals(e.NewFocus, OkButton)
+            || ReferenceEquals(e.NewFocus, CancelButton)
+            || ReferenceEquals(e.NewFocus, RestoreDefaultsButton))
             return;
-        }
-        string input = AllowedSilenceTextBox.Text.Trim();
-        if (!IsCompleteSilenceSeconds(input)
-            || !decimal.TryParse(input, NumberStyles.AllowDecimalPoint,
-                CultureInfo.InvariantCulture, out decimal allowed))
-        {
-            ShowValueError("允许静音时长不能为空，必须是最多三位小数的数值。");
-            return;
-        }
-        if (allowed < minimum / 1000m)
-        {
-            ShowValueError($"允许静音时长不得低于 {minimum / 1000m:0.000} 秒。");
-            return;
-        }
-        HideValueError();
+        TryReadValues(out _);
     }
 
-    private bool ShowValueError(string message)
+    private void Field_TextChanged(object sender, TextChangedEventArgs e)
     {
-        validationTimer.Stop();
-        ValidationText.Text = "参数错误：" + message;
-        HelpText.Visibility = Visibility.Collapsed;
-        ValidationBar.Visibility = Visibility.Visible;
-        validationTimer.Start();
+        if (sender is not TextBox box || !ReferenceEquals(box, invalidField)) return;
+        if (IsFieldValid(box)) ClearValueError();
+    }
+
+    private bool IsFieldValid(TextBox box)
+    {
+        if (ReferenceEquals(box, FrameMillisecondsTextBox))
+            return int.TryParse(box.Text, out int frameValue) && frameValue is >= 1 and <= 100;
+        if (ReferenceEquals(box, MinimumSilenceTextBox))
+            return int.TryParse(box.Text, out int minimumValue) && minimumValue is >= 50 and <= 5000;
+        if (ReferenceEquals(box, SilenceThresholdTextBox))
+            return int.TryParse(box.Text, out int thresholdValue) && thresholdValue is >= -100 and <= 0;
+        if (ReferenceEquals(box, NavigationToleranceTextBox))
+            return int.TryParse(box.Text, out int toleranceValue) && toleranceValue is >= 1 and <= 5000;
+        string input = box.Text.Trim();
+        return IsCompleteSilenceSeconds(input)
+            && decimal.TryParse(input, NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out decimal seconds)
+            && int.TryParse(MinimumSilenceTextBox.Text, out int minimum)
+            && seconds >= minimum / 1000m;
+    }
+
+    private bool ShowValueError(string message, TextBox field)
+    {
+        if (invalidField is not null && !ReferenceEquals(invalidField, field))
+            invalidField.ClearValue(TextBox.BorderBrushProperty);
+        invalidField = field;
+        field.BorderBrush = Brushes.IndianRed;
+        ToastMessages.Show(message, ToastLevel.Warning);
         return false;
     }
 
-    private void HideValueError()
+    private void ClearValueError()
     {
-        validationTimer.Stop();
-        ValidationText.Text = "";
-        ValidationBar.Visibility = Visibility.Collapsed;
-        HelpText.Visibility = Visibility.Visible;
+        invalidField?.ClearValue(TextBox.BorderBrushProperty);
+        invalidField = null;
     }
 }

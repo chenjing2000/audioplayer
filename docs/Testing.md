@@ -38,7 +38,7 @@ External data paths are passed as arguments; scripts do not hard-code a develope
 
 Use `-AudioDirectory` with a **folder containing actual MP3 files**. It copies one MP3 into a temporary directory and runs the legacy MP3 metadata, playback, and UI checks. A standalone M4A file must not be passed as an MP3 directory.
 
-Use `-AudioFile` for a **single WAV, MP3, or M4A file**. The runner copies the media to a temporary directory with its **original extension**, runs the real long-silence trimming pipeline and verifies the output extension, that it can be decoded and that the source remains unchanged. This does not pretend that an M4A is MP3; the old MP3-specific playback/UI tests are skipped unless `-AudioDirectory` is also supplied. Large recordings may take extra time to decode and encode.
+Use `-AudioFile` for a **single WAV, MP3, or M4A file containing at least one compressible silence interval**. The runner copies the media to a temporary directory with its **original extension**, runs the real long-silence trimming pipeline and verifies the output extension, that it can be decoded and that the source remains unchanged. A file with no interval longer than the configured allowed duration produces no output by design, so it is not a valid positive trimming fixture. This does not pretend that an M4A is MP3; the old MP3-specific playback/UI tests are skipped unless `-AudioDirectory` is also supplied. Large recordings may take extra time to decode and encode.
 
 ```powershell
 .\tools\Test.ps1 -Suite Full -AudioDirectory '<local MP3 directory>'
@@ -74,3 +74,34 @@ Evidence supplied by the user from Windows PowerShell on `feature/long-silence-t
 | Real MP3 and WAV long-pause recordings | **Deferred at user request**: no suitable recordings available |
 
 The M4A end-to-end test and listening confirmation are **real-machine acceptance evidence**, not evidence that every system codec, sample rate, MP3 file or WAV file has been tested. Synthetic WAV/PCM regression tests remain in Core. Do not change MP3/WAV real-media coverage from deferred to passed without a separate test.
+
+
+## Results/Toast refactor: automated coverage and acceptance
+
+The approved [refactor specification](specs/Results-Cache-Toast-Refactor.md) and [implementation checklist](guides/Results-Cache-Toast-Implementation.md) require updated Core/UI/Full tests for the single `results/<full audio filename>/silence.json` store, metadata-based invalidation without SHA-256, automatic detection/cancellation, navigation from verified in-memory ranges, cache-based trimming without a second scan, numbered non-overwriting outputs, independent results for newly encoded media, Toast behavior, one-decimal settings validation, and playlist alignment.
+
+The implementation and new Core/UI assertions are committed on `feature/results-cache-toast-refactor`. Their actual pass/fail evidence must be taken from this branch's CI runs and new Windows acceptance, not from the earlier M4A/Windows records. Use temporary synthetic WAV/PCM fixtures where possible. Real long-pause MP3/WAV testing remains deferred until suitable files exist; do not turn a Skip into Pass.
+
+
+### 2026-11-23: feature-branch Windows CI evidence
+
+Workflow: [Feature validation #45101311195](https://github.com/chenjing2000/audioplayer/actions/runs/45101311195), commit \`1c50a6cdb\` on \`feature/results-cache-toast-refactor\`.
+
+| Verification | Result |
+| --- | --- |
+| \`tools/Test.ps1 -Suite Core\` | **Passed**: 44 application assertions, 0 failed; publishing safeguard checks passed |
+| \`tools/Test.ps1 -Suite UI\` | **Passed**: 44 core assertions and 77 WPF UI assertions, 0 failed |
+| Portable EXE publish | **Passed** |
+| Published EXE acceptance | **Passed**: 3 groups, 0 failed |
+| Actual audio-device playback during hosted UI tests | **Skipped**: hosted Windows runner reported no available \`waveOut\` output device; playback is not claimed verified |
+| Optional local real MP3 metadata/playback | **Skipped**: no local MP3 supplied to CI |
+| This refactor's real M4A cache/navigation/numbered-trim/output-result/Toast and listening acceptance | **Passed later on the user's Windows machine**; see the dated local acceptance entry below |
+| Real long-pause MP3 and WAV media acceptance | **Deferred** as previously agreed |
+
+This initial CI evidence covers compilation, synthetic WAV/PCM cache/trimming cases, WPF layout and settings validation, and published executable checks. The later local Windows evidence below independently verifies M4A playback, interaction, trimming, and listening for this refactor. Real MP3/WAV long-pause recordings remain deferred.
+
+### 2026-11-23: feature refactor local Windows acceptance
+
+User-supplied local results after the EOF cache-rounding fix at `f12777d`: **Core 45 passed / 0 failed; UI 79 passed / 0 failed; portable publish passed**. The user explicitly confirmed all nine manual acceptance items: first detection and persistent task toast; cache reuse without a second full scan; left/right silence navigation; three repeated trims with unique numbered names; independent `silence.json` for each output and unchanged source; Toast levels and dismissal; one-decimal/empty/minimum settings validation; playlist layout; and listening checks for intact speech and no obvious splice pops. Selecting an already-trimmed output correctly leaves scissors disabled when no compressible intervals remain.
+
+Follow-up defect: clicking Confirm with an empty allowed-silence field initially showed **two identical warning Toasts**, because both the field's focus-loss handler and the Confirm button validated. The feature branch now skips focus-loss validation when keyboard focus moves to a dialog action button while preserving the button's own validation, red field border, and normal input-to-input focus validation. A WPF UI regression asserts exactly one warning for the combined focus-transfer-and-confirm sequence. **Post-fix real-window reconfirmation passed**: the user updated through `27ba90b`, ran `tools/Test.ps1 -Suite UI` (**45 Core assertions and 81 WPF UI assertions passed, 0 failed**), successfully published `dist/EnglishAudioPlayer.exe`, launched it, cleared the allowed-silence field, and confirmed that clicking Confirm shows **exactly one warning Toast**. Publishing safeguards passed (5/5). The feature branch's [Windows CI run #45105610515](https://github.com/chenjing2000/audioplayer/actions/runs/45105610515) also completed successfully. The user's nine other manual feature acceptance checks remain passed. Real MP3 and WAV long-pause acceptance remain deferred; the user-confirmed M4A work does not establish them.

@@ -22,6 +22,8 @@ EnglishAudioPlayer/
 ├── AudioPlayer.cs
 ├── SilenceDetector.cs
 ├── SilenceTrimmer.cs
+├── SilenceResultStore.cs
+├── ToastHost.cs
 ├── SilenceSettings.cs
 ├── SilenceSettingsWindow.xaml / .cs
 ├── SilenceRange.cs
@@ -44,7 +46,9 @@ tests/
 |---|---|
 | `AudioPlayer.cs` | 封装 NAudio，负责打开、播放、暂停、停止、Seek、播放状态和资源释放 |
 | `SilenceDetector.cs` | 独立读取 PCM，计算 RMS/dBFS，识别停顿并提供前后停顿导航 |
-| `SilenceTrimmer.cs` | 在原始采样时间轴计算删除区间、淡化、编码及安全输出 |
+| `SilenceTrimmer.cs` | 读取已验证结果，在原始采样时间轴计算删除区间、淡化、编码及安全输出 |
+| `SilenceResultStore.cs` | 管理唯一的 results/<完整文件名>/silence.json、元数据校验与安全替换 |
+| `ToastHost.cs` | 主窗口和设置窗口共用的 WPF 悬浮消息组件 |
 | `SilenceSettings.cs` | 保存停顿检测与导航参数、默认值和基本范围校验 |
 | `SilenceSettingsWindow.xaml/.cs` | 编辑参数、恢复默认值，不参与音频分析 |
 | `SilenceRange.cs` | 保存停顿起点、终点和中点 |
@@ -78,11 +82,11 @@ dotnet run --project EnglishAudioPlayer/AudioPausePlayer.csproj --no-restore
 - **停止按钮**：停止并归零，保留当前已加载文件。
 - **进度条**：点击或拖动后 Seek，保持原播放/暂停状态。
 - **停止按钮右侧的剪刀按钮**：使用当前选中的音频压缩长静音，生成新的同格式音频文件。
-- **剪刀按钮右侧的圆形设置按钮**：打开停顿检测设置。修改后点“确定”立即生效；当前已加载音频会在后台重新分析，播放状态不变。
+- **剪刀按钮右侧的圆形设置按钮**：打开“设置”。仅当三项检测参数变化时重新分析；导航容差和允许静音时长改变不触发 PCM 扫描。
 - **恢复默认**：将设置页中的五个参数恢复为默认值；点“确定”后应用。
-- **设置错误**：在设置窗口内提示，5 秒后收起；不弹出消息窗口。
+- **设置错误**：在设置窗口以 Toast 提示，无效输入框显示红色边框，修正前不保存或关闭。
 
-分析期间普通播放、暂停、停止和拖动定位仍可使用；为避免多个分析任务重叠，分析完成前不允许切换播放文件或重新打开文件夹。
+加载音频后后台验证 `results/<完整音频文件名>/silence.json`，命中直接复用区间，失效才扫描 PCM；左右方向键只读取已验证的内存区间。检测期间仍可切换音频或文件夹，旧分析会取消。
 
 ## 停顿检测参数
 
@@ -93,7 +97,7 @@ dotnet run --project EnglishAudioPlayer/AudioPausePlayer.csproj --no-restore
 最短停顿时长               300 ms
 静音阈值                   -45 dBFS
 前后跳转容差               200 ms
-允许静音时长               2.000 s
+允许静音时长               2.0 s
 ```
 
 允许范围：
@@ -103,7 +107,7 @@ dotnet run --project EnglishAudioPlayer/AudioPausePlayer.csproj --no-restore
 最短停顿时长               50 - 5000 ms
 静音阈值                   -100 - 0 dBFS
 前后跳转容差               1 - 5000 ms
-允许静音时长               ≥ 最短停顿时长 / 1000 (s)，最多三位小数
+允许静音时长               ≥ 最短停顿时长 / 1000 (s)（显示下限向上取到 0.1 s），最多一位小数
 ```
 
 前三项决定停顿识别，导航容差决定左右方向键在当前位置附近跳过多大的范围。停顿位置取静音区间中点。五项设置保存在主程序同目录的 `<主程序名>.settings.json` 中，下次启动自动读取。
@@ -176,10 +180,10 @@ dotnet run --project tests/AudioPausePlayer.Tests --no-restore -- --ui
 
 Use `.\tools\Test.ps1 -Suite Core`, `-Suite UI`, or `-Suite Full`. After publishing, run `.\tools\Test-PublishedApp.ps1`. External audio/article/dictionary paths are optional explicit arguments; missing optional integration data is reported as skipped. See the [documentation index](docs/README.md) and [test guide](docs/Testing.md). PowerShell source is English-only.
 
-## 长静音裁剪（功能分支）
+## 长静音裁剪与结果存储
 
-从列表中选中一个音频，点击剪刀图标。程序先完整分析静音，再从每一段超过允许静音时长的区间中间删除多余部分，首尾各保留一半，并以最多 10ms 的淡出/淡入处理拼接。分析与输出均使用原始时间轴，源文件保持不变。
+选中具有有效停顿结果且存在可压缩区间的音频后，剪刀按钮可用。点击时再次验证源文件与结果；有效缓存直接供帧级裁剪使用，失效则自动检测后裁剪。音频重新编码后单独生成输出文件的 `results/<完整文件名>/silence.json`。保留 PCM 淡入淡出、源文件安全和系统编码器。
 
-输出在原目录中保存为 `<stem>.lesssilence.<ext>`，已有目标文件时拒绝覆盖；没有需要压缩的静音时直接复制源文件。支持 WAV、MP3、AAC/M4A；WAV 写入 16-bit PCM，MP3/AAC 使用 Windows Media Foundation，暂不引入 FFmpeg。M4A 编码可用性取决于运行电脑的系统组件，需要 Windows 实机测试。
+输出名为 `<stem>.lesssilence.<ext>`，重名按 ` (1)`、` (2)` 递增并跳过已占用文件，绝不覆盖；无可压缩区间时不生成副本。仅使用 WAV、MP3、AAC/M4A，不引入 FFmpeg。
 
-详见 [功能规格](docs/specs/Long-Silence-Trimming.md) 与 [实施及验收方案](docs/guides/Long-Silence-Implementation.md)。当前功能分支的 Windows 编译、媒体实机与发布验收尚未完成，不应以旧日期的报告替代。
+本轮 [权威规格](docs/specs/Results-Cache-Toast-Refactor.md) 与 [实施验收](docs/guides/Results-Cache-Toast-Implementation.md) 已实现，并通过 Windows 真实 M4A、交互和听感验收。真实长停顿 MP3/WAV 测试按约定暂缓；详细记录见 [测试文档](docs/Testing.md)。

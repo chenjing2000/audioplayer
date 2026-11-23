@@ -1,5 +1,7 @@
 # 长静音压缩：实施与验收方案
 
+> **历史开发记录**：此实施计划已完成并通过 [PR #1](https://github.com/chenjing2000/audioplayer/pull/1) 合并到 `main`。文中当时“不得合并 main”等语句是历史开发约束，不代表现在尚未合并。新一轮待实施任务以 [results/Toast 实施方案](Results-Cache-Toast-Implementation.md) 为准。
+
 对应规格：[Long-Silence-Trimming.md](../specs/Long-Silence-Trimming.md)。
 规范来源：`chenjing2000/windowsappplaybook` 的设计框架、可复用模式、UI 指南和验证形态。
 
@@ -44,4 +46,4 @@ E. 增补核心/集成用例，运行原有测试、构建、UI、真实格式�
 
 **验收范围：** M4A/AAC 的实际工作流程与人工听感已通过；WAV 的合成 PCM 回归测试已通过；由于目前缺少有明显停顿的真实 MP3/WAV 文件，这两种格式的真实长静音测试按用户要求暂缓。详情及数据统一记录在 [Testing](../Testing.md#2026-11-23-local-windows-acceptance-evidence-for-long-silence-trimming)，不在本方案重复计数。
 
-当前不合并 `main`，保持功能分支供最终集成验收；不因缺少 MP3/WAV 实际样本引入 FFmpeg 或改变已确定范围。
+该阶段最终已由 PR #1 合并至 `main`（2026-11-23）；真实长停顿 MP3/WAV 实机验收仍暂缓。后续变更另用新分支，不在本历史实施方案中追加新功能要求。
