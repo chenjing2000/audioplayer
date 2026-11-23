@@ -56,21 +56,36 @@ internal static class UiChecks
                     int nativeStyle = GetWindowLong(new System.Windows.Interop.WindowInteropHelper(window).Handle, -16);
                     Assert((nativeStyle & 0x00010000) != 0, "Native maximize button is enabled");
                     Assert(window.ResizeMode == ResizeMode.CanResize, "Window remains resizable");
-                    var notification = (Border)window.FindName("NotificationBar");
-                    var notificationText = (TextBlock)window.FindName("NotificationText");
-                    Assert(notification.Visibility == Visibility.Collapsed, "Notification normally collapsed");
-                    window.ShowNotification("测试信息", false, TimeSpan.Zero, informational: true);
-                    Assert(notification.Visibility == Visibility.Visible && notificationText.Text == "提示：测试信息",
-                        "Informational notice has its own prefix");
+                    var toasts = (ToastHost)window.FindName("ToastMessages");
+                    var toastStack = FindVisual<StackPanel>(toasts)!;
+                    Assert(toastStack.Children.Count == 0, "Toast overlay starts empty");
+                    window.ShowNotification("测试信息", false, informational: true);
+                    Assert(toastStack.Children.Count == 1 &&
+                        FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "普通：测试信息",
+                        "Normal toasts use the information prefix");
                     window.ShowNotification("测试警告", false);
-                    Assert(notification.Visibility == Visibility.Visible && notificationText.Text == "警告：测试警告", "Warning appears inline");
-                    await Task.Delay(2000);
                     window.ShowNotification("测试错误", true);
-                    Assert(notificationText.Text == "错误：测试错误", "Error replaces warning inline");
-                    await Task.Delay(3000);
-                    Assert(notification.Visibility == Visibility.Visible, "New message resets five-second timer");
-                    await Task.Delay(2200);
-                    Assert(notification.Visibility == Visibility.Collapsed && notificationText.Text == "", "Message clears and bar collapses after five seconds");
+                    Assert(toastStack.Children.Count == 3 &&
+                        FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "错误：测试错误",
+                        "Newest visible toast is on top");
+                    window.ShowNotification("排队消息", false, informational: true);
+                    Assert(toastStack.Children.Count == 3, "Only three toast slots are shown");
+                    FindVisual<Button>((Border)toastStack.Children[2])!
+                        .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    await Task.Delay(350);
+                    Assert(toastStack.Children.Count == 3 &&
+                        FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "普通：排队消息",
+                        "Closing the oldest toast dequeues the next message");
+                    await Task.Delay(5500);
+                    Assert(toastStack.Children.OfType<Border>().Any(x =>
+                        FindVisual<TextBlock>(x)?.Text == "错误：测试错误"), "Error toast persists");
+                    toasts.Clear();
+                    var active = toasts.ShowTask("持续检测");
+                    await Task.Delay(5300);
+                    Assert(toastStack.Children.Count == 1, "Task toast remains visible");
+                    toasts.CompleteTask(active, "检测完成", ToastLevel.Info, TimeSpan.FromMilliseconds(150));
+                    await Task.Delay(350);
+                    Assert(toastStack.Children.Count == 0, "Completed task expires in the same slot");
                     await window.LoadFolderAsync(audioFolder);
                     var list = (DataGrid)window.FindName("TrackList");
                     var slider = (Slider)window.FindName("ProgressSlider");
@@ -87,15 +102,19 @@ internal static class UiChecks
                            Math.Abs(settingsBorder.CornerRadius.TopLeft - 18) < 0.01, "Settings button is circular");
                     Assert(Math.Abs(settingsImage.Width - 22) < 0.01 && Math.Abs(settingsImage.Height - 22) < 0.01, "Settings icon is 22x22");
                     Assert(Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 && Grid.GetColumn(settingsButton) == 6, "Trim button is between stop and settings buttons");
+                    Assert(settingsButton.ToolTip?.ToString() == "设置", "Settings gear has the updated name");
                     Assert(settingsButton.HorizontalAlignment == HorizontalAlignment.Center && settingsButton.VerticalAlignment == VerticalAlignment.Center, "Settings button is centered in the top row");
                     Assert(settingsButton.FocusVisualStyle is null, "Settings button has no focus visual");
                     var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
+                    Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 324) < 0.01, "Settings window width is 324");
                     Assert(Math.Abs(settingsWindow.Height - 390) < 0.01, "Settings window height is 390");
                     foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox" })
                     {
                         var textBox = (TextBox)settingsWindow.FindName(textBoxName);
-                        Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop, textBoxName + " is 80 wide, centers its value, and blocks drag/drop text");
+                        Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop, textBoxName + " retains input size and alignment");
+                        textBox.ApplyTemplate();
+                        Assert(FindVisual<Border>(textBox)!.CornerRadius.TopLeft == 6, "Input has rounded corners");
                     }
                     MethodInfo positiveInput = typeof(SilenceSettingsWindow).GetMethod("IsPositiveIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
                     MethodInfo signedInput = typeof(SilenceSettingsWindow).GetMethod("IsSignedIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -103,26 +122,47 @@ internal static class UiChecks
                     Assert((bool)signedInput.Invoke(null, new object[] { "-45" })! && (bool)signedInput.Invoke(null, new object[] { "+45" })! && !(bool)signedInput.Invoke(null, new object[] { "4-5" })! && !(bool)signedInput.Invoke(null, new object[] { "-4.5" })!, "Silence threshold box accepts digits and one leading sign only");
                     MethodInfo editableSeconds = typeof(SilenceSettingsWindow).GetMethod("IsEditableSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
                      MethodInfo completeSeconds = typeof(SilenceSettingsWindow).GetMethod("IsCompleteSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
-                     Assert((bool)editableSeconds.Invoke(null, new object[] { "0." })!
-                         && (bool)editableSeconds.Invoke(null, new object[] { "" })!
-                         && !(bool)editableSeconds.Invoke(null, new object[] { "2.1234" })!
-                         && !(bool)editableSeconds.Invoke(null, new object[] { "2,4" })!, "Trim seconds input rejects invalid characters and precision");
-                     Assert((bool)completeSeconds.Invoke(null, new object[] { "2.500" })!
-                         && !(bool)completeSeconds.Invoke(null, new object[] { "2." })!, "Trim seconds requires complete decimal at confirmation");
+                     Assert((bool)editableSeconds.Invoke(null, new object[] { "2." })!
+                          && (bool)editableSeconds.Invoke(null, new object[] { "" })!
+                          && !(bool)editableSeconds.Invoke(null, new object[] { "2.35" })!
+                          && !(bool)editableSeconds.Invoke(null, new object[] { "2.00" })!,
+                          "Seconds input limits typed and pasted precision");
+                     Assert((bool)completeSeconds.Invoke(null, new object[] { "2." })!
+                          && (bool)completeSeconds.Invoke(null, new object[] { "2.0" })!
+                          && !(bool)completeSeconds.Invoke(null, new object[] { "." })!,
+                          "Trailing period is valid at confirmation");
                      var restoreButton = (Button)settingsWindow.FindName("RestoreDefaultsButton");
-                    var cancelButton = (Button)settingsWindow.FindName("CancelButton");
-                    var okButton = (Button)settingsWindow.FindName("OkButton");
-                    Assert(Math.Abs(restoreButton.Width - 76) < 0.01, "Restore defaults button width is 76");
-                    Assert(Math.Abs(cancelButton.Width - 54) < 0.01 && Math.Abs(okButton.Width - 54) < 0.01, "Cancel and OK button widths are 54");
-                    ((TextBox)settingsWindow.FindName("FrameMillisecondsTextBox")).Text = "0";
-                    okButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    var validationBar = (Border)settingsWindow.FindName("ValidationBar");
-                    Assert(validationBar.Visibility == Visibility.Visible && settingsWindow.Settings.FrameMilliseconds == 10,
-                        "Invalid settings show an inline warning without changing parameters");
-                    await Task.Delay(5200);
-                    Assert(validationBar.Visibility == Visibility.Collapsed && ((TextBlock)settingsWindow.FindName("HelpText")).Visibility == Visibility.Visible,
-                        "Settings warning collapses after five seconds");
-                    settingsWindow.Close();
+                     var cancelButton = (Button)settingsWindow.FindName("CancelButton");
+                     var okButton = (Button)settingsWindow.FindName("OkButton");
+                     Assert(Math.Abs(restoreButton.Width - 76) < 0.01, "Restore button width is 76");
+                     Assert(Math.Abs(cancelButton.Width - 54) < 0.01 && Math.Abs(okButton.Width - 54) < 0.01, "Dialog button widths are 54");
+                     var allowedBox = (TextBox)settingsWindow.FindName("AllowedSilenceTextBox");
+                     MethodInfo readValues = typeof(SilenceSettingsWindow).GetMethod("TryReadValues",
+                         BindingFlags.Instance | BindingFlags.NonPublic)!;
+                     allowedBox.Text = "2.";
+                     Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })!
+                         && allowedBox.Text == "2.0", "Confirming 2. normalizes it to 2.0");
+                     allowedBox.Text = "";
+                     okButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     Assert(allowedBox.BorderBrush == Brushes.IndianRed
+                         && settingsWindow.Settings.AllowedSilenceSeconds == 2.0m,
+                         "Empty value keeps dialog open with a red border");
+                     var modalToasts = (ToastHost)settingsWindow.FindName("ToastMessages");
+                     Assert(FindVisual<StackPanel>(modalToasts)!.Children.Count > 0,
+                         "Modal validates through its own toast");
+                     ((TextBox)settingsWindow.FindName("MinimumSilenceTextBox")).Text = "350";
+                     allowedBox.Text = "0.3";
+                     okButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     Assert(allowedBox.BorderBrush == Brushes.IndianRed,
+                         "Minimum 350ms requires at least 0.4s");
+                     allowedBox.Text = "0.4";
+                     Assert(allowedBox.BorderBrush != Brushes.IndianRed,
+                         "Correcting value clears red border");
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     Assert(allowedBox.Text == "2.0"
+                         && FindVisual<StackPanel>(modalToasts)!.Children.Count == 0,
+                         "Restore clears toast and resets precision");
+                     settingsWindow.Close();
                     Assert(Math.Abs(window.FontSize - 12) < 0.01 && Math.Abs(timeText.FontSize - 12) < 0.01 && Math.Abs(list.FontSize - 12) < 0.01, "UI font size is 12");
                     Assert(Grid.GetColumn(slider) == 1 && Grid.GetColumn(timeText) == 2 && Grid.GetColumn(playButton) == 3, "Time display sits between progress slider and play button");
                     foreach (Button button in new[] { openButton, playButton, stopButton })
@@ -161,7 +201,7 @@ internal static class UiChecks
                     File.WriteAllText(settingsStore.FilePath, invalidConfiguration);
                     var invalidWindow = new MainWindow(settingsStore);
                     Assert(!FieldValue<bool>(invalidWindow, "settingsFileReady")
-                        && ((Border)invalidWindow.FindName("NotificationBar")).Visibility == Visibility.Visible
+                        && FindVisual<StackPanel>((ToastHost)invalidWindow.FindName("ToastMessages"))!.Children.Count > 0
                         && File.ReadAllText(settingsStore.FilePath) == invalidConfiguration,
                         "Invalid configuration is preserved and reported inline");
                     invalidWindow.Close();
@@ -190,6 +230,7 @@ internal static class UiChecks
                         return;
                     }
                     Assert(list.Columns.Count == 4 && list.Items.Count == 3, "Four columns and three MP3 files");
+                    Assert(list.Columns[2].Header?.ToString() == "时长", "Duration header is shortened");
                     list.UpdateLayout();
                     var row0 = (DataGridRow)list.ItemContainerGenerator.ContainerFromIndex(0);
                     var row1 = (DataGridRow)list.ItemContainerGenerator.ContainerFromIndex(1);
