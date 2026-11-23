@@ -1,13 +1,9 @@
 # Getting started
 
-Use Windows x64 with a compatible .NET 10 Windows Desktop Runtime x64. End users do not need the SDK; the ordinary .NET Runtime does not include WPF.
+Windows x64 需要安装 [.NET 10 Windows Desktop Runtime x64](https://dotnet.microsoft.com/download/dotnet/10.0)；普通 .NET Runtime 不包含 WPF，终端用户不需要 SDK。
 
-Launch dist/AudioPlayer.exe or the EXE downloaded from GitHub Releases in a writable directory. Select a local folder of WAV, MP3 or compatible M4A audio. Double-click to play and use Left/Right to navigate silence midpoints. Select a row with validated silence information and compressible pauses, then click the scissors icon. The new file uses `<stem>.lesssilence.<ext>`, or ` (1)`, ` (2)` etc. if necessary; existing audio is never overwritten. The gear opens “设置” (Settings). Audio loading automatically reuses or regenerates `results/<full audio filename>/silence.json`; there is no separate detection button. This behavior has been merged into `main` through PR #2. Audio remains external user data.
+将 `AudioPlayer.exe` 放在有写权限的目录并运行。选择包含 WAV、MP3 或 M4A 的文件夹（非递归），双击列表行播放。Space 暂停或恢复；Left/Right 跳转停顿；进度条支持 Seek。刷新按钮重新扫描当前目录，扫描成功后停止旧播放，扫描失败不更改现有列表。
 
-Settings are stored beside the EXE as AudioPlayer.settings.json. See [Configuration](Configuration.md) for naming and recovery. Close the program before replacing the EXE and preserve existing user files.
+程序自动检测停顿，结果保存在音频目录下的 `results/<完整音频文件名>.silent_segments.json`。选中有可压缩静音、且检测结果有效的文件后，可用剪刀按钮输出 `<stem>.new.<ext>` 或 `<stem>.new (1).<ext>` 等不覆盖的文件。AAC/M4A 裁剪另需安装 [FFmpeg](FFmpeg-Setup.txt)；WAV/MP3 不需要。
 
-Developers need .NET 10 SDK (honor global.json where present). Use [Testing](Testing.md) for verification and [Publishing](Publishing.md) to build the portable EXE. Start with Core checks, then run UI/Full checks serially on the desktop.
-
-## Detailed operation
-
-- [Program operations and modules](program-overview.md)
+设置保存在 EXE 同目录的 `<实际 EXE 名>.settings.json`。更新程序时保留配置和自行安装的运行时。详见 [Configuration](Configuration.md) 和 [Publishing](Publishing.md)。开发和测试命令见 [Testing](Testing.md)。

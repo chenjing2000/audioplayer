@@ -1,27 +1,17 @@
 # Configuration
 
-The configuration file is named after the executable (normally AudioPlayer.settings.json) and lives alongside it, not in the working directory. Renaming the EXE changes the settings filename stem.
+AudioPlayer 配置文件存放在实际 EXE 同目录，默认 `AudioPlayer.settings.json`；重命名 EXE 会更改配置文件名前缀，不自动迁移旧文件。目录必须对当前用户可写。
 
-SettingsStore uses the actual EXE name. Invalid settings are reported and retained; failed writes preserve the previous file.
+| 参数 | 默认值 | 合法范围 |
+| --- | --- | --- |
+| `FrameMilliseconds` | 10 ms | 1–100 ms |
+| `MinimumSilenceMilliseconds` | 300 ms | 50–5000 ms |
+| `SilenceThresholdDb` | -45 dBFS | -100–0 dBFS |
+| `NavigationToleranceMilliseconds` | 200 ms | 1–5000 ms |
+| `AllowedSilenceSeconds` | 2.0 s | 不小于最短停顿时长/1000，最多一位小数 |
 
-## Ownership and updates
+首次启动自动写入完整默认配置；读取缺字段、无效 JSON 或不合法参数时，保留文件，使用会话默认值并提示错误，用户须修复后重启才能再通过设置窗口保存。确认修改时先写同目录临时文件，再原子替换；失败保留旧配置和当前参数，不做静默修复。
 
-The application owns its configuration format. Publishing updates only the EXE and preserves configuration and other user files. Git and Release assets exclude personal settings and media. Do not delete dist to update a program. Use a writable application folder.
+设置窗口允许输入 `2`、`2.`、`2.0` 并在确认时统一显示 `2.0`；空值或非法输入保持窗口打开，显示字段错误。最短停顿 350 ms 时允许时长最低显示 0.4 s。前三项更改后必要时重新分析当前音频；仅导航容差/允许静音时长更改不会重新扫描 PCM。
 
-Acceptance tests launch a renamed EXE in a temporary directory, check configuration placement, and use an isolated runtime root to verify the missing-.NET instructions. Application-specific configuration recovery remains covered by the existing service/UI checks.
-
-## Application-specific details
-
-See [program-overview.md](program-overview.md) and [Testing](Testing.md).
-
-## Long-silence trimming (historical settings behavior before PR #2)
-
-The settings dialog adds `AllowedSilenceSeconds` (default 2.000, at most three decimal places). It must be at least `MinimumSilenceMilliseconds / 1000`. The last confirmed values, not incomplete edits, drive each trim task. Legacy JSON without the new field is initialized to `max(2.000, MinimumSilenceMilliseconds / 1000)`; invalid explicit values are reported, not repaired silently.
-
-The existing EXE-adjacent settings location is retained for backward compatibility and documented as a project-specific exception to WindowsAppPlaybook's default userdata path. See [trimming specification](specs/Long-Silence-Trimming.md).
-
-## Current settings behavior (merged through PR #2)
-
-The [results/Toast refactor](specs/Results-Cache-Toast-Refactor.md) changes `AllowedSilenceSeconds` to default **2.0 s** with at most **one decimal place**; `2.` is normalized to `2.0` when confirmed, while an empty value keeps the settings dialog open with a red input border. The displayed minimum for a 350 ms minimum silence is 0.4 s. The input boxes share a rounded style and the window title becomes “设置”.
-
-This is a **breaking change**: no old-JSON migration or repair logic, and no silent deletion/rewrite of incompatible configuration. Numerically valid existing settings may still load if they satisfy new rules. EXE-adjacent settings are unchanged. This behavior was merged into `main` through PR #2 and accepted on Windows.
+这是项目明确保留的 EXE 同目录配置约定，与 WindowsAppPlaybook 默认用户目录不同。发布仅更新 EXE，不删除配置。早期三位小数配置及旧字段自动填补属于历史行为，不再支持自动迁移；历史规格保留于 Git 历史和 [文档索引](README.md)。

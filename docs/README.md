@@ -1,36 +1,24 @@
 # AudioPlayer documentation
 
-These pages describe AudioPlayer. The documentation categories follow the shared project convention; application behavior and modules are documented here specifically for this player.
+当前行为以 [程序说明](program-overview.md)、[项目契约](project-contract.md) 和实际源码为准。历史规格用于追溯设计，不应覆盖后来合并的规则。
 
-| Document | Responsibility |
+| 文档 | 用途 |
 | --- | --- |
-| [Current development handoff](HANDOFF.md) | Latest merged baseline, verification, project boundaries, and next-session setup |
-| [Results/Toast refactor specification](specs/Results-Cache-Toast-Refactor.md) | Implemented and accepted: one silence.json per audio, auto-detection, WPF Toast, settings and playlist changes |
-| [Results/Toast implementation and acceptance](guides/Results-Cache-Toast-Implementation.md) | Historical implementation plan and completed acceptance checklist |
-| [Long-silence trimming specification](specs/Long-Silence-Trimming.md) | Historical implemented baseline for NAudio/Media Foundation trimming |
-| [FFmpeg AAC/M4A stream-copy specification](specs/FFmpeg-M4A-Stream-Copy.md) | Implemented in PR #8: optional FFmpeg, AAC stream copy, join accuracy and safety |
-| [FFmpeg setup instructions](FFmpeg-Setup.txt) | Standalone installation instructions copied beside the EXE |
-| [Trimming implementation plan](guides/Long-Silence-Implementation.md) | Implementation stages and acceptance requirements |
-| [Project contract](project-contract.md) | Current application-specific standards and exceptions |
-| [Getting Started](Getting-Started.md) | Runtime requirements, launch, and first use |
-| [Application Overview](Application-Overview.md) | Purpose, modules, and application-specific architecture |
-| [Configuration](Configuration.md) | Settings location, ownership, preservation, and recovery |
-| [Testing](Testing.md) | Core/UI/Full entry points, media preparation, and published acceptance |
-| [Publishing](Publishing.md) | Portable profile, staged updates, and GitHub Release workflow |
-| [Release Notes](Release-Notes.md) | Distribution changes and runtime requirements |
-| [Health Check](Health-Check-2026-10-13.md) | Dated verification evidence and limitations |
-| [Code Review](Code-Review-2026-10-13.md) | Module boundaries, local simplification, retained complexity, and current regression evidence |
+| [HANDOFF](HANDOFF.md) | 最新已确认的 `main` 基线、未完成验证与下一轮开发 |
+| [Program overview](program-overview.md) | 当前功能、模块和运行逻辑 |
+| [Project contract](project-contract.md) | 技术、数据安全与项目约束 |
+| [Getting Started](Getting-Started.md) | 最简运行说明 |
+| [Configuration](Configuration.md) | 当前五项配置及安全保存 |
+| [Testing](Testing.md) | 测试命令、历史结果和未完成验收 |
+| [Publishing](Publishing.md) | 便携发布、EXE/安装说明交付 |
+| [FFmpeg setup](FFmpeg-Setup.txt) | 运行时可选依赖的安装说明 |
+| [Release Notes](Release-Notes.md) | 下次发行包的发布说明 |
 
-## Application-specific references
+## 历史规格与审查证据
 
-- [Program operations and modules](program-overview.md)
+- [长静音裁剪原始规格](specs/Long-Silence-Trimming.md)：PR #1 阶段的 PCM 规则；旧 M4A 编码与输出命名已被后续 PR 取代
+- [结果与 Toast 重构规格](specs/Results-Cache-Toast-Refactor.md)：PR #2 的原始规格；其旧 `silence.json` 路径已被 PR #10 取代
+- [FFmpeg M4A stream-copy 规格](specs/FFmpeg-M4A-Stream-Copy.md)：PR #8 引入的 AAC 处理规则
+- [2026-10-13 代码审查](Code-Review-2026-10-13.md) 与 [体检记录](Health-Check-2026-10-13.md)：仅作为当时的事实记录，不代表当前提交重新验收
 
-## Version and implementation status
-
-Long-silence trimming and the results/Toast refactor were merged into `main` through PR #1 and PR #2 on 2026-11-23; focused simplification through PR #3; the approved unified v3 icons and later Play/Stop balance adjustments through PR #4 and PR #5. The latest merged feature baseline is `main@4b4afc6` (PR #8). [Windows main CI #45126656033](https://github.com/chenjing2000/audioplayer/actions/runs/45126656033) passed 45 Core and 111 WPF UI assertions plus workflow, portable publish, and published-EXE checks. User-reported Windows M4A/interaction/listening and icon visual acceptance passed; real long-pause MP3/WAV tests remain deferred. The older trimming specification is retained as historical baseline, with the results/Toast specification taking precedence where behavior changed.
-
-[PR #7](https://github.com/chenjing2000/audioplayer/pull/7) approved the FFmpeg design and [PR #8](https://github.com/chenjing2000/audioplayer/pull/8) merged the implemented M4A stream-copy path. Real Windows M4A playback/listening and user-reported acceptance passed; selected failure-path checks remain unverified (see [Testing](Testing.md)). Only `main` remains in the remote repository after branch cleanup.
-
-## Maintenance rules
-
-Keep executable commands in Testing and Publishing; link them from usage guides. Keep settings rules in Configuration. Record dated results in Health Check rather than implying that an old result verifies later changes. Domain references describe file formats and behavior, not another publishing pipeline. Historical audits and plans remain historical and are not the current workflow entry point.
+已完成的实施计划不再作为日常维护入口；其历史内容可通过 Git 提交记录查看。最新可核实的已合并基线是 PR #10 的 `main@2be037f`，对应 [main CI #45182410792](https://github.com/chenjing2000/audioplayer/actions/runs/45182410792) 通过。后续修复分支的检查结果应另行记录，不能借用上述旧 CI。

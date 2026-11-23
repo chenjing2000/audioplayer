@@ -1,6 +1,6 @@
 # 长静音压缩：确认的产品规格
 
-> **历史基线（已合并 main）**：本文记录 2026-11-23 完成验收的版本。下一轮已确认但**尚未实现**的通知/结果缓存/输出命名/允许静音时长规则见 [results/Toast 重构规格](Results-Cache-Toast-Refactor.md)；若未来实施后有冲突，以新规格为准。此处保留原验收定义，不代表新规则已完成。
+> **历史基线（已合并 main）**：本文记录 PR #1 阶段的原始行为。PR #2、PR #8、PR #10 已先后改变结果路径、M4A 裁剪方式和输出命名；现行行为见 [程序说明](../program-overview.md)，本文件仅用于追溯当时决策。
 
 状态：**2026-11-23 已实现；M4A 实机裁剪与人工听感验收通过，真实 MP3/WAV 长停顿文件测试暂缓。** 详见 [验收记录](../Testing.md#2026-11-23-local-windows-acceptance-evidence-for-long-silence-trimming)。  
 仓库：`chenjing2000/audioplayer`；基线为当前 `main`；功能分支：`feature/long-silence-trimming`。
