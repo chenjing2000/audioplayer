@@ -217,6 +217,45 @@ Check("Silence results reuse verified metadata and ignore navigation and trim pa
     finally { Directory.Delete(folder, true); }
 });
 
+Check("One PCM sample of decoder duration rounding keeps cached silence usable", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "silence-eof-rounding-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    string source = Path.Combine(folder, "end-silence.wav");
+    try
+    {
+        using (var writer = new WaveFileWriter(source, WaveFormat.CreateIeeeFloatWaveFormat(48000, 1)))
+        {
+            float[] audio = new float[48000 * 3];
+            writer.WriteSamples(audio, 0, audio.Length);
+        }
+
+        var settings = new SilenceSettings();
+        var detected = SilenceResultStore.LoadOrDetect(source, settings);
+        Assert(detected.Saved && detected.Ranges.Count == 1, "End-of-file silence was detected");
+
+        string path = SilenceResultStore.GetPath(source);
+        var node = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
+        long durationTicks = node["durationTicks"]!.GetValue<long>();
+        Assert(node["ranges"]![0]!["endTicks"]!.GetValue<long>() == durationTicks,
+            "New results store normalized PCM end boundaries");
+
+        // Reproduce the supplied 48-kHz M4A result: last end 208 ticks past duration.
+        node["ranges"]![0]!["endTicks"] = durationTicks + 208;
+        File.WriteAllText(path, node.ToJsonString());
+        var reused = SilenceResultStore.LoadOrDetect(source, settings);
+        Assert(reused.FromCache && reused.Ranges.Count == 1
+            && reused.Ranges[0].End.Ticks == durationTicks,
+            "A 208-tick EOF rounding difference must not trigger re-detection");
+
+        node["ranges"]![0]!["endTicks"] = durationTicks + 210;
+        File.WriteAllText(path, node.ToJsonString());
+        Assert(SilenceResultStore.TryLoad(source, settings) is null,
+            "More than one sample beyond duration must remain invalid");
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
 Check("Uncompressible silence does not create an output file", () =>
 {
     string folder = Path.Combine(Path.GetTempPath(), "silence-short-" + Guid.NewGuid().ToString("N"));
