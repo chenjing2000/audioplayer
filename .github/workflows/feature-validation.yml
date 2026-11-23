@@ -3,7 +3,7 @@ name: Feature validation
 on:
   push:
     branches:
-      - feature/long-silence-trimming
+      - feature/results-cache-toast-refactor
   pull_request:
     branches:
       - main
