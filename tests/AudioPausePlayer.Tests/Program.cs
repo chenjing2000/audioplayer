@@ -184,8 +184,13 @@ Check("Silence results reuse verified metadata and ignore navigation and trim pa
         WaveFileWriter.CreateWaveFile16(source, new Samples(Signal(100, 4500, 100), 1000, 1, int.MaxValue));
         var settings = new SilenceSettings();
         string path = SilenceResultStore.GetPath(source);
-        Assert(path == Path.Combine(folder, "results", "lesson (1).wav", "silence.json"));
+        Assert(path == Path.Combine(folder, "results", "lesson (1).wav.silent_segments.json"));
+        // Old nested results are not imported or changed by the new flat result store.
+        string legacy = Path.Combine(folder, "results", "lesson (1).wav", "silence.json");
+        Directory.CreateDirectory(Path.GetDirectoryName(legacy)!);
+        File.WriteAllText(legacy, "{old-cache}");
         var first = SilenceResultStore.LoadOrDetect(source, settings);
+        Assert(File.ReadAllText(legacy) == "{old-cache}", "Legacy result remains untouched");
         Assert(!first.FromCache && first.Saved && first.Ranges.Count == 1 && File.Exists(path));
         string original = File.ReadAllText(path);
         Assert(!original.Contains("sha256", StringComparison.OrdinalIgnoreCase), "No content hashing");
@@ -289,17 +294,17 @@ Check("Trim WAV output is separately saved, validated, and never overwritten", (
         long originalLength = new FileInfo(source).Length;
         SilenceTrimResult trimmed = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
         Assert(trimmed.TrimmedRangeCount == 1 && Math.Abs(trimmed.RemovedDuration.TotalSeconds - 5) < 0.01);
-        Assert(trimmed.OutputPath == Path.Combine(folder, "sample.lesssilence.wav"));
+        Assert(trimmed.OutputPath == Path.Combine(folder, "sample.new.wav"));
         Assert(new FileInfo(source).Length == originalLength, "Original source modified");
         using (var output = new AudioFileReader(trimmed.OutputPath))
             Assert(Math.Abs(output.TotalTime.TotalSeconds - 2.2) < 0.02);
         Assert(trimmed.OutputSilenceSaved, "Re-encoded output must have its own silence result");
-        Assert(File.Exists(SilenceResultStore.GetPath(source)), "Source has independent silence.json");
-        Assert(File.Exists(SilenceResultStore.GetPath(trimmed.OutputPath)), "Output has independent silence.json");
+        Assert(File.Exists(SilenceResultStore.GetPath(source)), "Source has independent silent_segments.json");
+        Assert(File.Exists(SilenceResultStore.GetPath(trimmed.OutputPath)), "Output has independent silent_segments.json");
         var second = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
         var third = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
-        Assert(second.OutputPath == Path.Combine(folder, "sample.lesssilence (1).wav"));
-        Assert(third.OutputPath == Path.Combine(folder, "sample.lesssilence (2).wav"));
+        Assert(second.OutputPath == Path.Combine(folder, "sample.new (1).wav"));
+        Assert(third.OutputPath == Path.Combine(folder, "sample.new (2).wav"));
         Assert(second.OutputSilenceSaved && third.OutputSilenceSaved && Directory.GetFiles(folder).Length == 4,
             "Numbered files coexist with independent results");
         File.Delete(second.OutputPath);
