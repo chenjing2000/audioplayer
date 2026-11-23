@@ -135,9 +135,9 @@ This cleanup has **not** yet received a new Windows physical-device listening ch
 
 For the latest handoff and next development baseline, read [HANDOFF](HANDOFF.md).
 
-## Approved next feature: FFmpeg AAC/M4A stream-copy acceptance (pending)
+## Original FFmpeg AAC/M4A acceptance plan (historical, before implementation)
 
-The [approved design](specs/FFmpeg-M4A-Stream-Copy.md) is **not yet implemented**, so none of the checks below is claimed as passed. Future branch acceptance must cover:
+The following [approved design](specs/FFmpeg-M4A-Stream-Copy.md) checklist was written **before implementation**. For actual Windows verification and remaining gaps, see the dated PR #8 acceptance evidence below. The original checklist required:
 
 - Launch, play, seek, detect, cache and MP3/WAV trim without FFmpeg; only M4A trimming checks the dependency. Missing EXE or its DLLs gives an **error Toast referring to `FFmpeg-Setup.txt`**, no MessageBox, fallback encoding, source alteration or committed output.
 - AAC/M4A trim from multiple silence intervals with BtbN Windows x64 GPL Shared: `-c:a copy` without AAC re-encoding or 10 ms fades; reject unsupported M4A codecs. Verify AAC codec, sample rate, channels, packet timestamps, complete decoding, realistic duration/accumulated drift and listening at joins. Do not assume concat `inpoint`/`outpoint` is sample-exact.
@@ -146,9 +146,9 @@ The [approved design](specs/FFmpeg-M4A-Stream-Copy.md) is **not yet implemented*
 
 Use a **pinned and recorded** FFmpeg build (version and package SHA-256) for actual Windows media testing; the downloadable `latest` URL is not a reproducible version. Existing historical Windows acceptance does not cover this forthcoming change.
 
-## Feature branch implementation note (not yet accepted)
+## Original feature-branch implementation note (before Windows acceptance)
 
-The FFmpeg M4A implementation branch adds a deterministic concat manifest unit check and optional-dependency check. Windows BtbN shared-library, source codec, long-media and join listening checks remain **required**, not yet passed. The M4A runtime dependency is intentionally not downloaded in normal CI.
+The initial implementation branch added deterministic concat manifest and optional-dependency checks. At that time, Windows BtbN media/listening acceptance was still pending; later user-reported checks are recorded below. The M4A runtime dependency is intentionally not downloaded in ordinary CI.
 
 ## 2026-11-23: PR #8 Windows AAC/M4A stream-copy acceptance evidence
 
