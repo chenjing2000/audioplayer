@@ -4,8 +4,8 @@ These pages describe AudioPlayer. The documentation categories follow the shared
 
 | Document | Responsibility |
 | --- | --- |
-| [Next-iteration refactor specification](specs/Results-Cache-Toast-Refactor.md) | **Implemented on feature branch; Windows acceptance pending:** single silence.json per audio, auto-detection, WPF Toast, settings and playlist changes |
-| [Next-iteration implementation and acceptance](guides/Results-Cache-Toast-Implementation.md) | Staged development tasks, tests, branch and acceptance checklist |
+| [Results/Toast refactor specification](specs/Results-Cache-Toast-Refactor.md) | Implemented and accepted: one silence.json per audio, auto-detection, WPF Toast, settings and playlist changes |
+| [Results/Toast implementation and acceptance](guides/Results-Cache-Toast-Implementation.md) | Historical implementation plan and completed acceptance checklist |
 | [Long-silence trimming specification](specs/Long-Silence-Trimming.md) | Confirmed UI, trimming, codec and safety behavior |
 | [Trimming implementation plan](guides/Long-Silence-Implementation.md) | Implementation stages and acceptance requirements |
 | [Project contract](project-contract.md) | Current application-specific standards and exceptions |
@@ -24,7 +24,7 @@ These pages describe AudioPlayer. The documentation categories follow the shared
 
 ## Version and implementation status
 
-The long-silence trimming feature was merged to `main` through PR #1 on 2026-11-23. The new results/Toast refactor has implementation and synthetic Core/UI regression coverage in `feature/results-cache-toast-refactor`; it is not merged to `main` and real-media/interaction acceptance is outstanding. The previous trimming specification is preserved as the completed baseline, with new requirements superseding only the relevant behaviors after implementation.
+Long-silence trimming and the results/Toast refactor were merged into `main` through PR #1 and PR #2 on 2026-11-23. The refactor passed Core/UI/publish CI plus user-reported real M4A and Windows interaction/listening acceptance; real long-pause MP3/WAV acceptance remains deferred. The previous trimming specification is retained as the historical baseline, with the refactor specification taking precedence where behavior changed.
 
 ## Maintenance rules
 
