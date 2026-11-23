@@ -13,7 +13,7 @@
 ## 2. 主要模块
 
 - **MainWindow**：负责主界面、用户操作、播放列表显示以及各模块之间的协调；不直接解码音频或读写 JSON。
-- **AudioPlayer**：基于 NAudio 负责音频打开、播放、暂停、停止、Seek、播放位置及资源释放。
+- **PlaybackEngine**：基于 NAudio 负责音频打开、播放、暂停、停止、Seek、播放位置及资源释放。
 - **SilenceDetector**：读取 PCM 音频数据，计算 RMS/dBFS，识别有效停顿，并查找前后停顿位置。
 - **SilenceResultStore**：校验和原子更新每个音频独有的 `results/<完整文件名>.silent_segments.json`，仅在缓存无效时重扫，不计算 SHA。
 - **ToastHost**：主窗口和设置窗口共享的 WPF 非模态通知。

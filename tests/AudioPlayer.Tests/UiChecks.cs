@@ -7,7 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AudioPlayer;
-using PlayerEngine = global::AudioPlayer.AudioPlayer;
+using PlayerEngine = global::AudioPlayer.PlaybackEngine;
 using NAudio.Wave;
 
 internal static class UiChecks

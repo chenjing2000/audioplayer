@@ -19,7 +19,7 @@ AudioPlayer/
 ├── App.xaml / App.xaml.cs
 ├── MainWindow.xaml / MainWindow.xaml.cs
 ├── SettingsStore.cs
-├── AudioPlayer.cs
+├── PlaybackEngine.cs
 ├── SilenceDetector.cs
 ├── SilenceTrimmer.cs
 ├── SilenceResultStore.cs
@@ -44,7 +44,7 @@ tests/
 
 | 文件 | 职责 |
 |---|---|
-| `AudioPlayer.cs` | 封装 NAudio，负责打开、播放、暂停、停止、Seek、播放状态和资源释放 |
+| `PlaybackEngine.cs` | 封装 NAudio，负责打开、播放、暂停、停止、Seek、播放状态和资源释放 |
 | `SilenceDetector.cs` | 独立读取 PCM，计算 RMS/dBFS，识别停顿并提供前后停顿导航 |
 | `SilenceTrimmer.cs` | 读取已验证结果，在原始采样时间轴计算删除区间、淡化、编码及安全输出 |
 | `SilenceResultStore.cs` | 管理唯一的 results/<完整文件名>.silent_segments.json、元数据校验与安全替换 |
@@ -57,7 +57,7 @@ tests/
 | `MainWindow.xaml/.cs` | WPF 布局、用户输入、后台分析和各模块协调 |
 | `SettingsStore.cs` | 在 exe 同目录初始化、验证并保存用户配置 |
 
-`MainWindow` 不处理 PCM、RMS 或 MP3 解码；`SilenceDetector` 不依赖播放器或 UI；`AudioPlayer` 不知道播放列表和停顿检测逻辑。
+`MainWindow` 不处理 PCM、RMS 或 MP3 解码；`SilenceDetector` 不依赖播放器或 UI；`PlaybackEngine` 不知道播放列表和停顿检测逻辑。
 
 ## 运行
 

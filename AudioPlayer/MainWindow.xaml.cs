@@ -15,7 +15,7 @@ namespace AudioPlayer;
 
 public partial class MainWindow : Window
 {
-    private readonly AudioPlayer player = new();
+    private readonly PlaybackEngine player = new();
     private readonly ObservableCollection<AudioTrack> tracks = new();
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private SilenceSettings silenceSettings = new();

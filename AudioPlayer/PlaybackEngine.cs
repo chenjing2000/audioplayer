@@ -2,7 +2,7 @@ using NAudio.Wave;
 
 namespace AudioPlayer;
 
-public sealed class AudioPlayer : IDisposable
+public sealed class PlaybackEngine : IDisposable
 {
     private AudioFileReader? reader;
     private WaveOutEvent? output;

@@ -1,5 +1,5 @@
 using AudioPlayer;
-using PlayerEngine = global::AudioPlayer.AudioPlayer;
+using PlayerEngine = global::AudioPlayer.PlaybackEngine;
 using NAudio.Wave;
 using System.IO;
 
