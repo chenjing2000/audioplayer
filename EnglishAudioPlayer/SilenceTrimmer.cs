@@ -9,7 +9,6 @@ public sealed record SilenceTrimResult(
     TimeSpan OutputDuration,
     int TrimmedRangeCount,
     TimeSpan RemovedDuration,
-    bool CopiedUnchanged,
     bool OutputSilenceSaved);
 
 internal readonly record struct SilenceCut(long SilenceStart, long CutStart, long CutEnd, long SilenceEnd);
@@ -104,7 +103,7 @@ public static class SilenceTrimmer
                 outputSaved = false; // Do not remove successfully committed audio.
             }
             return new SilenceTrimResult(destination, duration, resultDuration,
-                cuts.Count, removed, false, outputSaved);
+                cuts.Count, removed, outputSaved);
         }
         finally
         {
