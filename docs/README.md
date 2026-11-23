@@ -7,7 +7,7 @@ These pages describe AudioPlayer. The documentation categories follow the shared
 | [Current development handoff](HANDOFF.md) | Latest merged baseline, verification, project boundaries, and next-session setup |
 | [Results/Toast refactor specification](specs/Results-Cache-Toast-Refactor.md) | Implemented and accepted: one silence.json per audio, auto-detection, WPF Toast, settings and playlist changes |
 | [Results/Toast implementation and acceptance](guides/Results-Cache-Toast-Implementation.md) | Historical implementation plan and completed acceptance checklist |
-| [Long-silence trimming specification](specs/Long-Silence-Trimming.md) | Confirmed UI, trimming, codec and safety behavior |
+| [Long-silence trimming specification](specs/Long-Silence-Trimming.md) | Historical implemented baseline for NAudio/Media Foundation trimming |\n| [Approved FFmpeg M4A trimming specification](specs/FFmpeg-M4A-Stream-Copy.md) | **Not implemented**: optional FFmpeg, AAC stream copy, join accuracy, safety and tests |\n| [FFmpeg setup instructions](FFmpeg-Setup.txt) | User-facing install-only TXT to be copied beside EXE when the feature is implemented |
 | [Trimming implementation plan](guides/Long-Silence-Implementation.md) | Implementation stages and acceptance requirements |
 | [Project contract](project-contract.md) | Current application-specific standards and exceptions |
 | [Getting Started](Getting-Started.md) | Runtime requirements, launch, and first use |
@@ -27,6 +27,6 @@ These pages describe AudioPlayer. The documentation categories follow the shared
 
 Long-silence trimming and the results/Toast refactor were merged into `main` through PR #1 and PR #2 on 2026-11-23; focused simplification through PR #3; the approved unified v3 icons and later Play/Stop balance adjustments through PR #4 and PR #5. The latest feature baseline is `main@8aa15b1` (PR #5). [Windows main CI #45126656033](https://github.com/chenjing2000/audioplayer/actions/runs/45126656033) passed 45 Core and 111 WPF UI assertions plus workflow, portable publish, and published-EXE checks. User-reported Windows M4A/interaction/listening and icon visual acceptance passed; real long-pause MP3/WAV tests remain deferred. The older trimming specification is retained as historical baseline, with the results/Toast specification taking precedence where behavior changed.
 
-## Maintenance rules
+The M4A FFmpeg stream-copy change has been approved for the **next feature branch**, but has not been developed or verified. Current `main` still re-encodes M4A via Media Foundation; do not describe the approved plan as already shipped.\n\n## Maintenance rules
 
 Keep executable commands in Testing and Publishing; link them from usage guides. Keep settings rules in Configuration. Record dated results in Health Check rather than implying that an old result verifies later changes. Domain references describe file formats and behavior, not another publishing pipeline. Historical audits and plans remain historical and are not the current workflow entry point.

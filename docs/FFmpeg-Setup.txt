@@ -1,0 +1,49 @@
+FFmpeg installation for AudioPlayer (Windows x64)
+================================================
+
+AudioPlayer needs FFmpeg ONLY when trimming long silences from AAC/M4A without
+re-encoding. Playback, seeking and silence detection do not require FFmpeg.
+
+Download:
+  BtbN FFmpeg Builds — Windows x64 GPL Shared
+  https://github.com/FFmpeg-Builds/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl-shared.zip
+
+Installation:
+  1. Download and extract the ZIP.
+  2. Open the extracted package's bin folder.
+  3. Copy ffmpeg.exe, ffprobe.exe and ALL DLL files from bin into the folder:
+       runtimes\ffmpeg\win-x64\bin\
+     This folder is relative to EnglishAudioPlayer.exe. Create missing
+     directories if necessary.
+  4. Return to AudioPlayer and click M4A trim again. No restart is needed.
+
+Expected layout:
+  EnglishAudioPlayer.exe
+  FFmpeg-Setup.txt
+  runtimes\ffmpeg\win-x64\bin\ffmpeg.exe
+  runtimes\ffmpeg\win-x64\bin\ffprobe.exe
+  runtimes\ffmpeg\win-x64\bin\avcodec-*.dll
+  runtimes\ffmpeg\win-x64\bin\avformat-*.dll
+  runtimes\ffmpeg\win-x64\bin\avutil-*.dll
+  runtimes\ffmpeg\win-x64\bin\(all other DLLs from the same ZIP)
+
+ffplay.exe, the include folder, and developer .lib files are not required.
+Do not copy ffmpeg.exe without its DLLs: this is a shared-library build.
+Keep all files from the same downloaded build together.
+
+To verify in PowerShell, from the folder containing EnglishAudioPlayer.exe:
+  & ".\runtimes\ffmpeg\win-x64\bin\ffmpeg.exe" -version
+
+The URL above points to a moving 'latest' build; the version can change.
+Use a known tested build and do not mix DLL files from different builds.
+BtbN is a third-party binary distributor; FFmpeg has open-source license
+obligations if its binaries are redistributed. AudioPlayer does not
+automatically download or bundle FFmpeg.
+
+M4A trimming copies AAC compressed packets rather than re-encoding, so cut
+boundaries can differ slightly from the requested silence duration. Other
+M4A codecs such as ALAC are not part of the supported stream-copy path.
+
+If the command above fails, check that all DLLs were copied to the exact
+folder, that the download is Windows x64 GPL Shared, and that the archive
+was fully extracted.
