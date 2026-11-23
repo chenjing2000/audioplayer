@@ -30,7 +30,11 @@
             <Slider x:Name="ProgressSlider" Grid.Column="1" Margin="20,0,12,0" VerticalAlignment="Center" Minimum="0" Maximum="1" IsEnabled="False"
                         Height="36" IsMoveToPointEnabled="True"
                         ValueChanged="ProgressSlider_ValueChanged"
-                        LostMouseCapture="ProgressSlider_LostMouseCapture"/>
+                        LostMouseCapture="ProgressSlider_LostMouseCapture">
+                <Slider.RenderTransform>
+                    <TranslateTransform Y="5"/>
+                </Slider.RenderTransform>
+            </Slider>
             <TextBlock x:Name="TimeText" Grid.Column="2" Margin="0,0,16,0" Text="00:00 / 00:00" VerticalAlignment="Center"
                            Foreground="#566477"/>
             <Button x:Name="PlayButton" Grid.Column="3" Style="{StaticResource CircleButtonStyle}" ToolTip="播放" AutomationProperties.Name="播放"
