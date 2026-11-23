@@ -180,13 +180,33 @@ internal static class UiChecks
                      Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })!
                          && allowedBox.Text == "2.0", "Confirming 2. normalizes it to 2.0");
                      allowedBox.Text = "";
+                     var modalToasts = (ToastHost)settingsWindow.FindName("ToastMessages");
+                     var modalToastStack = FindVisual<StackPanel>(modalToasts)!;
+                     foreach (Button actionButton in new[] { okButton, cancelButton, restoreButton })
+                     {
+                         // Clicking an action changes keyboard focus before raising its Click event.
+                         var focusLoss = new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice,
+                             Environment.TickCount, allowedBox, actionButton)
+                         { RoutedEvent = Keyboard.LostKeyboardFocusEvent };
+                         allowedBox.RaiseEvent(focusLoss);
+                     }
+                     Assert(modalToastStack.Children.Count == 0,
+                         "Dialog action focus changes do not validate or warn before the action");
                      okButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                      Assert(allowedBox.BorderBrush == Brushes.IndianRed
                          && settingsWindow.Settings.AllowedSilenceSeconds == 2.0m,
                          "Empty value keeps dialog open with a red border");
-                     var modalToasts = (ToastHost)settingsWindow.FindName("ToastMessages");
-                     Assert(FindVisual<StackPanel>(modalToasts)!.Children.Count > 0,
-                         "Modal validates through its own toast");
+                     Assert(modalToastStack.Children.Count == 1,
+                         "One invalid confirmation shows exactly one warning toast");
+                     modalToasts.Clear();
+                     var minimumBox = (TextBox)settingsWindow.FindName("MinimumSilenceTextBox");
+                     var normalFocusLoss = new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice,
+                         Environment.TickCount, allowedBox, minimumBox)
+                     { RoutedEvent = Keyboard.LostKeyboardFocusEvent };
+                     allowedBox.RaiseEvent(normalFocusLoss);
+                     Assert(modalToastStack.Children.Count == 1,
+                         "Moving between inputs still validates once on focus loss");
+                     modalToasts.Clear();
                      ((TextBox)settingsWindow.FindName("MinimumSilenceTextBox")).Text = "350";
                      allowedBox.Text = "0.3";
                      okButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
