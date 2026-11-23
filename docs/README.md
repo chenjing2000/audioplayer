@@ -4,7 +4,7 @@ These pages describe AudioPlayer. The documentation categories follow the shared
 
 | Document | Responsibility |
 | --- | --- |
-| [Next-iteration refactor specification](specs/Results-Cache-Toast-Refactor.md) | **Approved, not implemented:** single silence.json per audio, auto-detection, WPF Toast, settings and playlist changes |
+| [Next-iteration refactor specification](specs/Results-Cache-Toast-Refactor.md) | **Implemented on feature branch; Windows acceptance pending:** single silence.json per audio, auto-detection, WPF Toast, settings and playlist changes |
 | [Next-iteration implementation and acceptance](guides/Results-Cache-Toast-Implementation.md) | Staged development tasks, tests, branch and acceptance checklist |
 | [Long-silence trimming specification](specs/Long-Silence-Trimming.md) | Confirmed UI, trimming, codec and safety behavior |
 | [Trimming implementation plan](guides/Long-Silence-Implementation.md) | Implementation stages and acceptance requirements |
@@ -24,7 +24,7 @@ These pages describe AudioPlayer. The documentation categories follow the shared
 
 ## Version and implementation status
 
-The long-silence trimming feature was merged to `main` through PR #1 on 2026-11-23. The new results/Toast refactor is **only a confirmed plan** in `feature/results-cache-toast-refactor`; do not treat its behavior as implemented until code changes and new acceptance tests pass. The previous trimming specification is preserved as the completed baseline, with new requirements superseding only the relevant behaviors after implementation.
+The long-silence trimming feature was merged to `main` through PR #1 on 2026-11-23. The new results/Toast refactor has implementation and synthetic Core/UI regression coverage in `feature/results-cache-toast-refactor`; it is not merged to `main` and real-media/interaction acceptance is outstanding. The previous trimming specification is preserved as the completed baseline, with new requirements superseding only the relevant behaviors after implementation.
 
 ## Maintenance rules
 
