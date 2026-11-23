@@ -130,3 +130,10 @@ dotnet run --project tests/AudioPausePlayer.Tests -c Release -- --ui --playback 
 35 项核心检查、58 项 WPF 检查通过。新增测试先复现静音阈值边界和音频切换失败，再验证整改；使用临时合成静音 WAV 检查真实设备打开、停止和再次加载，不写入用户音频目录。
 
 当前没有本地 MP3，MP3 元数据、真实教材停顿效果以及完整的 MP3 播放回归仍未验证；合成 WAV 检查不代表完成教材音频的听感验收。
+
+
+## 9. 长静音压缩（2026-11 功能分支）
+
+用户选中音频后点击剪刀按钮。新模块 `SilenceTrimmer` 使用现有 `SilenceDetector` 的静音结果，以原始采样帧为坐标规划各段的中心删除区间，依次拼接原 PCM 音频，并在每个拼接点前后最多 10 ms 线性淡化。原有播放、停止、Seek、停顿跳转仍由 `AudioPlayer` 独立管理。
+
+支持 WAV、MP3、AAC/M4A 输出；无 FFmpeg 依赖。输出为 `<stem>.lesssilence.<ext>`，原音频与已有输出均不可覆盖。新设置 `AllowedSilenceSeconds` 默认 2.000，最多三位小数，下限随最短停顿值动态变化：`AllowedSilenceSeconds * 1000 >= MinimumSilenceMilliseconds`；旧配置缺字段时使用兼容默认值。详细行为见 [权威规格](specs/Long-Silence-Trimming.md)。本功能尚需真实 Windows 编解码和听感验收。

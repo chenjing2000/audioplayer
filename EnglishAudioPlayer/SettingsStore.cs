@@ -35,8 +35,17 @@ internal sealed class SettingsStore
             return defaults;
         }
 
-        var settings = JsonSerializer.Deserialize<SilenceSettings>(File.ReadAllText(FilePath))
+        string json = File.ReadAllText(FilePath);
+        var settings = JsonSerializer.Deserialize<SilenceSettings>(json)
             ?? throw new JsonException("配置文件不能为 null。");
+        using (var document = JsonDocument.Parse(json))
+        {
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+                throw new JsonException("配置文件必须是 JSON 对象。");
+            if (!document.RootElement.TryGetProperty(nameof(SilenceSettings.AllowedSilenceSeconds), out _))
+                settings.AllowedSilenceSeconds = Math.Max(SilenceSettings.DefaultAllowedSilenceSeconds,
+                    settings.MinimumSilenceMilliseconds / 1000m);
+        }
         settings.Validate();
         return settings;
     }

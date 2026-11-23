@@ -46,6 +46,24 @@
         </DrawingImage.Drawing>
     </DrawingImage>
 
+    <DrawingImage x:Key="TrimIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="Transparent" Geometry="M0,0 H24 V24 H0 Z"/>
+                <GeometryDrawing Geometry="M7,7 L19,19 M7,17 L19,5">
+                    <GeometryDrawing.Pen><Pen Brush="#566477" Thickness="1.9" StartLineCap="Round"/></GeometryDrawing.Pen>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#FFFFFF">
+                    <GeometryDrawing.Geometry><EllipseGeometry Center="5.3,5.5" RadiusX="2.5" RadiusY="2.5"/></GeometryDrawing.Geometry>
+                    <GeometryDrawing.Pen><Pen Brush="#566477" Thickness="1.7"/></GeometryDrawing.Pen>
+                </GeometryDrawing>
+                <GeometryDrawing Brush="#FFFFFF">
+                    <GeometryDrawing.Geometry><EllipseGeometry Center="5.3,18.5" RadiusX="2.5" RadiusY="2.5"/></GeometryDrawing.Geometry>
+                    <GeometryDrawing.Pen><Pen Brush="#566477" Thickness="1.7"/></GeometryDrawing.Pen>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
     <DrawingImage x:Key="SettingsIcon">
         <DrawingImage.Drawing>
             <DrawingGroup>

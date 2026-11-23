@@ -13,3 +13,9 @@ Acceptance tests launch a renamed EXE in a temporary directory, check configurat
 ## Application-specific details
 
 See [program-overview.md](program-overview.md) and [Testing](Testing.md).
+
+## Long-silence trimming
+
+The settings dialog adds `AllowedSilenceSeconds` (default 2.000, at most three decimal places). It must be at least `MinimumSilenceMilliseconds / 1000`. The last confirmed values, not incomplete edits, drive each trim task. Legacy JSON without the new field is initialized to `max(2.000, MinimumSilenceMilliseconds / 1000)`; invalid explicit values are reported, not repaired silently.
+
+The existing EXE-adjacent settings location is retained for backward compatibility and documented as a project-specific exception to WindowsAppPlaybook's default userdata path. See [trimming specification](specs/Long-Silence-Trimming.md).
