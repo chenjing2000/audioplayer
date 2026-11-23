@@ -1,6 +1,6 @@
 # Configuration
 
-The current configuration file is EnglishAudioPlayer.settings.json beside the actual executable. It follows the EXE directory rather than the working directory. For AudioPlayer, ReciteWords, and ReadArticles, renaming the EXE changes the .settings.json stem; MdictViewer always uses dictionaries.json.
+The configuration file is named after the executable (normally EnglishAudioPlayer.settings.json) and lives alongside it, not in the working directory. Renaming the EXE changes the settings filename stem.
 
 SettingsStore uses the actual EXE name. Invalid settings are reported and retained; failed writes preserve the previous file.
 
@@ -14,14 +14,14 @@ Acceptance tests launch a renamed EXE in a temporary directory, check configurat
 
 See [program-overview.md](program-overview.md) and [Testing](Testing.md).
 
-## Long-silence trimming (historical `main` baseline)
+## Long-silence trimming (historical settings behavior before PR #2)
 
 The settings dialog adds `AllowedSilenceSeconds` (default 2.000, at most three decimal places). It must be at least `MinimumSilenceMilliseconds / 1000`. The last confirmed values, not incomplete edits, drive each trim task. Legacy JSON without the new field is initialized to `max(2.000, MinimumSilenceMilliseconds / 1000)`; invalid explicit values are reported, not repaired silently.
 
 The existing EXE-adjacent settings location is retained for backward compatibility and documented as a project-specific exception to WindowsAppPlaybook's default userdata path. See [trimming specification](specs/Long-Silence-Trimming.md).
 
-## Results/Toast refactor (implemented on feature branch; acceptance pending)
+## Current settings behavior (merged through PR #2)
 
 The [results/Toast refactor](specs/Results-Cache-Toast-Refactor.md) changes `AllowedSilenceSeconds` to default **2.0 s** with at most **one decimal place**; `2.` is normalized to `2.0` when confirmed, while an empty value keeps the settings dialog open with a red input border. The displayed minimum for a 350 ms minimum silence is 0.4 s. The input boxes share a rounded style and the window title becomes “设置”.
 
-This is a **breaking change**: no old-JSON migration or repair logic, and no silent deletion/rewrite of incompatible configuration. Numerically valid existing settings may still load if they satisfy new rules. EXE-adjacent settings are unchanged. This behavior is in `feature/results-cache-toast-refactor`, not yet merged to `main`.
+This is a **breaking change**: no old-JSON migration or repair logic, and no silent deletion/rewrite of incompatible configuration. Numerically valid existing settings may still load if they satisfy new rules. EXE-adjacent settings are unchanged. This behavior was merged into `main` through PR #2 and accepted on Windows.
