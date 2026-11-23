@@ -115,7 +115,7 @@ public partial class MainWindow : Window
 
     private async void TrackList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (analyzing || operationBusy || closing || e.ChangedButton != MouseButton.Left) return;
+        if (operationBusy || closing || e.ChangedButton != MouseButton.Left) return;
         DependencyObject? source = e.OriginalSource as DependencyObject;
         while (source is not null && source is not DataGridRow)
             source = VisualTreeHelper.GetParent(source);
@@ -129,7 +129,7 @@ public partial class MainWindow : Window
         if (sender is not DataGridRow row || !row.IsKeyboardFocusWithin) return;
 
         e.Handled = true;
-        if (analyzing || operationBusy || closing || row.Item is not AudioTrack track) return;
+        if (operationBusy || closing || row.Item is not AudioTrack track) return;
         await RunActionAsync(() => PlayTrackAsync(track));
     }
 
@@ -324,29 +324,16 @@ public partial class MainWindow : Window
 
     private async void TrimButton_Click(object sender, RoutedEventArgs e)
     {
-        if (trimming || closing) return;
-        AudioTrack? track = TrackList.SelectedItem as AudioTrack;
-        if (track is null && TrackList.IsKeyboardFocusWithin)
-            track = TrackList.CurrentItem as AudioTrack;
-        if (track is null)
-        {
-            ShowNotification("请先在列表中选择需要裁剪的音频文件。", false);
-            return;
-        }
+        if (trimming || analyzing || closing || !selectedCanTrim) return;
+        if (TrackList.SelectedItem is not AudioTrack track) return;
 
-        var settings = new SilenceSettings
-        {
-            FrameMilliseconds = silenceSettings.FrameMilliseconds,
-            MinimumSilenceMilliseconds = silenceSettings.MinimumSilenceMilliseconds,
-            SilenceThresholdDb = silenceSettings.SilenceThresholdDb,
-            NavigationToleranceMilliseconds = silenceSettings.NavigationToleranceMilliseconds,
-            AllowedSilenceSeconds = silenceSettings.AllowedSilenceSeconds
-        };
+        SilenceSettings settings = SnapshotSettings(silenceSettings);
         string source = track.FilePath;
         trimming = true;
         trimCancellation = new CancellationTokenSource();
         UpdateControls();
-        ShowNotification("正在分析并压缩长静音：" + Path.GetFileName(source), false, TimeSpan.Zero, informational: true);
+        trimToast = ToastMessages.ShowTask(
+            $"正在压缩 {Path.GetFileName(source)} 的长静音，请等待裁剪完成。");
         Task<SilenceTrimResult> work = SilenceTrimmer.TrimAsync(source, settings, trimCancellation.Token);
         trimTask = work;
         try
@@ -364,27 +351,40 @@ public partial class MainWindow : Window
                     index++;
                 tracks.Insert(index, added);
             }
-            string message = result.CopiedUnchanged
-                ? "未发现超过允许时长的静音区间，已复制原文件。"
-                : $"已压缩 {result.TrimmedRangeCount} 段静音，累计删除 {result.RemovedDuration.TotalSeconds:F3} 秒。";
-            ShowNotification($"裁剪完成：{result.OutputPath}\n原时长 {AudioTrack.FormatTime(result.OriginalDuration)}，" +
-                $"新时长 {AudioTrack.FormatTime(result.OutputDuration)}。{message}", false, TimeSpan.FromSeconds(15), informational: true);
+            if (!result.OutputSilenceSaved)
+                ToastMessages.CompleteTask(trimToast!, "音频已保存，但停顿信息更新失败：" + result.OutputPath,
+                    ToastLevel.Warning, TimeSpan.FromSeconds(15));
+            else
+                ToastMessages.CompleteTask(trimToast!,
+                    $"裁剪完成：{result.OutputPath}。压缩 {result.TrimmedRangeCount} 段，减少 " +
+                    $"{result.RemovedDuration.TotalSeconds:F3} 秒；原时长 " +
+                    $"{AudioTrack.FormatTime(result.OriginalDuration)}，新时长 {AudioTrack.FormatTime(result.OutputDuration)}。",
+                    ToastLevel.Info, TimeSpan.FromSeconds(15));
         }
         catch (OperationCanceledException)
         {
-            if (!closing) ShowNotification("长静音裁剪已取消。", false, informational: true);
+            if (!closing && trimToast is not null)
+                ToastMessages.CompleteTask(trimToast, "长静音裁剪已取消。", ToastLevel.Info);
         }
         catch (Exception ex)
         {
-            if (!closing) ShowNotification("裁剪失败：" + ex.Message, true, TimeSpan.FromSeconds(15));
+            if (!closing && trimToast is not null)
+                ToastMessages.CompleteTask(trimToast, "裁剪失败：" + ex.Message, ToastLevel.Error);
         }
         finally
         {
+            trimToast = null;
             trimTask = null;
             trimCancellation?.Dispose();
             trimCancellation = null;
             trimming = false;
-            if (!closing) UpdateControls();
+            if (!closing)
+            {
+                if (loadedTrack is not null && !analysisReady && !analyzing)
+                    StartAnalysis(loadedTrack);
+                RefreshSelectedCache();
+                UpdateControls();
+            }
         }
     }
 
@@ -398,16 +398,16 @@ public partial class MainWindow : Window
         else
         {
             var track = TrackList.SelectedItem as AudioTrack ?? tracks.FirstOrDefault();
-            if (track is not null && !analyzing) await LoadTrackAsync(track);
+            if (track is not null) await LoadTrackAsync(track);
         }
     }
 
     private async void PlayButton_Click(object sender, RoutedEventArgs e) => await RunActionAsync(TogglePlaybackAsync);
     private async void StopButton_Click(object sender, RoutedEventArgs e) => await RunActionAsync(player.StopAsync);
 
-    private async void SettingsButton_Click(object sender, RoutedEventArgs e)
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        if (analyzing || operationBusy || closing) return;
+        if (operationBusy || closing) return;
 
         if (!settingsFileReady)
         {
@@ -427,10 +427,9 @@ public partial class MainWindow : Window
             || silenceSettings.MinimumSilenceMilliseconds != dialog.Settings.MinimumSilenceMilliseconds
             || silenceSettings.SilenceThresholdDb != dialog.Settings.SilenceThresholdDb;
         silenceSettings = dialog.Settings;
-        if (!detectionChanged || loadedTrack is null) return;
-
-        analysisTask = AnalyzeAsync(loadedTrack, silenceSettings);
-        await analysisTask;
+        if (detectionChanged && loadedTrack is not null && !trimming)
+            StartAnalysis(loadedTrack);
+        RefreshSelectedCache();
     }
 
     private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -527,10 +526,10 @@ public partial class MainWindow : Window
     private void UpdateControls()
     {
         bool available = !operationBusy && !closing;
-        OpenButton.IsEnabled = available && !analyzing;
-        SettingsButton.IsEnabled = available && !analyzing;
-        TrimButton.IsEnabled = !closing && !trimming;
-        TrackList.IsEnabled = available && !analyzing;
+        OpenButton.IsEnabled = available;
+        SettingsButton.IsEnabled = available;
+        TrimButton.IsEnabled = !closing && !operationBusy && !analyzing && !trimming && selectedCanTrim;
+        TrackList.IsEnabled = available;
         PlayButton.IsEnabled = available && (player.IsLoaded || tracks.Count > 0);
         StopButton.IsEnabled = available && player.IsLoaded;
         ProgressSlider.IsEnabled = available && player.IsLoaded;
@@ -565,23 +564,8 @@ public partial class MainWindow : Window
     internal void ShowNotification(string message, bool isError, TimeSpan? duration = null, bool informational = false)
     {
         if (closing) return;
-        notificationTimer.Stop();
-        NotificationText.Text = (isError ? "错误：" : informational ? "提示：" : "警告：") + message;
-        NotificationBar.Background = new SolidColorBrush(isError ? Color.FromRgb(253, 232, 232) : Color.FromRgb(255, 244, 214));
-        NotificationText.Foreground = new SolidColorBrush(isError ? Color.FromRgb(153, 27, 27) : Color.FromRgb(146, 64, 14));
-        NotificationBar.Visibility = Visibility.Visible;
-        if (duration != TimeSpan.Zero)
-        {
-            notificationTimer.Interval = duration ?? TimeSpan.FromSeconds(5);
-            notificationTimer.Start();
-        }
-    }
-
-    private void HideNotification()
-    {
-        notificationTimer.Stop();
-        NotificationText.Text = "";
-        NotificationBar.Visibility = Visibility.Collapsed;
+        ToastMessages.Show(message,
+            isError ? ToastLevel.Error : informational ? ToastLevel.Info : ToastLevel.Warning, duration);
     }
 
     private void UpdateTimeText() => TimeText.Text = AudioTrack.FormatTime(TimeSpan.FromSeconds(ProgressSlider.Value)) + " / " + AudioTrack.FormatTime(player.GetDuration());
@@ -626,16 +610,18 @@ public partial class MainWindow : Window
         e.Cancel = true;
         if (closing) return;
         closing = true;
-        analysisCancellation?.Cancel();
+        CancelAnalysis();
+        CancelSelectionCheck();
         trimCancellation?.Cancel();
         timer.Stop();
-        HideNotification();
+        ToastMessages.Clear();
         UpdateControls();
         try
         {
             if (activeOperation is not null) await activeOperation;
             await navigationTask;
-            if (analysisTask is not null) await analysisTask;
+            await Task.WhenAll(runningAnalyses);
+            if (selectionTask is not null) await selectionTask;
             if (trimTask is not null)
             {
                 try { await trimTask; }
