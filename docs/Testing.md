@@ -145,3 +145,7 @@ The [approved design](specs/FFmpeg-M4A-Stream-Copy.md) is **not yet implemented*
 - Local build and published portable EXE each contain **only the user-facing setup TXT `FFmpeg-Setup.txt`** as added deployment documentation, not a copied repository README or bundled FFmpeg. Check the published runtime can find the TXT irrespective of working directory and that normal CI requires no downloaded FFmpeg.
 
 Use a **pinned and recorded** FFmpeg build (version and package SHA-256) for actual Windows media testing; the downloadable `latest` URL is not a reproducible version. Existing historical Windows acceptance does not cover this forthcoming change.
+
+## Feature branch implementation note (not yet accepted)
+
+The FFmpeg M4A implementation branch adds a deterministic concat manifest unit check and optional-dependency check. Windows BtbN shared-library, source codec, long-media and join listening checks remain **required**, not yet passed. The M4A runtime dependency is intentionally not downloaded in normal CI.

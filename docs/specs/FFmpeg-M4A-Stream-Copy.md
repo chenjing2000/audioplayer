@@ -40,3 +40,7 @@ Terminate the **specific** FFmpeg child process on cancellation; avoid leaving o
 5. Build and publish must place `FFmpeg-Setup.txt` beside the *actual* development/published EXE; published-EXE tests check it. Do not require an FFmpeg download in ordinary CI or publishing.
 
 Code changes are permitted only on a feature branch; do not merge to `main` without explicit approval. This specification is not evidence that code, CI or real-media tests have passed.
+
+## Implementation tracking
+
+Development branch `feature/ffmpeg-m4a-stream-copy` is implementing this specification. No Windows CI result or real BtbN listening acceptance is asserted by this document update. Keep actual implementation status separate from approval.

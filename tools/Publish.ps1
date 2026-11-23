@@ -5,6 +5,8 @@ $workspace = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $publishDirectory = Join-Path $workspace 'dist'
 $stagingDirectory = Join-Path $publishDirectory ('.publish-' + [Guid]::NewGuid().ToString('N'))
 $destination = Join-Path $publishDirectory $exeName
+$setupSource = Join-Path $workspace 'docs\FFmpeg-Setup.txt'
+$setupDestination = Join-Path $publishDirectory 'FFmpeg-Setup.txt'
 
 Push-Location $workspace
 try {
@@ -20,6 +22,8 @@ try {
         throw 'Expected a single EXE; the existing release has been preserved.'
     }
 
+    if (-not (Test-Path -LiteralPath $setupSource -PathType Leaf)) { throw 'FFmpeg setup instructions are missing.' }
+
     # Check the current EXE before attempting its replacement.
     if (Test-Path -LiteralPath $destination) {
         $handle = [IO.File]::Open($destination, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
@@ -33,6 +37,7 @@ try {
     else {
         [IO.File]::Move($output[0].FullName, $destination)
     }
+    Copy-Item -LiteralPath $setupSource -Destination $setupDestination -Force
     Write-Host "Published: $destination"
 }
 finally {

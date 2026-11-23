@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-23 (FFmpeg M4A design approved; implementation pending)  
+**Updated:** 2026-11-23 (FFmpeg M4A design merged; feature development ongoing)  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Latest merged feature baseline:** `main@8aa15b1` (PR #5, Play/Stop icon balance). This SHA describes the last functional change; later documentation-only commits may advance `main`.
@@ -15,7 +15,7 @@
 
 ## Application and UI baseline
 
-- Windows desktop: **C# / WPF / .NET 10**; NAudio 2.2.1, TagLibSharp 2.3.0. Project: `EnglishAudioPlayer/AudioPausePlayer.csproj`. **Current main still has no FFmpeg integration**; the approved next change will add optional FFmpeg for AAC/M4A trimming only. No MVVM framework, DI container, or unnecessary new abstractions.
+- Windows desktop: **C# / WPF / .NET 10**; NAudio 2.2.1, TagLibSharp 2.3.0. Project: `EnglishAudioPlayer/AudioPausePlayer.csproj`. **Current main still has no FFmpeg integration**; feature branch `feature/ffmpeg-m4a-stream-copy` is implementing optional FFmpeg for AAC/M4A trimming only. No MVVM framework, DI container, or unnecessary new abstractions.
 - The selected directory is scanned nonrecursively for WAV/MP3/M4A. Playback, pause, stop, seek, left/right silence-midpoint navigation, and silence compression must retain their existing behavior.
 - Three detection settings control PCM RMS/dBFS analysis. Validated silence ranges are shared by navigation and trimming and persisted as one `results/<full audio filename>/silence.json` per audio; protect source files, reject stale results, and never overwrite existing audio.
 - Five settings live in `<actual EXE stem>.settings.json` beside the EXE. Toast messages are WPF-native. Settings validation and previous confirmed behavior must be preserved.
@@ -29,7 +29,7 @@
 - [Current result/Toast specification](specs/Results-Cache-Toast-Refactor.md) and its [historical implementation plan](guides/Results-Cache-Toast-Implementation.md). The earlier [long-silence specification](specs/Long-Silence-Trimming.md) remains relevant for PCM, output format and safety.
 - [Testing and acceptance](Testing.md), [Publishing](Publishing.md). Preserve historical dated audits as historical evidence; do not promote older test counts to the current release.
 
-## Approved next feature: M4A stream copy (NOT YET IMPLEMENTED)
+## Approved feature: M4A stream copy (feature branch in progress; NOT MERGED)
 
 - [Approved FFmpeg/M4A specification](specs/FFmpeg-M4A-Stream-Copy.md): NAudio stays responsible for playback, navigation, and RMS detection; only AAC/M4A trimming changes to optional BtbN Windows x64 GPL Shared FFmpeg, with no AAC re-encoding and no 10 ms fades. Start with one concat demuxer process; validate timing, joins and real recordings rather than assuming exact packet cuts.
 - Only check the FFmpeg dependency on an M4A trim request. If missing/broken, use an existing error Toast referring to **`FFmpeg-Setup.txt`**, not a MessageBox; no startup check, automatic download, fallback encoder or unrelated MP3/WAV changes.
@@ -56,4 +56,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Test-PublishedApp.ps1
 ```
 
-**The FFmpeg M4A stream-copy feature is approved for development, but not implemented yet.** The documentation-only branch must not merge to `main` without authorization. Do not start unrelated refactoring.
+**The FFmpeg M4A stream-copy feature is in development on a feature branch; it is not merged to `main` and has not passed Windows media acceptance yet.** Do not merge the feature branch without authorization. Do not start unrelated refactoring.
