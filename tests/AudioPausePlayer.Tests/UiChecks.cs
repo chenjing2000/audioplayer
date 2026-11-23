@@ -95,6 +95,37 @@ internal static class UiChecks
                     var stopButton = (Button)window.FindName("StopButton");
                     var settingsButton = (Button)window.FindName("SettingsButton");
                      var trimButton = (Button)window.FindName("TrimButton");
+
+                    // Selection must inspect only existing results and never analyze an unopened audio file.
+                    string resultFolder = Path.Combine(audioFolder, "ui-results-" + Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(resultFolder);
+                    try
+                    {
+                        string source = Path.Combine(resultFolder, "selected.wav");
+                        using (var writer = new WaveFileWriter(source, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                            writer.WriteSamples(new float[44100 * 4], 0, 44100 * 4);
+                        await window.LoadFolderAsync(resultFolder);
+                        list.SelectedIndex = 0;
+                        if (Field<Task>(window, "selectionTask") is Task missingCheck) await missingCheck;
+                        Assert(!trimButton.IsEnabled && !File.Exists(SilenceResultStore.GetPath(source)),
+                            "Selecting uncached audio does not trigger detection or enable trimming");
+
+                        Assert(SilenceResultStore.LoadOrDetect(source, new SilenceSettings()).Saved,
+                            "Synthetic selection fixture can persist results");
+                        list.SelectedIndex = -1;
+                        list.SelectedIndex = 0;
+                        if (Field<Task>(window, "selectionTask") is Task validCheck) await validCheck;
+                        Assert(trimButton.IsEnabled, "Validated cached compressible intervals enable scissors");
+
+                        File.SetLastWriteTimeUtc(source, File.GetLastWriteTimeUtc(source).AddSeconds(5));
+                        list.SelectedIndex = -1;
+                        list.SelectedIndex = 0;
+                        if (Field<Task>(window, "selectionTask") is Task outdatedCheck) await outdatedCheck;
+                        Assert(!trimButton.IsEnabled, "Changed source invalidates selected trim availability");
+                        await window.LoadFolderAsync(audioFolder);
+                    }
+                    finally { Directory.Delete(resultFolder, true); }
+
                     settingsButton.ApplyTemplate();
                     var settingsBorder = (Border)settingsButton.Template.FindName("ButtonBorder", settingsButton);
                     var settingsImage = FindVisual<Image>(settingsButton)!;
