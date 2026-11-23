@@ -81,3 +81,21 @@ The M4A end-to-end test and listening confirmation are **real-machine acceptance
 The approved [refactor specification](specs/Results-Cache-Toast-Refactor.md) and [implementation checklist](guides/Results-Cache-Toast-Implementation.md) require updated Core/UI/Full tests for the single `results/<full audio filename>/silence.json` store, metadata-based invalidation without SHA-256, automatic detection/cancellation, navigation from verified in-memory ranges, cache-based trimming without a second scan, numbered non-overwriting outputs, independent results for newly encoded media, Toast behavior, one-decimal settings validation, and playlist alignment.
 
 The implementation and new Core/UI assertions are committed on `feature/results-cache-toast-refactor`. Their actual pass/fail evidence must be taken from this branch's CI runs and new Windows acceptance, not from the earlier M4A/Windows records. Use temporary synthetic WAV/PCM fixtures where possible. Real long-pause MP3/WAV testing remains deferred until suitable files exist; do not turn a Skip into Pass.
+
+
+### 2026-11-23: feature-branch Windows CI evidence
+
+Workflow: [Feature validation #45101311195](https://github.com/chenjing2000/audioplayer/actions/runs/45101311195), commit \`1c50a6cdb\` on \`feature/results-cache-toast-refactor\`.
+
+| Verification | Result |
+| --- | --- |
+| \`tools/Test.ps1 -Suite Core\` | **Passed**: 44 application assertions, 0 failed; publishing safeguard checks passed |
+| \`tools/Test.ps1 -Suite UI\` | **Passed**: 44 core assertions and 77 WPF UI assertions, 0 failed |
+| Portable EXE publish | **Passed** |
+| Published EXE acceptance | **Passed**: 3 groups, 0 failed |
+| Actual audio-device playback during hosted UI tests | **Skipped**: hosted Windows runner reported no available \`waveOut\` output device; playback is not claimed verified |
+| Optional local real MP3 metadata/playback | **Skipped**: no local MP3 supplied to CI |
+| This refactor's real M4A cache/navigation/numbered-trim/output-result/Toast and listening acceptance | **Pending** on the user's Windows machine |
+| Real long-pause MP3 and WAV media acceptance | **Deferred** as previously agreed |
+
+This evidence covers compilation, synthetic WAV/PCM cache/trimming cases, WPF layout and settings validation, and published executable checks. Hardware-dependent playback and actual M4A output listening must still be accepted locally; the earlier long-silence M4A listening record cannot substitute for this refactor's acceptance. No merge to \`main\` has been authorized.
