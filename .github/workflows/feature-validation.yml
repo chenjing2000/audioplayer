@@ -3,7 +3,8 @@ name: Feature validation
 on:
   push:
     branches:
-      - feature/results-cache-toast-refactor
+      - main
+      - 'feature/**'
   pull_request:
     branches:
       - main
@@ -22,6 +23,9 @@ jobs:
       - name: Core tests
         shell: powershell
         run: .\tools\Test.ps1 -Suite Core
+      - name: Workflow smoke tests
+        shell: powershell
+        run: .\tools\Test-Workflow.ps1
       - name: WPF UI regression tests
         shell: powershell
         run: .\tools\Test.ps1 -Suite UI

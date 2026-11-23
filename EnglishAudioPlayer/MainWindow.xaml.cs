@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private int selectionGeneration;
     private CancellationTokenSource? selectionCancellation;
     private Task? selectionTask;
+    private readonly List<Task> runningSelectionChecks = new();
     private readonly List<Task> runningAnalyses = new();
     private ToastHost.ToastMessage? analysisToast;
     private ToastHost.ToastMessage? trimToast;
@@ -77,7 +78,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) when (IsSettingsFileError(ex))
         {
-            ShowNotification($"配置读取或初始化失败，暂用默认参数：{ex.Message}", true);
+            ToastMessages.Show($"配置读取或初始化失败，暂用默认参数：{ex.Message}", ToastLevel.Error);
         }
     }
 
@@ -101,14 +102,11 @@ public partial class MainWindow : Window
         await player.CloseAsync();
         currentFolder = Path.GetFullPath(path);
         loadedTrack = null;
-        ranges.Clear();
-        analysisReady = false;
-        selectedCanTrim = false;
         tracks.Clear();
         foreach (var file in files) tracks.Add(file);
         int errors = files.Count(file => file.LoadError is not null);
-        if (errors > 0) ShowNotification($"{errors} 个文件的标签读取失败，悬停对应行可查看原因。", false);
-        else if (files.Count == 0) ShowNotification("此文件夹中没有 WAV、MP3 或 M4A 音频文件。", false);
+        if (errors > 0) ToastMessages.Show($"{errors} 个文件的标签读取失败，悬停对应行可查看原因。", ToastLevel.Warning);
+        else if (files.Count == 0) ToastMessages.Show("此文件夹中没有 WAV、MP3 或 M4A 音频文件。", ToastLevel.Warning);
         RefreshProgress();
         UpdateControls();
     }
@@ -148,8 +146,6 @@ public partial class MainWindow : Window
     private async Task LoadTrackAsync(AudioTrack track)
     {
         CancelAnalysis();
-        ranges.Clear();
-        analysisReady = false;
         // OpenAsync releases the previous reader even if the replacement cannot open.
         loadedTrack = null;
         await player.OpenAsync(track.FilePath);
@@ -204,16 +200,14 @@ public partial class MainWindow : Window
         try
         {
             // A hit must not generate an imaginary progress notification or run the PCM detector.
-            IReadOnlyList<SilenceRange>? cached = await Task.Run(
-                () => SilenceResultStore.TryLoad(track.FilePath, settings, cancellation.Token),
+            SilenceAnalysis? cached = await Task.Run(
+                () => SilenceResultStore.TryLoadVerified(track.FilePath, settings, cancellation.Token),
                 cancellation.Token);
             if (!IsCurrentAnalysis(track, generation, cancellation)) return;
             SilenceAnalysis result;
             if (cached is not null)
             {
-                result = new SilenceAnalysis(cached, true, true,
-                    await Task.Run(() => SilenceResultStore.Capture(track.FilePath, cancellation.Token),
-                        cancellation.Token));
+                result = cached;
             }
             else
             {
@@ -251,7 +245,7 @@ public partial class MainWindow : Window
             {
                 if (toast is not null)
                     ToastMessages.CompleteTask(toast, "停顿检测失败，普通播放仍可用：" + ex.Message, ToastLevel.Error);
-                else ShowError("停顿检测失败，普通播放仍可用：" + ex.Message);
+                else ToastMessages.Show("停顿检测失败，普通播放仍可用：" + ex.Message, ToastLevel.Error);
                 if (ReferenceEquals(analysisToast, toast)) analysisToast = null;
             }
         }
@@ -287,7 +281,10 @@ public partial class MainWindow : Window
         var cancellation = new CancellationTokenSource();
         selectionCancellation = cancellation;
         int generation = selectionGeneration;
-        selectionTask = CheckSelectedCacheAsync(track, SnapshotSettings(silenceSettings), generation, cancellation);
+        Task work = CheckSelectedCacheAsync(track, SnapshotSettings(silenceSettings), generation, cancellation);
+        selectionTask = work;
+        runningSelectionChecks.RemoveAll(task => task.IsCompleted);
+        runningSelectionChecks.Add(work);
     }
 
     private async Task CheckSelectedCacheAsync(AudioTrack track, SilenceSettings settings, int generation,
@@ -297,11 +294,10 @@ public partial class MainWindow : Window
         {
             bool available = await Task.Run(() =>
             {
-                IReadOnlyList<SilenceRange>? cached =
-                    SilenceResultStore.TryLoad(track.FilePath, settings, cancellation.Token);
-                if (cached is null) return false;
-                int sampleRate = SilenceResultStore.Capture(track.FilePath, cancellation.Token).SampleRate;
-                return SilenceTrimmer.PlanCuts(cached, sampleRate, settings.AllowedSilenceSeconds).Count > 0;
+                SilenceAnalysis? cached =
+                    SilenceResultStore.TryLoadVerified(track.FilePath, settings, cancellation.Token);
+                return cached is not null && SilenceTrimmer.PlanCuts(
+                    cached.Ranges, cached.Fingerprint.SampleRate, settings.AllowedSilenceSeconds).Count > 0;
             }, cancellation.Token);
             if (!closing && !cancellation.IsCancellationRequested && generation == selectionGeneration
                 && ReferenceEquals(track, TrackList.SelectedItem))
@@ -411,7 +407,7 @@ public partial class MainWindow : Window
 
         if (!settingsFileReady)
         {
-            ShowNotification("配置文件不可用，请修复文件或目录权限后重新启动程序。", true);
+            ToastMessages.Show("配置文件不可用，请修复文件或目录权限后重新启动程序。", ToastLevel.Error);
             return;
         }
         var dialog = new SilenceSettingsWindow(silenceSettings) { Owner = this };
@@ -420,7 +416,7 @@ public partial class MainWindow : Window
         try { settingsStore.Save(dialog.Settings); }
         catch (Exception ex) when (IsSettingsFileError(ex))
         {
-            ShowNotification($"配置保存失败，参数未更改：{ex.Message}", true);
+            ToastMessages.Show($"配置保存失败，参数未更改：{ex.Message}", ToastLevel.Error);
             return;
         }
         bool detectionChanged = silenceSettings.FrameMilliseconds != dialog.Settings.FrameMilliseconds
@@ -507,7 +503,7 @@ public partial class MainWindow : Window
         {
             if (!closing)
             {
-                ShowError(ex.Message);
+                ToastMessages.Show(ex.Message, ToastLevel.Error);
             }
         }
     }
@@ -522,7 +518,7 @@ public partial class MainWindow : Window
         else if (!ReferenceEquals(player.LastError, displayedPlaybackError))
         {
             displayedPlaybackError = player.LastError;
-            ShowError("播放设备异常：" + player.LastError.Message);
+            ToastMessages.Show("播放设备异常：" + player.LastError.Message, ToastLevel.Error);
         }
     }
 
@@ -557,18 +553,9 @@ public partial class MainWindow : Window
         UpdateTimeText();
     }
 
-    private void ShowError(string message) => ShowNotification(message, true);
-
     private void PlaylistBorder_SizeChanged(object sender, SizeChangedEventArgs e)
     {
         PlaylistBorder.Clip = new RectangleGeometry(new Rect(0, 0, e.NewSize.Width, e.NewSize.Height), 8, 8);
-    }
-
-    internal void ShowNotification(string message, bool isError, TimeSpan? duration = null, bool informational = false)
-    {
-        if (closing) return;
-        ToastMessages.Show(message,
-            isError ? ToastLevel.Error : informational ? ToastLevel.Info : ToastLevel.Warning, duration);
     }
 
     private void UpdateTimeText() => TimeText.Text = AudioTrack.FormatTime(TimeSpan.FromSeconds(ProgressSlider.Value)) + " / " + AudioTrack.FormatTime(player.GetDuration());
@@ -624,7 +611,7 @@ public partial class MainWindow : Window
             if (activeOperation is not null) await activeOperation;
             await navigationTask;
             await Task.WhenAll(runningAnalyses);
-            if (selectionTask is not null) await selectionTask;
+            await Task.WhenAll(runningSelectionChecks);
             if (trimTask is not null)
             {
                 try { await trimTask; }

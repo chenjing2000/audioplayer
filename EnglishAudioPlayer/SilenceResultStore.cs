@@ -78,9 +78,15 @@ internal static class SilenceResultStore
 
     public static IReadOnlyList<SilenceRange>? TryLoad(string audioPath, SilenceSettings settings,
         CancellationToken cancellation = default)
+        => TryLoadVerified(audioPath, settings, cancellation)?.Ranges;
+
+    // Return the already-validated fingerprint to callers that need the sample rate.
+    internal static SilenceAnalysis? TryLoadVerified(string audioPath, SilenceSettings settings,
+        CancellationToken cancellation = default)
     {
-        var fingerprint = Capture(audioPath, cancellation);
-        return TryLoad(audioPath, settings, fingerprint, cancellation);
+        AudioFingerprint fingerprint = Capture(audioPath, cancellation);
+        IReadOnlyList<SilenceRange>? ranges = TryLoad(audioPath, settings, fingerprint, cancellation);
+        return ranges is null ? null : new SilenceAnalysis(ranges, true, true, fingerprint);
     }
 
     private static IReadOnlyList<SilenceRange>? TryLoad(string audioPath, SilenceSettings settings,

@@ -59,16 +59,16 @@ internal static class UiChecks
                     var toasts = (ToastHost)window.FindName("ToastMessages");
                     var toastStack = FindVisual<StackPanel>(toasts)!;
                     Assert(toastStack.Children.Count == 0, "Toast overlay starts empty");
-                    window.ShowNotification("测试信息", false, informational: true);
+                    toasts.Show("测试信息", ToastLevel.Info);
                     Assert(toastStack.Children.Count == 1 &&
                         FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "普通：测试信息",
                         "Normal toasts use the information prefix");
-                    window.ShowNotification("测试警告", false);
-                    window.ShowNotification("测试错误", true);
+                    toasts.Show("测试警告", ToastLevel.Warning);
+                    toasts.Show("测试错误", ToastLevel.Error);
                     Assert(toastStack.Children.Count == 3 &&
                         FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "错误：测试错误",
                         "Newest visible toast is on top");
-                    window.ShowNotification("排队消息", false, informational: true);
+                    toasts.Show("排队消息", ToastLevel.Info);
                     Assert(toastStack.Children.Count == 3, "Only three toast slots are shown");
                     FindVisual<Button>((Border)toastStack.Children[2])!
                         .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -128,6 +128,13 @@ internal static class UiChecks
                         list.SelectedIndex = 0;
                         if (Field<Task>(window, "selectionTask") is Task outdatedCheck) await outdatedCheck;
                         Assert(!trimButton.IsEnabled, "Changed source invalidates selected trim availability");
+                        for (int i = 0; i < 12; i++)
+                        {
+                            list.SelectedIndex = -1;
+                            list.SelectedIndex = 0;
+                        }
+                        await Task.WhenAll(Field<List<Task>>(window, "runningSelectionChecks")!);
+                        Assert(!trimButton.IsEnabled, "Rapid selection changes leave stale caches disabled");
                         await window.LoadFolderAsync(audioFolder);
                     }
                     finally { Directory.Delete(resultFolder, true); }
@@ -220,6 +227,25 @@ internal static class UiChecks
                          && FindVisual<StackPanel>(modalToasts)!.Children.Count == 0,
                          "Restore clears toast and resets precision");
                      settingsWindow.Close();
+
+                    // Simulate an older canceled selection check that outlives the latest task.
+                    var closingWindow = new MainWindow(
+                        new SettingsStore(Path.Combine(audioFolder, "UiClosing.settings.json")))
+                    { ShowInTaskbar = false, ShowActivated = false, Left = -20000, Top = -20000 };
+                    closingWindow.Show();
+                    var pendingSelection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    Field<List<Task>>(closingWindow, "runningSelectionChecks")!.Add(pendingSelection.Task);
+                    var closeCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    closingWindow.Closed += (_, _) => closeCompleted.TrySetResult();
+                    closingWindow.Close();
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                    Assert(!closeCompleted.Task.IsCompleted,
+                        "Closing waits for an older pending selection check");
+                    pendingSelection.TrySetResult();
+                    await closeCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                    Assert(!closingWindow.IsVisible,
+                        "Closing completes after all selection checks finish");
+
                     Assert(Math.Abs(window.FontSize - 12) < 0.01 && Math.Abs(timeText.FontSize - 12) < 0.01 && Math.Abs(list.FontSize - 12) < 0.01, "UI font size is 12");
                     Assert(Grid.GetColumn(slider) == 1 && Grid.GetColumn(timeText) == 2 && Grid.GetColumn(playButton) == 3, "Time display sits between progress slider and play button");
                     foreach (Button button in new[] { openButton, playButton, stopButton })
