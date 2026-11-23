@@ -121,7 +121,7 @@ This cleanup has **not** yet received a new Windows physical-device listening ch
 
 ### 2026-11-23: AudioPlayer unified v3 icons
 
-- The toolbar now renders the approved v3 SVG geometry as six native WPF `DrawingImage` resources. All visible button icons have a `#26798A` circular background, white symbols occupying approximately 50% of the circle height, and transparent surroundings.
+- The toolbar now renders the approved v3 SVG geometry as six native WPF `DrawingImage` resources. The icons retain a `#26798A` circular background, white symbols, and transparent surroundings. Most white glyphs occupy approximately 50% of the circle height; the Stop square is intentionally 35%, and the Play triangle is shifted slightly right for balanced corner margins.
 - Open, Play/Pause, Stop, Trim and Settings share 36×36 transparent hit targets with 28×28 visible images; hovering or pressing changes only the symbol's overall opacity, never its border or background.
 - Play/Pause remains a single button with two states. The application icon is the approved leaf artwork in a compact multi-size ICO (16, 32, 48, 256 pixels); no SVG runtime dependency was added.
 - WPF checks cover dimensions, resource colors, borderless button templates, and the existing playback UI. Automatic checks do not replace Windows taskbar/title-bar appearance review, hover feedback inspection, or real audio acceptance.

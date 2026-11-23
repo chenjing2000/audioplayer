@@ -161,6 +161,23 @@ internal static class UiChecks
                         Assert(symbol.Children.OfType<GeometryDrawing>().All(part => ColorOf(part.Brush) == "#FFFFFFFF"),
                             key + " has a uniform white foreground");
                     }
+                    var playDrawing = (DrawingGroup)((DrawingImage)window.FindResource("PlayIcon")).Drawing;
+                    var playSymbol = (DrawingGroup)playDrawing.Children[2];
+                    var playMatrix = (MatrixTransform)playSymbol.Transform;
+                    Assert(Math.Abs(playMatrix.Matrix.OffsetX - (-35.80336528)) < 0.01,
+                        "Play triangle moves right inside the unchanged circular background");
+
+                    var stopDrawing = (DrawingGroup)((DrawingImage)window.FindResource("StopIcon")).Drawing;
+                    var stopCircle = (EllipseGeometry)((GeometryDrawing)stopDrawing.Children[1]).Geometry;
+                    var stopSymbol = (DrawingGroup)stopDrawing.Children[2];
+                    var stopMatrix = (MatrixTransform)stopSymbol.Transform;
+                    var stopSquare = (RectangleGeometry)((GeometryDrawing)stopSymbol.Children[0]).Geometry;
+                    Rect stopBounds = stopMatrix.TransformBounds(stopSquare.Bounds);
+                    Assert(Math.Abs(stopBounds.Height / (2 * stopCircle.RadiusY) - 0.35) < 0.001
+                        && Math.Abs(stopBounds.Left + stopBounds.Width / 2 - stopCircle.Center.X) < 0.01
+                        && Math.Abs(stopBounds.Top + stopBounds.Height / 2 - stopCircle.Center.Y) < 0.01,
+                        "Stop square is centered and exactly 35% of circle height");
+
                     var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 324) < 0.01, "Settings window width is 324");
