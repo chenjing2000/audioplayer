@@ -38,7 +38,7 @@ External data paths are passed as arguments; scripts do not hard-code a develope
 
 Use `-AudioDirectory` with a **folder containing actual MP3 files**. It copies one MP3 into a temporary directory and runs the legacy MP3 metadata, playback, and UI checks. A standalone M4A file must not be passed as an MP3 directory.
 
-Use `-AudioFile` for a **single WAV, MP3, or M4A file**. The runner copies the media to a temporary directory with its **original extension**, runs the real long-silence trimming pipeline and verifies the output extension, that it can be decoded and that the source remains unchanged. This does not pretend that an M4A is MP3; the old MP3-specific playback/UI tests are skipped unless `-AudioDirectory` is also supplied. Large recordings may take extra time to decode and encode.
+Use `-AudioFile` for a **single WAV, MP3, or M4A file containing at least one compressible silence interval**. The runner copies the media to a temporary directory with its **original extension**, runs the real long-silence trimming pipeline and verifies the output extension, that it can be decoded and that the source remains unchanged. A file with no interval longer than the configured allowed duration produces no output by design, so it is not a valid positive trimming fixture. This does not pretend that an M4A is MP3; the old MP3-specific playback/UI tests are skipped unless `-AudioDirectory` is also supplied. Large recordings may take extra time to decode and encode.
 
 ```powershell
 .\tools\Test.ps1 -Suite Full -AudioDirectory '<local MP3 directory>'
