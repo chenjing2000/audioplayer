@@ -1,17 +1,17 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-23 (PR #10 in review: toolbar/refresh/naming and full engineering rename)  
+**Updated:** 2026-11-23 (PR #10 accepted for merge: toolbar refresh, output naming and full AudioPlayer engineering rename)  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Latest merged baseline:** `main@de5dee4` (PR #8 AAC/M4A stream copy; PR #9 docs sync). New work is on `feature/toolbar-refresh-and-output-naming`, not yet merged.
+**Historical baseline for PR #10:** `main@de5dee4` (PR #8 AAC/M4A stream copy; PR #9 docs sync). PR #10 was developed on `feature/toolbar-refresh-and-output-naming` and accepted for squash merge. For subsequent work, inspect the actual latest `main` HEAD.
 
 ## Current status
 
 - Long-silence trimming merged via [PR #1](https://github.com/chenjing2000/audioplayer/pull/1). The results/Toast/silence.json refactor merged via [PR #2](https://github.com/chenjing2000/audioplayer/pull/2). Focused logic cleanup merged via [PR #3](https://github.com/chenjing2000/audioplayer/pull/3).
 - Unified teal/white AudioPlayer v3 icons merged via [PR #4](https://github.com/chenjing2000/audioplayer/pull/4). Play triangle horizontal balance and Stop square 35% height merged via [PR #5](https://github.com/chenjing2000/audioplayer/pull/5).
-- [PR #7](https://github.com/chenjing2000/audioplayer/pull/7) merged the FFmpeg implementation specification; [PR #8](https://github.com/chenjing2000/audioplayer/pull/8) merged the implemented AAC/M4A stream-copy feature via squash commit `4b4afc6`. After PR #9, only remote `main` remained; a separate new feature branch now exists. Do not infer local working-tree status without user verification.
+- [PR #7](https://github.com/chenjing2000/audioplayer/pull/7) merged the FFmpeg implementation specification; [PR #8](https://github.com/chenjing2000/audioplayer/pull/8) merged the implemented AAC/M4A stream-copy feature via squash commit `4b4afc6`. After PR #9, PR #10 was developed on a separate feature branch. Do not infer local working-tree status without user verification.
 - PR #8 feature-branch Windows CI [#45164533459](https://github.com/chenjing2000/audioplayer/actions/runs/45164533459) **passed** after final review. User-reported local Windows acceptance: **47 Core, 113 UI, 5 publishing safeguards, 4 published-EXE checks**, plus real M4A playback and listening. These are feature-branch checks, not a claim of a new post-merge `main` run.
-- `feature/toolbar-refresh-and-output-naming` changes manual folder refresh, toolbar spacing/alignment, trim output suffix and silence result paths. Branch CI [#45171773385](https://github.com/chenjing2000/audioplayer/actions/runs/45171773385) passed: 47 Core, 124 UI, 5 publishing safeguards and 4 published-EXE checks. Windows visual/taskbar and real-audio acceptance remain **pending**. The checked-in 16/32/48-pixel ICO layers already use the teal/white icon, and the 256-pixel layer is present; any old pinned taskbar icon must be investigated on Windows before changing the ICO.
+- PR #10 implements manual folder refresh, toolbar spacing/alignment (final progress slider offset **10 DIP**), trim output suffix, flat silence-result paths and complete AudioPlayer naming. Latest Windows PR CI [#45181394625](https://github.com/chenjing2000/audioplayer/actions/runs/45181394625) **passed** on commit `038f021`. User Windows acceptance confirmed successful launch, settings persistence, M4A playback/trimming, refresh button, taskbar icon and progress alignment. No ICO changes were needed.
 - Windows M4A/interaction/listening acceptance was reported for the audio refactor, and the user accepted the icon appearance on Windows. **Real long-pause MP3/WAV media acceptance remains deferred.** Automated CI does not replace actual codec and listening tests.
 
 ## Application and UI baseline
@@ -38,12 +38,12 @@
 - **New branch output naming:** `<stem>.new[ (N)].<ext>` without overwrite; M4A keeps FFmpeg stream copy, WAV/MP3 keep the PCM paths. The folder refresh button invokes existing `LoadFolderAsync(currentFolder)`, scans before closing playback, and does not resume playback after a successful reload. Scan failure preserves existing list/playback. Old nested silence results are ignored and left untouched.
 - **Windows feature-branch evidence (PR #8, historical):** Core 47/47, UI 113/113, publishing safeguards 5/5 and published-EXE checks 4/4; AAC-LC stereo 48-kHz source 7142.442667 s / 102,033,724 bytes -> trimmed 5468.970021 s / 81,561,519 bytes. User confirmed playback and natural joins. See [Testing](Testing.md#2026-11-23-pr-8-windows-aacm4a-stream-copy-acceptance-evidence). Incomplete DLL, active cancellation, source-mutation scenarios and exact FFmpeg build checksum remain unverified.
 
-## Engineering name consolidation (PR #10, unmerged)
+## Engineering name consolidation (PR #10, user-approved for merge)
 
 - Project and test directories/files are now `AudioPlayer/AudioPlayer.csproj` and `tests/AudioPlayer.Tests/AudioPlayer.Tests.csproj`. C# namespaces, XAML `x:Class` declarations, resource pack URIs and friend-assembly references are unified under `AudioPlayer` / `AudioPlayer.Tests`; the playback implementation class is `AudioPlayer.PlaybackEngine` (renamed from the class that conflicted with the new namespace in WPF-generated markup).
 - The window, assembly and portable executable are named `AudioPlayer` / `AudioPlayer.exe`. Default settings are stored in `AudioPlayer.settings.json`; renamed executables still use their own name. Old settings are **not auto-migrated**: if desired, manually copy settings after closing the old program and before first launch, without overwriting existing new settings.
-- The publishing script produces `dist/AudioPlayer.exe` and leaves any old `旧版 EXE` or settings files untouched; delete the obsolete EXE manually only after acceptance. No automatic deletion or compatibility logic.
-- Renamed-build Windows CI [#45178109384](https://github.com/chenjing2000/audioplayer/actions/runs/45178109384) **passed**: 47 Core, 125 UI, 5 publishing safeguards, and 4 published-EXE checks. Audio-device playback was skipped on the CI runner; real-device playback, taskbar appearance, configuration preservation and optional FFmpeg M4A acceptance remain pending. Historical test counts refer to their original branches.
+- The publishing script produces `dist/AudioPlayer.exe` and leaves older release executables and settings files untouched; clean up obsolete files manually only after verifying the new build. No automatic deletion or compatibility logic.
+- Final PR #10 Windows CI [#45181394625](https://github.com/chenjing2000/audioplayer/actions/runs/45181394625) **passed** on `038f021`. User-supplied Windows test log before the last 10-DIP visual adjustment recorded **47 Core, 127 UI, 5 publishing safeguards, 4 published-EXE checks**, zero failures; final 10-DIP position was subsequently visually accepted. User also confirmed normal running, settings save, M4A playback/trimming, refresh behavior and taskbar icon. Hosted CI audio-device-dependent checks and real long-pause MP3/WAV listening remain outside this acceptance; do not claim them passed.
 
 ## Next development session
 
@@ -65,4 +65,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Test-PublishedApp.ps1
 ```
 
-**PR #8 and PR #9 are merged.** The new work is confined to `feature/toolbar-refresh-and-output-naming`; do not merge or claim Windows acceptance before explicit authorization. The remaining PR #8 failure-path checks remain deferred. Remaining edge-case checks are documented in Testing; do not label them as passed or start unrelated refactoring.
+**PR #8 and PR #9 were merged before PR #10.** PR #10 was explicitly accepted for squash merge on 2026-11-23 after the final 10-DIP visual inspection and Windows checks. Verify actual GitHub merge/main state before asserting the merge is complete. PR #8 failure-path and long-pause MP3/WAV edge cases remain deferred; see Testing.
