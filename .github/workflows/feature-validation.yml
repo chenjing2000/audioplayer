@@ -3,7 +3,8 @@ name: Feature validation
 on:
   push:
     branches:
-      - feature/results-cache-toast-refactor
+      - main
+      - 'feature/**'
   pull_request:
     branches:
       - main
