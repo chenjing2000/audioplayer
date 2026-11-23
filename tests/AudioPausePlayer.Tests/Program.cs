@@ -137,28 +137,35 @@ Check("Energy above threshold", () => Assert(Detect(Enumerable.Repeat(0.006f, 40
 Check("Allowed silence default and linked minimum", () =>
 {
     var settings = new SilenceSettings();
-    Assert(settings.AllowedSilenceSeconds == 2.000m);
+    Assert(settings.AllowedSilenceSeconds == 2.0m);
     settings.MinimumSilenceMilliseconds = 5000;
     bool rejected = false;
     try { settings.Validate(); }
     catch (ArgumentOutOfRangeException) { rejected = true; }
     Assert(rejected);
-    settings.AllowedSilenceSeconds = 5.000m;
+    settings.AllowedSilenceSeconds = 5.0m;
     settings.Validate();
-    settings.AllowedSilenceSeconds = 5.0001m;
+    settings.AllowedSilenceSeconds = 5.01m;
     rejected = false;
     try { settings.Validate(); }
     catch (ArgumentOutOfRangeException) { rejected = true; }
     Assert(rejected);
 });
-Check("Legacy config without trim setting respects previous minimum", () =>
+Check("Missing trim value is not migrated and invalid precision is rejected", () =>
 {
     string path = Path.Combine(Path.GetTempPath(), "legacy-audio-" + Guid.NewGuid().ToString("N") + ".json");
     try
     {
         File.WriteAllText(path, """{"MinimumSilenceMilliseconds":3000}""");
-        var settings = new SettingsStore(path).LoadOrCreate();
-        Assert(settings.MinimumSilenceMilliseconds == 3000 && settings.AllowedSilenceSeconds == 3.000m);
+        bool missingRejected = false;
+        try { new SettingsStore(path).LoadOrCreate(); }
+        catch (ArgumentOutOfRangeException) { missingRejected = true; }
+        Assert(missingRejected, "Do not migrate a missing value to the minimum");
+        File.WriteAllText(path, """{"MinimumSilenceMilliseconds":300,"AllowedSilenceSeconds":1.25}""");
+        bool precisionRejected = false;
+        try { new SettingsStore(path).LoadOrCreate(); }
+        catch (ArgumentOutOfRangeException) { precisionRejected = true; }
+        Assert(precisionRejected, "Old precision is not migrated");
         File.WriteAllText(path, """{"MinimumSilenceMilliseconds":3000,"AllowedSilenceSeconds":2}""");
         bool rejected = false;
         try { new SettingsStore(path).LoadOrCreate(); }
@@ -167,6 +174,65 @@ Check("Legacy config without trim setting respects previous minimum", () =>
     }
     finally { if (File.Exists(path)) File.Delete(path); }
 });
+Check("Silence results reuse verified metadata and ignore navigation and trim parameters", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "silence-result-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    string source = Path.Combine(folder, "lesson (1).wav");
+    try
+    {
+        WaveFileWriter.CreateWaveFile16(source, new Samples(Signal(100, 4500, 100), 1000, 1, int.MaxValue));
+        var settings = new SilenceSettings();
+        string path = SilenceResultStore.GetPath(source);
+        Assert(path == Path.Combine(folder, "results", "lesson (1).wav", "silence.json"));
+        var first = SilenceResultStore.LoadOrDetect(source, settings);
+        Assert(!first.FromCache && first.Saved && first.Ranges.Count == 1 && File.Exists(path));
+        string original = File.ReadAllText(path);
+        Assert(!original.Contains("sha256", StringComparison.OrdinalIgnoreCase), "No content hashing");
+
+        var reused = SilenceResultStore.LoadOrDetect(source, new SilenceSettings
+        {
+            NavigationToleranceMilliseconds = 500, AllowedSilenceSeconds = 3.0m
+        });
+        Assert(reused.FromCache && reused.Ranges.Count == 1);
+        Assert(File.ReadAllText(path) == original, "Cache hit did not rewrite JSON");
+
+        settings.FrameMilliseconds = 20;
+        Assert(!SilenceResultStore.LoadOrDetect(source, settings).FromCache, "Detection parameters invalidate cache");
+        string newJson = File.ReadAllText(path);
+        Assert(newJson != original && Directory.GetFiles(Path.GetDirectoryName(path)!).Length == 1);
+
+        File.WriteAllText(path, "{broken");
+        Assert(!SilenceResultStore.LoadOrDetect(source, settings).FromCache, "Corrupt cache regenerates");
+        var node = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
+        node["ranges"]![0]!["endTicks"] = node["durationTicks"]!.GetValue<long>() + 1000;
+        File.WriteAllText(path, node.ToJsonString());
+        Assert(!SilenceResultStore.LoadOrDetect(source, settings).FromCache, "Out-of-bounds range regenerates");
+
+        File.SetLastWriteTimeUtc(source, File.GetLastWriteTimeUtc(source).AddSeconds(4));
+        Assert(!SilenceResultStore.LoadOrDetect(source, settings).FromCache, "Metadata change invalidates");
+        Assert(SilenceResultStore.LoadOrDetect(source, settings).FromCache, "New result is reusable");
+        Assert(!Directory.Exists(Path.Combine(folder, "cache")), "No legacy cache directory created");
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
+Check("Uncompressible silence does not create an output file", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "silence-short-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    string path = Path.Combine(folder, "short.wav");
+    try
+    {
+        WaveFileWriter.CreateWaveFile16(path, new Samples(Signal(100, 700, 100), 1000, 1, int.MaxValue));
+        bool rejected = false;
+        try { SilenceTrimmer.TrimAsync(path, new SilenceSettings()).GetAwaiter().GetResult(); }
+        catch (InvalidOperationException) { rejected = true; }
+        Assert(rejected && Directory.GetFiles(folder).Length == 1);
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
 Check("Trim WAV output is separately saved, validated, and never overwritten", () =>
 {
     string folder = Path.Combine(Path.GetTempPath(), "audio-trim-" + Guid.NewGuid().ToString("N"));
@@ -183,10 +249,15 @@ Check("Trim WAV output is separately saved, validated, and never overwritten", (
         Assert(new FileInfo(source).Length == originalLength, "Original source modified");
         using (var output = new AudioFileReader(trimmed.OutputPath))
             Assert(Math.Abs(output.TotalTime.TotalSeconds - 2.2) < 0.02);
-        bool conflict = false;
-        try { SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult(); }
-        catch (IOException) { conflict = true; }
-        Assert(conflict && Directory.GetFiles(folder).Length == 2, "Existing result should be protected");
+        Assert(trimmed.OutputSilenceSaved, "Re-encoded output must have its own silence result");
+        Assert(File.Exists(SilenceResultStore.GetPath(source)), "Source has independent silence.json");
+        Assert(File.Exists(SilenceResultStore.GetPath(trimmed.OutputPath)), "Output has independent silence.json");
+        var second = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
+        var third = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
+        Assert(second.OutputPath == Path.Combine(folder, "sample.lesssilence (1).wav"));
+        Assert(third.OutputPath == Path.Combine(folder, "sample.lesssilence (2).wav"));
+        Assert(second.OutputSilenceSaved && third.OutputSilenceSaved && Directory.GetFiles(folder).Length == 4,
+            "Numbered files coexist with independent results");
     }
     finally { Directory.Delete(folder, true); }
 });
