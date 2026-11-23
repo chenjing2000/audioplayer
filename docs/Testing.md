@@ -118,3 +118,10 @@ Branch: `feature/code-audit-simplification`, based on `main@67bf351`. This is a 
 - [Windows feature CI #45117264424](https://github.com/chenjing2000/audioplayer/actions/runs/45117264424) passed: Core **45/45**, WPF UI **82/82**, publishing safeguards **5/5**, portable EXE publish and published-app checks. A later CI run must also confirm the newly included workflow harness step before merge.
 
 This cleanup has **not** yet received a new Windows physical-device listening check. Earlier user-confirmed M4A acceptance belongs to the preceding release; real long-pause MP3/WAV checks remain deferred.
+
+### 2026-11-23: AudioPlayer unified v3 icons
+
+- The toolbar now renders the approved v3 SVG geometry as six native WPF `DrawingImage` resources. All visible button icons have a `#26798A` circular background, white symbols occupying approximately 50% of the circle height, and transparent surroundings.
+- Open, Play/Pause, Stop, Trim and Settings share 36×36 transparent hit targets with 28×28 visible images; hovering or pressing changes only the symbol's overall opacity, never its border or background.
+- Play/Pause remains a single button with two states. The application icon is the approved leaf artwork in a compact multi-size ICO (16, 32, 48, 256 pixels); no SVG runtime dependency was added.
+- WPF checks cover dimensions, resource colors, borderless button templates, and the existing playback UI. Automatic checks do not replace Windows taskbar/title-bar appearance review, hover feedback inspection, or real audio acceptance.
