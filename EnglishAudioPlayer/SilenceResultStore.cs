@@ -71,9 +71,9 @@ internal static class SilenceResultStore
     // Clamp only this sub-sample boundary difference; larger overflows remain invalid.
     private static long NormalizeEndTicks(long endTicks, AudioFingerprint fingerprint)
     {
-        long extra = endTicks - fingerprint.DurationTicks;
+        if (endTicks <= fingerprint.DurationTicks) return endTicks;
         long oneSampleTicks = (TimeSpan.TicksPerSecond + fingerprint.SampleRate - 1L) / fingerprint.SampleRate;
-        return extra > 0 && extra <= oneSampleTicks ? fingerprint.DurationTicks : endTicks;
+        return endTicks - fingerprint.DurationTicks <= oneSampleTicks ? fingerprint.DurationTicks : endTicks;
     }
 
     public static IReadOnlyList<SilenceRange>? TryLoad(string audioPath, SilenceSettings settings,
