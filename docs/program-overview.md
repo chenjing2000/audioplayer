@@ -1,6 +1,6 @@
 # English Audio Player 程序说明
 
-> 本文包含播放器基础功能和历史验证记录；当前开发分支已实现 [results/Toast 重构规格](specs/Results-Cache-Toast-Refactor.md)，仍待 Windows 实机验收及合并。历史测试数据不得当作新版本通过证据。
+> 本文包含播放器当前功能和部分历史验证记录；[results/Toast 重构规格](specs/Results-Cache-Toast-Refactor.md) 已通过 Windows 验收并经 PR #2 合并到 `main`。历史测试数据不代表当前版本的新验证结果，详见 [Testing](Testing.md)。
 
 ## 1. 开发目的
 
@@ -110,7 +110,7 @@ dotnet run --project tests/AudioPausePlayer.Tests -c Release -- --ui --playback 
 | AudioPlayer | 管理一个文件读取器、输出设备和播放生命周期；不依赖 WPF 控件、列表或停顿算法 |
 | SilenceDetector / SilenceRange | 计算静音区间和导航目标；使用独立读取器，不修改播放器位置 |
 | AudioLibrary / AudioTrack | 扫描、自然排序、读取元数据和保存列表项状态；不操作音频设备 |
-| SilenceSettings | 集中维护四项参数的默认值和有效范围，避免各入口各自定义范围 |
+| SilenceSettings | 集中维护五项参数的默认值和有效范围，避免各入口各自定义范围 |
 | SettingsStore | 文件定位、JSON 读取和原子替换集中处理；不依赖界面 |
 | SilenceSettingsWindow | 编辑和验证输入，返回确认的参数；不直接写配置或重新分析音频 |
 | MainWindow | 协调输入、播放、分析、拖动、通知和关闭；保留在一个窗口中，避免碎片化拆分 |
@@ -136,7 +136,7 @@ dotnet run --project tests/AudioPausePlayer.Tests -c Release -- --ui --playback 
 当前没有本地 MP3，MP3 元数据、真实教材停顿效果以及完整的 MP3 播放回归仍未验证；合成 WAV 检查不代表完成教材音频的听感验收。
 
 
-## 9. 长静音压缩与自动结果持久化（当前开发分支）
+## 9. 长静音压缩与自动结果持久化
 
 播放音频后自动校验和复用 `silence.json`，缺失/无效时后台运行原有 RMS 检测。方向键只使用当前播放会话的内存区间；选中列表条目的有效结果用于判断裁剪按钮是否可用。`SilenceTrimmer` 在点击时重新验证源元数据及结果，直接调用原有 `PlanCuts` 帧级裁剪、10 ms 淡化和 WAV/MP3/M4A 系统编码，不对有效缓存重复扫描源 PCM。
 
