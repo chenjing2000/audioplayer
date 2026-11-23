@@ -57,3 +57,20 @@ The tag-triggered GitHub Release workflow runs Core, publishes the EXE, and then
 ## Long-silence trimming acceptance
 
 Before release, verify WAV, MP3 and AAC-in-M4A inputs/outputs on a real Windows 10/11 computer using the installed Media Foundation codecs. Include PCM-generated fixtures for: no silence; short, equal and longer-than-allowed silence; multiple segments; silence at both ends; stereo; fractional seconds; 10-ms fading; and old/new settings validation. Check the generated output can be decoded, has the expected length (allowing compressed-codec padding), and does not overwrite an existing or source file. Test cancellation on shutdown and selection without focus. Automated tests alone do not establish that the system AAC/MP3 encoder is available; report real-device tests separately.
+
+### 2026-11-23: local Windows acceptance evidence for long-silence trimming
+
+Evidence supplied by the user from Windows PowerShell on `feature/long-silence-trimming` at `7e9dbb7`, with a separately confirmed listening check:
+
+| Check | Result |
+| --- | --- |
+| `Test.ps1 -Suite Full -AudioFile <AAC/M4A file>` | 43 application tests passed, 0 failed; 62 UI assertions passed, 0 failed; MP3 playback skipped |
+| `Test.ps1 -Suite UI` | 42 application tests passed, 0 failed; 62 UI assertions passed, 0 failed |
+| M4A end-to-end trim | 119 silence intervals compressed; removed 1673.473 s |
+| Source vs resulting M4A duration | 7142.443 s vs 5468.971 s, subject to codec rounding |
+| Output format and source-file safety | Test passed: same extension, output could be decoded, source retained |
+| Linked minimum/allowed silence settings | User confirmed the real UI validation works |
+| Listening test | User confirmed that speech remains complete and no obvious popping is heard at joins |
+| Real MP3 and WAV long-pause recordings | **Deferred at user request**: no suitable recordings available |
+
+The M4A end-to-end test and listening confirmation are **real-machine acceptance evidence**, not evidence that every system codec, sample rate, MP3 file or WAV file has been tested. Synthetic WAV/PCM regression tests remain in Core. Do not change MP3/WAV real-media coverage from deferred to passed without a separate test.

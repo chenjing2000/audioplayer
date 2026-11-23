@@ -37,3 +37,11 @@ E. 增补核心/集成用例，运行原有测试、构建、UI、真实格式�
 既有入口：`tools/Test.ps1 -Suite Core|UI|Full`、`tools/Publish.ps1` 与 `tools/Test-PublishedApp.ps1`。额外核心用例写入现有测试工程，尽量用合成 PCM 而不是随 Git 提交真实音频。分别汇报静态审查、编译、自动化测试、Windows 实机与格式测试的真实状态。
 
 发布保持框架依赖型 .NET 10 便携式单文件，并保护用户音频和现有 EXE 同目录的配置文件。若后续编码限制迫使运行形态改变，先单独说明，不能静默引入 FFmpeg。
+
+## 2026-11-23 实施结果
+
+功能已在 `feature/long-silence-trimming` 分支实现。用户提供的 Windows 运行日志显示：Core、UI 与 M4A 的真实裁剪测试通过；用户进一步确认裁剪后的语音完整，拼接处没有明显爆音。
+
+**验收范围：** M4A/AAC 的实际工作流程与人工听感已通过；WAV 的合成 PCM 回归测试已通过；由于目前缺少有明显停顿的真实 MP3/WAV 文件，这两种格式的真实长静音测试按用户要求暂缓。详情及数据统一记录在 [Testing](../Testing.md#2026-11-23-local-windows-acceptance-evidence-for-long-silence-trimming)，不在本方案重复计数。
+
+当前不合并 `main`，保持功能分支供最终集成验收；不因缺少 MP3/WAV 实际样本引入 FFmpeg 或改变已确定范围。

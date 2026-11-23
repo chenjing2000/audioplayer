@@ -1,6 +1,6 @@
 # 长静音压缩：确认的产品规格
 
-状态：**2026-11-23 需求已确认；以功能分支实现和真实 Windows 验收为准。**  
+状态：**2026-11-23 已实现；M4A 实机裁剪与人工听感验收通过，真实 MP3/WAV 长停顿文件测试暂缓。** 详见 [验收记录](../Testing.md#2026-11-23-local-windows-acceptance-evidence-for-long-silence-trimming)。  
 仓库：`chenjing2000/audioplayer`；基线为当前 `main`；功能分支：`feature/long-silence-trimming`。
 
 ## 目标及不变项
