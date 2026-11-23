@@ -34,5 +34,5 @@ jobs:
         run: |
           $exe = @(Get-ChildItem -LiteralPath dist -Filter *.exe -File)
           if ($exe.Count -ne 1) { throw 'Expected one release EXE.' }
-          gh release create "$env:RELEASE_TAG" "$($exe[0].FullName)" --verify-tag --title "$env:RELEASE_TAG" --notes-file docs/Release-Notes.md
+          gh release create "$env:RELEASE_TAG" "$($exe[0].FullName)" "dist/FFmpeg-Setup.txt" --verify-tag --title "$env:RELEASE_TAG" --notes-file docs/Release-Notes.md
           if ($LASTEXITCODE -ne 0) { throw 'GitHub Release creation failed.' }

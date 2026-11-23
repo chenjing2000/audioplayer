@@ -18,6 +18,8 @@ TestResults/
 
 # Local audio and generated test output
 *.mp3
+*.wav
+*.m4a
 docs/test-results/
 
 # Logs and temporary packages

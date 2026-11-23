@@ -7,12 +7,22 @@ public static class AudioLibrary
     public static List<AudioTrack> LoadFolder(string folderPath)
     {
         string[] files = Directory.GetFiles(folderPath).Where(path =>
-            new[] { ".mp3", ".m4a", ".wav" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)).ToArray();
+            new[] { ".mp3", ".m4a", ".wav" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)
+            && !IsTrimTemporaryFile(path)).ToArray();
         Array.Sort(files, (left, right) => CompareNames(Path.GetFileName(left), Path.GetFileName(right)));
         var tracks = new List<AudioTrack>();
         foreach (string path in files)
             tracks.Add(ReadTrack(path));
         return tracks;
+    }
+
+    // Only hide our own in-progress trim output; keep other dot-prefixed audio visible.
+    internal static bool IsTrimTemporaryFile(string path)
+    {
+        string stem = Path.GetFileNameWithoutExtension(path);
+        if (!stem.StartsWith(".", StringComparison.Ordinal)) return false;
+        int marker = stem.LastIndexOf(".new.", StringComparison.Ordinal);
+        return marker > 1 && Guid.TryParseExact(stem[(marker + 5)..], "N", out _);
     }
 
     internal static AudioTrack ReadTrack(string path)
