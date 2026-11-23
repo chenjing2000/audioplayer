@@ -156,17 +156,17 @@ Check("Missing trim value is not migrated and invalid precision is rejected", ()
     string path = Path.Combine(Path.GetTempPath(), "legacy-audio-" + Guid.NewGuid().ToString("N") + ".json");
     try
     {
-        File.WriteAllText(path, """{"MinimumSilenceMilliseconds":3000}""");
+        File.WriteAllText(path, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200}""");
         bool missingRejected = false;
         try { new SettingsStore(path).LoadOrCreate(); }
-        catch (ArgumentOutOfRangeException) { missingRejected = true; }
-        Assert(missingRejected, "Do not migrate a missing value to the minimum");
-        File.WriteAllText(path, """{"MinimumSilenceMilliseconds":300,"AllowedSilenceSeconds":1.25}""");
+        catch (System.Text.Json.JsonException) { missingRejected = true; }
+        Assert(missingRejected, "Do not silently fill a missing allowed-silence field");
+        File.WriteAllText(path, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":1.25}""");
         bool precisionRejected = false;
         try { new SettingsStore(path).LoadOrCreate(); }
         catch (ArgumentOutOfRangeException) { precisionRejected = true; }
         Assert(precisionRejected, "Old precision is not migrated");
-        File.WriteAllText(path, """{"MinimumSilenceMilliseconds":3000,"AllowedSilenceSeconds":2}""");
+        File.WriteAllText(path, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":3000,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2}""");
         bool rejected = false;
         try { new SettingsStore(path).LoadOrCreate(); }
         catch (ArgumentOutOfRangeException) { rejected = true; }
