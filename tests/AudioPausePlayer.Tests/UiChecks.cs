@@ -59,16 +59,16 @@ internal static class UiChecks
                     var toasts = (ToastHost)window.FindName("ToastMessages");
                     var toastStack = FindVisual<StackPanel>(toasts)!;
                     Assert(toastStack.Children.Count == 0, "Toast overlay starts empty");
-                    window.ShowNotification("测试信息", false, informational: true);
+                    toasts.Show("测试信息", ToastLevel.Info);
                     Assert(toastStack.Children.Count == 1 &&
                         FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "普通：测试信息",
                         "Normal toasts use the information prefix");
-                    window.ShowNotification("测试警告", false);
-                    window.ShowNotification("测试错误", true);
+                    toasts.Show("测试警告", ToastLevel.Warning);
+                    toasts.Show("测试错误", ToastLevel.Error);
                     Assert(toastStack.Children.Count == 3 &&
                         FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "错误：测试错误",
                         "Newest visible toast is on top");
-                    window.ShowNotification("排队消息", false, informational: true);
+                    toasts.Show("排队消息", ToastLevel.Info);
                     Assert(toastStack.Children.Count == 3, "Only three toast slots are shown");
                     FindVisual<Button>((Border)toastStack.Children[2])!
                         .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
