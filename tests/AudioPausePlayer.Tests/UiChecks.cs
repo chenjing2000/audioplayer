@@ -118,14 +118,17 @@ internal static class UiChecks
                             writer.WriteSamples(new float[44100], 0, 44100);
                         refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                         if (Field<Task>(window, "activeOperation") is Task refreshAction) await refreshAction;
+                        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                         Assert(list.Items.Count == 2 &&
                             list.Items.OfType<AudioTrack>().Select(track => Path.GetFileName(track.FilePath))
                                 .SequenceEqual(new[] { "added.wav", "renamed.wav" }) &&
                             list.SelectedItem is null && !Field<AudioPlayer>(window, "player")!.IsLoaded,
                             "Refresh reloads added and renamed files, clears selection and closes playback");
+                        Assert(refreshButton.IsEnabled, "Refresh button re-enables after folder load");
                         File.Delete(added);
                         refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                         if (Field<Task>(window, "activeOperation") is Task removedAction) await removedAction;
+                        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                         Assert(list.Items.Count == 1 &&
                             Path.GetFileName(((AudioTrack)list.Items[0]).FilePath) == "renamed.wav",
                             "Refresh drops deleted audio files");
@@ -133,6 +136,7 @@ internal static class UiChecks
                         Directory.Delete(refreshFolder, true);
                         refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                         if (Field<Task>(window, "activeOperation") is Task failedAction) await failedAction;
+                        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                         Assert(list.Items.Count == 1 && refreshButton.IsEnabled,
                             "Failed refresh retains the old list and folder selection");
                         toasts.Clear();
