@@ -112,10 +112,16 @@ internal static class UiChecks
 
                         Assert(SilenceResultStore.LoadOrDetect(source, new SilenceSettings()).Saved,
                             "Synthetic selection fixture can persist results");
+                        // M4A decoders can report one PCM sample more than TotalTime at EOF.
+                        string resultPath = SilenceResultStore.GetPath(source);
+                        var resultNode = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(resultPath))!;
+                        resultNode["ranges"]![0]!["endTicks"] = resultNode["durationTicks"]!.GetValue<long>() + 208;
+                        File.WriteAllText(resultPath, resultNode.ToJsonString());
                         list.SelectedIndex = -1;
                         list.SelectedIndex = 0;
                         if (Field<Task>(window, "selectionTask") is Task validCheck) await validCheck;
-                        Assert(trimButton.IsEnabled, "Validated cached compressible intervals enable scissors");
+                        Assert(trimButton.IsEnabled,
+                            "Cached silence enables scissors even with a one-sample EOF rounding difference");
 
                         File.SetLastWriteTimeUtc(source, File.GetLastWriteTimeUtc(source).AddSeconds(5));
                         list.SelectedIndex = -1;
