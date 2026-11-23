@@ -1,6 +1,6 @@
 # AudioPlayer：统一通知与结果缓存重构——实施和验收方案
 
-**状态：2026-11-23 功能已实现，自动化回归与 Windows 实机 M4A、交互和听感验收通过；真实 MP3/WAV 长停顿测试按约定暂缓。** 权威要求：[Results-Cache-Toast-Refactor.md](../specs/Results-Cache-Toast-Refactor.md)。从已合并的 \`main@c7b92ce\` 在 \`feature/results-cache-toast-refactor\` 开发；不得未经授权合并 \`main\`。提交信息用英文、描述实际变化。
+**状态：历史实施计划，已通过 [PR #2](https://github.com/chenjing2000/audioplayer/pull/2) 合并到 `main`，自动化回归与 Windows 实机 M4A、交互和听感验收通过；真实 MP3/WAV 长停顿测试按约定暂缓。** 权威要求：[Results-Cache-Toast-Refactor.md](../specs/Results-Cache-Toast-Refactor.md)。历史开发起点为 `main@c7b92ce`，开发分支为 `feature/results-cache-toast-refactor`；下文有关分支、阶段与不得合并 `main` 的说明仅为当时的开发记录。新一轮工作以 [HANDOFF](../HANDOFF.md) 为入口。
 
 遵循第一性原理与最小必要设计。先删除失效的旧逻辑，再复用现有检测、PCM 裁剪、设置、WPF UI 与测试入口。不添加通用缓存框架、WebView2、SQLite、哈希校验或其他媒体依赖。
 

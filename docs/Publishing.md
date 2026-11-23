@@ -6,7 +6,7 @@
 .\tools\Publish.ps1
 ```
 
-发布脚本调用 EnglishAudioPlayer/Properties/PublishProfiles/Portable.pubxml 中的 Portable 配置。四个项目统一采用 Release、win-x64、依赖本机运行时的单文件发布，嵌入原生加载器，不裁剪、不压缩、不分发 PDB 或 XML 文档。正式输出为 dist/EnglishAudioPlayer.exe。用户需要 .NET 10 Windows Desktop Runtime x64，普通 .NET Runtime 不足以运行 WPF；不需要 SDK。
+发布脚本调用 EnglishAudioPlayer/Properties/PublishProfiles/Portable.pubxml 中的 Portable 配置。本项目采用 Release、win-x64、依赖本机运行时的单文件发布，嵌入原生加载器，不裁剪、不压缩、不分发 PDB 或 XML 文档。正式输出为 dist/EnglishAudioPlayer.exe。用户需要 .NET 10 Windows Desktop Runtime x64，普通 .NET Runtime 不足以运行 WPF；不需要 SDK。
 
 脚本先在 dist 下的唯一临时目录构建，排除调试符号和 XML 文档，确认剩余产物只有一个 EXE，再在同一卷中原子替换已有 EXE。构建失败、意外的额外依赖或 EXE 被占用时停止；保留旧程序、已有配置和其他用户文件。最终删除临时目录，不清理 bin/obj 构建缓存。同一项目不要同时执行发布、构建或测试。
 

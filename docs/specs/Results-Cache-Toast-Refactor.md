@@ -1,6 +1,6 @@
 # AudioPlayer：统一通知与停顿结果持久化重构规格
 
-状态：**2026-11-23 已实现并通过 Windows 实机验收；真实长停顿 MP3/WAV 测试按约定暂缓**。基线：\`main\` 合并提交 \`c7b92ce\`。实现分支：\`feature/results-cache-toast-refactor\`。
+状态：**2026-11-23 已经 PR #2 合并到 `main`，Windows 实机 M4A、交互及听感验收通过；真实长停顿 MP3/WAV 测试按约定暂缓**。历史开发基线：`main@c7b92ce`；历史实现分支：`feature/results-cache-toast-refactor`（已合并、已清理）。
 
 本文件是本轮破坏性改造的权威规格；既有 [长静音压缩规格](Long-Silence-Trimming.md) 的 PCM 裁剪、淡化、格式/输出安全规则继续有效，但本文件对通知、结果存储、输出重名、参数精度与任务状态的规定优先。实施步骤见 [实施与验收方案](../guides/Results-Cache-Toast-Implementation.md)。
 
