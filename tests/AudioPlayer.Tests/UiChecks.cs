@@ -146,7 +146,8 @@ internal static class UiChecks
 
                         // A failed scan from the Open Folder path clears the old state too.
                         await window.LoadFolderAsync(audioFolder);
-                        Assert(refreshButton.IsEnabled && list.Items.Count > 0,
+                        Assert(refreshButton.IsEnabled &&
+                            Field<string>(window, "currentFolder") == Path.GetFullPath(audioFolder),
                             "Valid folder can reopen after failed refresh");
                         bool failedScan = false;
                         try { await window.LoadFolderAsync(refreshFolder); }
