@@ -128,6 +128,13 @@ internal static class UiChecks
                         list.SelectedIndex = 0;
                         if (Field<Task>(window, "selectionTask") is Task outdatedCheck) await outdatedCheck;
                         Assert(!trimButton.IsEnabled, "Changed source invalidates selected trim availability");
+                        for (int i = 0; i < 12; i++)
+                        {
+                            list.SelectedIndex = -1;
+                            list.SelectedIndex = 0;
+                        }
+                        await Task.WhenAll(Field<List<Task>>(window, "runningSelectionChecks")!);
+                        Assert(!trimButton.IsEnabled, "Rapid selection changes leave stale caches disabled");
                         await window.LoadFolderAsync(audioFolder);
                     }
                     finally { Directory.Delete(resultFolder, true); }
@@ -220,6 +227,25 @@ internal static class UiChecks
                          && FindVisual<StackPanel>(modalToasts)!.Children.Count == 0,
                          "Restore clears toast and resets precision");
                      settingsWindow.Close();
+
+                    // Simulate an older canceled selection check that outlives the latest task.
+                    var closingWindow = new MainWindow(
+                        new SettingsStore(Path.Combine(audioFolder, "UiClosing.settings.json")))
+                    { ShowInTaskbar = false, ShowActivated = false, Left = -20000, Top = -20000 };
+                    closingWindow.Show();
+                    var pendingSelection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    Field<List<Task>>(closingWindow, "runningSelectionChecks")!.Add(pendingSelection.Task);
+                    var closeCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    closingWindow.Closed += (_, _) => closeCompleted.TrySetResult();
+                    closingWindow.Close();
+                    await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                    Assert(!closeCompleted.Task.IsCompleted,
+                        "Closing waits for an older pending selection check");
+                    pendingSelection.TrySetResult();
+                    await closeCompleted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                    Assert(!closingWindow.IsVisible,
+                        "Closing completes after all selection checks finish");
+
                     Assert(Math.Abs(window.FontSize - 12) < 0.01 && Math.Abs(timeText.FontSize - 12) < 0.01 && Math.Abs(list.FontSize - 12) < 0.01, "UI font size is 12");
                     Assert(Grid.GetColumn(slider) == 1 && Grid.GetColumn(timeText) == 2 && Grid.GetColumn(playButton) == 3, "Time display sits between progress slider and play button");
                     foreach (Button button in new[] { openButton, playButton, stopButton })
