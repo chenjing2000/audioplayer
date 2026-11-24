@@ -33,6 +33,15 @@ Check("Settings initialize beside executable, persist and preserve invalid files
         Assert(!File.Exists(store.FilePath));
         var settings = store.LoadOrCreate();
         Assert(File.Exists(store.FilePath) && settings.FrameMilliseconds == 10);
+        Assert(settings.BackwardStepSeconds == 5 && settings.ForwardStepSeconds == 4);
+        File.WriteAllText(store.FilePath, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0}""");
+        settings = store.LoadOrCreate();
+        Assert(settings.BackwardStepSeconds == 5 && settings.ForwardStepSeconds == 4);
+        Assert(settings.ExcludedFolderNames == "" && settings.PlaybackMode == PlaybackMode.PlayOne);
+        settings.PlaybackMode = PlaybackMode.RepeatAll;
+        settings.ExcludedFolderNames = "audio, 视频";
+        settings.BackwardStepSeconds = 0;
+        settings.ForwardStepSeconds = 99;
         settings.FrameMilliseconds = 20;
         settings.MinimumSilenceMilliseconds = 500;
         settings.SilenceThresholdDb = -40;
@@ -41,7 +50,24 @@ Check("Settings initialize beside executable, persist and preserve invalid files
         var loaded = new SettingsStore(store.FilePath).LoadOrCreate();
         Assert(loaded.FrameMilliseconds == 20 && loaded.MinimumSilenceMilliseconds == 500
             && loaded.SilenceThresholdDb == -40 && loaded.NavigationToleranceMilliseconds == 250);
+        Assert(loaded.BackwardStepSeconds == 0 && loaded.ForwardStepSeconds == 99 && loaded.ExcludedFolderNames == "audio, 视频" && loaded.PlaybackMode == PlaybackMode.RepeatAll);
+        Assert(File.ReadAllText(store.FilePath).Contains("\"PlaybackMode\": \"RepeatAll\""));
         string previous = File.ReadAllText(store.FilePath);
+        try { store.Save(new SilenceSettings { PlaybackMode = (PlaybackMode)99 }); throw new Exception("Invalid mode accepted"); }
+        catch (ArgumentOutOfRangeException) { }
+        Assert(File.ReadAllText(store.FilePath) == previous);
+        foreach (string invalidName in new[] { "audio*", "a/b", "CON", "NUL.txt", "folder.", ".." })
+        {
+            try { store.Save(new SilenceSettings { ExcludedFolderNames = invalidName }); throw new Exception("Invalid folder accepted"); }
+            catch (ArgumentOutOfRangeException) { }
+            Assert(File.ReadAllText(store.FilePath) == previous);
+        }
+        foreach (var invalidStep in new[] { new SilenceSettings { BackwardStepSeconds = -1 }, new SilenceSettings { ForwardStepSeconds = 100 } })
+        {
+            try { store.Save(invalidStep); throw new Exception("Invalid step accepted"); }
+            catch (ArgumentOutOfRangeException) { }
+            Assert(File.ReadAllText(store.FilePath) == previous);
+        }
         settings.FrameMilliseconds = 0;
         try { store.Save(settings); throw new Exception("Invalid settings accepted"); }
         catch (ArgumentOutOfRangeException) { }
@@ -82,6 +108,19 @@ Check("Settings save failure preserves original configuration", () =>
         if (File.Exists(path)) File.SetAttributes(path, FileAttributes.Normal);
         Directory.Delete(folder, true);
     }
+});
+
+Check("Playback mode completion policy", () =>
+{
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.PlayOne, 1, 3) == -1);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.RepeatOne, 1, 3) == 1);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.Sequential, 1, 3) == 2);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.Sequential, 2, 3) == -1);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.RepeatAll, 2, 3) == 0);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.Sequential, 0, 1) == -1);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.RepeatAll, 0, 1) == 0);
+    foreach (var mode in Enum.GetValues<PlaybackMode>())
+        Assert(MainWindow.NextPlaybackIndex(mode, -1, 3) == -1 && MainWindow.NextPlaybackIndex(mode, 0, 0) == -1);
 });
 
 Check("Silence settings defaults", () =>
@@ -458,11 +497,12 @@ try
         Assert(tooltipTrack.RowToolTip == fixture);
     });
 
-    Check("Recursive scan and restore skip exact audio subdirectories", () =>
+    Check("Recursive scan and restore use configurable exact folder exclusions", () =>
     {
         string root = Path.Combine(fixture, "exclusion");
         string[] excluded = { Path.Combine(root, "audio", "word.mp3"),
-            Path.Combine(root, "Book", "Audio", "deep", "word.m4a") };
+            Path.Combine(root, "Book", "Audio", "deep", "word.m4a"),
+            Path.Combine(root, "video", "nested", "clip.wav"), Path.Combine(root, "Book", "中文 文件夹", "word.mp3") };
         string[] included = { Path.Combine(root, "audio.mp3"),
             Path.Combine(root, "AudioBooks", "book.wav"),
             Path.Combine(root, "Book", "audio-files", "lesson.mp3") };
@@ -473,12 +513,17 @@ try
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 File.WriteAllText(path, "metadata fixture");
             }
+            var settings = new SilenceSettings { ExcludedFolderNames = " audio , video; AUDIO；中文 文件夹， " };
+            var names = settings.GetExcludedFolderNames();
+            Assert(names.Count == 3 && names.Contains("Audio") && names.Contains("中文 文件夹"));
+            Assert(new SilenceSettings().GetExcludedFolderNames().Count == 0);
+            Assert(AudioLibrary.LoadFolder(root).Count == included.Length + excluded.Length);
             var expected = included.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            Assert(AudioLibrary.LoadFolder(root).Select(t => t.FilePath).ToHashSet().SetEquals(expected));
-            Assert(AudioLibrary.LoadPaths(root, excluded.Concat(included), restore: true)
+            Assert(AudioLibrary.LoadFolder(root, excludedNames: names).Select(t => t.FilePath).ToHashSet().SetEquals(expected));
+            Assert(AudioLibrary.LoadPaths(root, excluded.Concat(included), restore: true, excludedNames: names)
                 .Select(t => t.FilePath).ToHashSet().SetEquals(expected));
-            Assert(excluded.All(path => !AudioLibrary.IsPlaylistPath(root, path)));
-            Assert(AudioLibrary.LoadFolder(Path.Combine(root, "audio")).Count == 1);
+            Assert(excluded.All(path => !AudioLibrary.IsPlaylistPath(root, path, names)));
+            Assert(AudioLibrary.LoadFolder(Path.Combine(root, "audio"), excludedNames: names).Count == 1);
         }
         finally { Directory.Delete(root, true); }
     });

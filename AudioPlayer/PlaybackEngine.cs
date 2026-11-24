@@ -8,10 +8,14 @@ public sealed class PlaybackEngine : IDisposable
     private WaveOutEvent? output;
     private readonly SemaphoreSlim operations = new(1, 1);
     private TaskCompletionSource? playbackCompletion;
-    private bool stopping;
-    private PlaybackState state = PlaybackState.Stopped;
-    private bool atEnd;
+    private volatile bool stopping;
+    private volatile PlaybackState state = PlaybackState.Stopped;
+    private volatile bool atEnd;
     private bool disposed;
+    private object? naturalCompletion;
+    internal object? NaturalCompletion => Volatile.Read(ref naturalCompletion);
+    internal bool ConsumeNaturalCompletion(object token)
+        => ReferenceEquals(Interlocked.CompareExchange(ref naturalCompletion, null, token), token);
 
     public bool IsLoaded => reader is not null;
     public bool IsPlaying => state == PlaybackState.Playing;
@@ -21,6 +25,7 @@ public sealed class PlaybackEngine : IDisposable
     internal PlaybackState PlaybackState => state;
     public Exception? LastError { get; private set; }
     public event EventHandler? StateChanged;
+    public event EventHandler? NaturalPlaybackEnded;
 
     public Task OpenAsync(string filePath) => RunSerializedAsync(async () =>
     {
@@ -53,20 +58,22 @@ public sealed class PlaybackEngine : IDisposable
     {
         if (reader is null || output is null) return;
         if (output.PlaybackState == PlaybackState.Playing) return;
+        Interlocked.Exchange(ref naturalCompletion, null);
         if (output.PlaybackState == PlaybackState.Stopped) await StopOutputAsync();
         if (atEnd || reader.CurrentTime >= reader.TotalTime) reader.CurrentTime = TimeSpan.Zero;
         atEnd = false;
         LastError = null;
         StartOutput();
-        state = PlaybackState.Playing;
         StateChanged?.Invoke(this, EventArgs.Empty);
     });
 
     public void Pause()
     {
         if (output is null || state != PlaybackState.Playing) return;
-        output.Pause();
         state = PlaybackState.Paused;
+        output.Pause();
+        // A natural completion may already have won the race with Pause.
+        if (output.PlaybackState == PlaybackState.Stopped) state = PlaybackState.Stopped;
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -88,16 +95,37 @@ public sealed class PlaybackEngine : IDisposable
         if (position > reader.TotalTime) position = reader.TotalTime;
         reader.CurrentTime = position;
         atEnd = position >= reader.TotalTime;
+        state = atEnd ? PlaybackState.Stopped : previous;
         if (previous == PlaybackState.Playing && !atEnd) StartOutput();
-        state = atEnd && previous == PlaybackState.Playing ? PlaybackState.Stopped : previous;
         StateChanged?.Invoke(this, EventArgs.Empty);
     });
 
     private void StartOutput()
     {
-        if (output!.PlaybackState == PlaybackState.Stopped)
+        if (reader!.TotalTime <= TimeSpan.Zero)
+        {
+            state = PlaybackState.Stopped;
+            throw new InvalidOperationException("音频文件没有可播放的内容。");
+        }
+        bool newCycle = output!.PlaybackState == PlaybackState.Stopped;
+        if (newCycle)
             playbackCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        output.Play();
+        // Publish state before the independent audio callback can report completion.
+        state = PlaybackState.Playing;
+        try { output.Play(); }
+        catch
+        {
+            state = PlaybackState.Stopped;
+            Interlocked.Exchange(ref naturalCompletion, null);
+            // A failed start may have no stop callback; release only this failed cycle.
+            if (newCycle && output.PlaybackState == PlaybackState.Stopped)
+            {
+                playbackCompletion?.TrySetResult();
+                playbackCompletion = null;
+            }
+            StateChanged?.Invoke(this, EventArgs.Empty);
+            throw;
+        }
     }
 
     public TimeSpan GetCurrentTime() => atEnd && reader is not null ? reader.TotalTime : reader?.CurrentTime ?? TimeSpan.Zero;
@@ -105,9 +133,10 @@ public sealed class PlaybackEngine : IDisposable
 
     private async Task StopOutputAsync()
     {
-        TaskCompletionSource? completion = playbackCompletion;
-        if (completion is null) return;
         stopping = true;
+        Interlocked.Exchange(ref naturalCompletion, null);
+        TaskCompletionSource? completion = playbackCompletion;
+        if (completion is null) { stopping = false; return; }
         try
         {
             if (output!.PlaybackState != PlaybackState.Stopped) output.Stop();
@@ -115,7 +144,7 @@ public sealed class PlaybackEngine : IDisposable
             await completion.Task.ConfigureAwait(false);
             playbackCompletion = null;
         }
-        finally { stopping = false; }
+        finally { Interlocked.Exchange(ref naturalCompletion, null); stopping = false; }
     }
 
     private void Output_PlaybackStopped(object? sender, StoppedEventArgs e)
@@ -129,7 +158,10 @@ public sealed class PlaybackEngine : IDisposable
             {
                 state = PlaybackState.Stopped;
                 atEnd = e.Exception is null;
+                if (atEnd && completion is not null)
+                    Interlocked.Exchange(ref naturalCompletion, completion);
                 StateChanged?.Invoke(this, EventArgs.Empty);
+                if (atEnd && completion is not null) NaturalPlaybackEnded?.Invoke(this, EventArgs.Empty);
             }
         }
         finally { completion?.TrySetResult(); }
@@ -157,6 +189,7 @@ public sealed class PlaybackEngine : IDisposable
 
     private void ReleaseResources()
     {
+        Interlocked.Exchange(ref naturalCompletion, null);
         if (output is not null)
         {
             output.PlaybackStopped -= Output_PlaybackStopped;

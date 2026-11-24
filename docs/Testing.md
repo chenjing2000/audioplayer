@@ -285,3 +285,116 @@ Together with the earlier 23 checks, this records 27 user-reported manual accept
 ### PR #15 final merge and post-merge verification
 
 After the user authorized merging, final feature head `10f2aee` passed [PR CI #45332463717](https://github.com/chenjing2000/audioplayer/actions/runs/45332463717) and [push CI #45332456815](https://github.com/chenjing2000/audioplayer/actions/runs/45332456815). [PR #15](https://github.com/chenjing2000/audioplayer/pull/15) was squash merged as `main@7cb288e` on 2026-11-24. [Post-merge Windows CI #45332633926](https://github.com/chenjing2000/audioplayer/actions/runs/45332633926) completed successfully. The remote branch listing now contains only `main`; local synchronization and local branch cleanup have not been independently confirmed. The 27 user-reported manual acceptance checks are cumulative across four revisions, not a complete manual rerun on the merge commit. Previously unverified directory-access-denial and real-media/failure-path cases remain outstanding. No tagged release was created by this merge.
+
+## Windows acceptance — PR #16
+
+The user explicitly confirmed all 16 Windows manual acceptance checks passed on 2026-11-24. The accepted application revision `ef17fe4` passed [Windows PR CI #45359288782](https://github.com/chenjing2000/audioplayer/actions/runs/45359288782) and [push CI #45359259023](https://github.com/chenjing2000/audioplayer/actions/runs/45359259023). Merge is explicitly deferred at the user's request.
+
+1. Settings window measures 480 × 390 DIP.
+2. Both parameter sections are properly aligned, without clipped text.
+3. New step parameters default to 5 and 4 seconds.
+4. Both input boxes accept only ASCII digits, with a maximum length of two.
+5. Invalid pasted values and empty confirmed values are rejected.
+6. Modified steps persist after restarting AudioPlayer.
+7. Restore Defaults and Cancel behave correctly.
+8. Ctrl + Left seeks backward by the configured step.
+9. Ctrl + Right seeks forward by the configured step.
+10. Seeking correctly handles the beginning and end of audio.
+11. Seeking preserves playing or paused status, except normal end-of-media behavior.
+12. A step of 0 produces no movement.
+13. Ctrl + Left/Right works regardless of the focused main-window control.
+14. Space toggles playback regardless of the focused main-window control.
+15. Existing Left/Right silence navigation remains functional.
+16. Changing only the step parameters does not trigger silence reanalysis.
+
+These are user-reported Windows manual results, separate from hosted automated CI. No new local automated assertion counts or previously deferred failure-path coverage are claimed.
+
+### PR #16 follow-up: configurable folder exclusion
+
+At `885cf2c`, the user-provided Windows log reported 54 Core passes, 5 publishing safeguard passes, successful publish and 4 published-app checks. The UI suite stopped after 94 passes and one failure because the invalid-folder test left a warning Toast in the shared dialog. Test-only correction `398b33b` was then locally verified: 54 Core and 148 UI checks passed, zero failures; 5 publishing safeguards passed. Optional valid-MP3 metadata and audio-dependent UI checks were skipped because no local MP3 was available.
+
+The user confirmed 15 of 16 manual checks passed on the folder-exclusion implementation:
+
+1. Empty default.
+2. Empty list includes `audio` folders.
+3. Mixed ASCII separators and whitespace normalize correctly.
+4. Chinese separators and folder names work.
+5. Duplicate names and empty entries are removed.
+6. Invalid Windows folder names are rejected.
+7. Excluded subtrees are skipped recursively.
+8. Exact case-insensitive matching preserves similarly named folders.
+9. Explicit root is exempt.
+10. Saving settings does not automatically refresh or interrupt playback.
+11. Refresh applies new exclusions.
+12. Settings persist after restart.
+13. Startup restoration respects exclusions.
+14. Cancel and Restore Defaults work.
+15. Existing playback and shortcuts remain functional.
+
+The remaining layout check failed: the new exclusion controls overlap the explanatory text. The layout correction retains only the allowed-silence explanation, reserves space for it, and adds a geometry assertion. Focused Windows visual acceptance and CI for that correction are pending. The 16 earlier seek-shortcut checks and these 15 checks are cumulative across revisions, not a full rerun on the new layout. No merge authorization.
+
+The user subsequently requested a 480 × 420 DIP settings dialog. Update the height regression while retaining the single-help-line and rendered geometry assertions. Prior 480 × 390 acceptance is historical; the revised layout requires focused visual acceptance. No application logic changes.
+
+The user subsequently confirmed that the revised settings window at `9aab81f` is acceptable, with a screenshot showing the single explanatory sentence and the exclusion row separated from the buttons without visible overlap. The outstanding layout check is accepted. All 16 folder-exclusion checks and the earlier 16 seek-shortcut checks are now accepted across successive revisions (32 total), not a complete rerun on one revision. No new local automated test counts are claimed. Merge remains deferred.
+
+### PR #16 follow-up: playlist row appearance
+
+User-reported intermittent left-edge strips emerge during scrolling and can disappear after Refresh. The first correction removes the unused row-header area and row border, preserving virtualization and existing row styling. The synthetic 120-file UI regression checks header visibility, border thickness and alternating backgrounds after distant scroll jumps. This is structural coverage, not pixel-level proof that the reported artifact is resolved. CI and focused Windows visual acceptance pending.
+
+The user explicitly confirmed all six scrolling checks passed at `c3bafcf`: initial appearance, slow scrolling, rapid scrolling and scrollbar dragging, refresh and scrolling, resizing and scrolling, and preservation of row colors, playback indicators, selection and tooltips. The supplied local log reports 54 Core passes, 36 UI passes before one failure at row 119, 5 publishing safeguards passed and successful publishing. Optional MP3 metadata tests were skipped. [Push CI #45375690419](https://github.com/chenjing2000/audioplayer/actions/runs/45375690419) and [PR CI #45375701189](https://github.com/chenjing2000/audioplayer/actions/runs/45375701189) failed. The combined assertion does not identify which condition failed. The test-only follow-up separates conditions and checks background against actual WPF alternation index and adjacent realized rows rather than assuming absolute index parity after virtualized jumps. Corrected CI and local UI rerun pending. Manual checks total 38 across successive revisions, not a single full rerun. No merge authorized.
+
+Local Windows rerun at `9cdf6d1` passed 54 Core checks, 191 UI checks and 5 publishing safeguards, zero failures. Optional MP3 metadata and audio-dependent UI checks were skipped. Row 119 had actual WPF alternation index 0, as did row 1 after a jump; row 0 had index 1 after scrolling back. All tested realized adjacent rows alternated and all tested headers/borders were absent. This confirms the original absolute-index parity assumption was incorrect. [pull_request CI #45376237012](https://github.com/chenjing2000/audioplayer/actions/runs/45376237012) success; [push CI #45376228289](https://github.com/chenjing2000/audioplayer/actions/runs/45376228289) in_progress. No application source changes were necessary for the test correction. The 38 user-reported manual checks remain cumulative across revisions; merge remains deferred.
+
+### PR #16 follow-up: playback modes
+
+Core tests cover mode persistence, default and invalid enum rejection, next-index policy including empty/single-file lists. UI tests cover cycling, icons, toolbar alignment and settings preservation/reset staging. Synthetic WAV integration when a waveOut device exists covers natural completion, repeat, sequential stop, wraparound, manual Stop and seek-to-end. Hosted CI and manual playback acceptance pending; previous 38 manual checks remain historical cumulative evidence.
+
+At `34f6972`, user confirmed the four modes cycle correctly and all four playback behaviors work as expected, with toolbar screenshot. This is focused functional acceptance, not explicit confirmation of all 20 detailed checks. Local application published successfully; 5 publishing safeguards and 4 published-app checks passed. Core/UI test project compilation failed with CS0136 at UiChecks.cs:587 (duplicate local `first`). Test-only fix renames synthetic mode fixture paths. Corrected automated rerun pending; no merge authorized.
+
+
+#### Playback mode final acceptance
+
+The user explicitly confirmed all 20 playback-mode Windows manual acceptance checks passed on 2026-11-24. Local Windows rerun at `3321875` passed 55 Core checks, 225 UI checks and 5 publishing safeguards, zero failures. The actual waveOut synthetic WAV playback integration ran and passed (Play One, Repeat One, Sequential, Repeat All, manual Stop and seek-to-end). Optional valid-MP3 metadata and MP3-dependent UI checks were skipped. Application revision remains `34f6972`; earlier publishing and published-app checks passed at that revision. [pull_request CI #45379441565](https://github.com/chenjing2000/audioplayer/actions/runs/45379441565) success; [push CI #45379433218](https://github.com/chenjing2000/audioplayer/actions/runs/45379433218) in_progress. Cumulative manual acceptance is 58 checks (16 seek + 16 exclusion + 6 scrolling + 20 playback modes), across successive revisions, not one complete manual rerun. Merge remains explicitly unauthorized.
+
+1. PASS — Button placement between Refresh and Settings.
+2. PASS — Four icons clear and visually consistent.
+3. PASS — Cycle A → B → C → D → A.
+4. PASS — Tooltip identifies each mode.
+5. PASS — Play One stops at completion.
+6. PASS — Repeat One restarts current file.
+7. PASS — Sequential advances to next file.
+8. PASS — Sequential stops at last file.
+9. PASS — Repeat All advances and wraps.
+10. PASS — Single-file Repeat One and Repeat All.
+11. PASS — Changing mode during playback does not interrupt.
+12. PASS — Manual Stop prevents continuation.
+13. PASS — Pause and Resume in all modes.
+14. PASS — Manual seek to end does not continue.
+15. PASS — Automatic next row scrolls into view.
+16. PASS — Refresh stops playback and retains mode.
+17. PASS — Mode persists on restart without autoplay.
+18. PASS — Ordinary settings retain mode; confirmed defaults reset it.
+19. PASS — Existing shortcuts, exclusions and scrolling still work.
+20. PASS — Unreadable next file stops and reports error.
+
+### PR #16 review remediation
+
+Read-only review at `20b9e84` followed by user-authorized corrections: state is published before audio startup; zero-duration media stops with an error; folder selection and settings share modal protection; actual user seeks and Stop supersede pending completion; scan avoids redundant exclusion filtering and dialog validation reuses parsed names. Tests exercise real Stop and shortcut routing, shared modal deferral (simulated guard, not native folder picker), unreadable/empty next media and very short WAV completion. Settings class names retained. Documentation consolidated; previous 58 manual checks are historical, new CI and focused Windows acceptance pending.
+
+
+#### Review remediation manual acceptance
+
+The user explicitly confirmed all 12 focused WindowsAppPlaybook remediation manual acceptance checks passed on 2026-11-24 at application revision `dbc2886`. Cumulative manual acceptance is 70 checks across successive revisions (16 seek, 16 exclusions, 6 scrolling, 20 playback modes, 12 remediation), not a complete rerun of all checks at one revision. Hosted verification: [pull_request CI #45380365612](https://github.com/chenjing2000/audioplayer/actions/runs/45380365612) success; [push CI #45380356119](https://github.com/chenjing2000/audioplayer/actions/runs/45380356119) success. A new local automated test/publishing log has not been supplied for this revision; previous 55 Core and 225 UI passes at `3321875` remain historical evidence. Merge remains explicitly unauthorized.
+
+1. PASS — Very short pronunciation audio completes without incorrect playing indicator.
+2. PASS — All four playback modes continue working.
+3. PASS — Stop near natural completion prevents continuation.
+4. PASS — Backward seek near end does not advance to another file.
+5. PASS — Forward seek to end stops without continuation.
+6. PASS — Open Folder dialog defers advancement.
+7. PASS — Cancel Open Folder processes valid pending continuation.
+8. PASS — Confirm new folder cancels old playlist continuation.
+9. PASS — Natural completion during Settings is handled correctly after closing.
+10. PASS — Empty or unreadable next audio stops with error.
+11. PASS — Folder exclusions work for opening, refresh and restoration.
+12. PASS — Closing during repeated or sequential playback releases resources.

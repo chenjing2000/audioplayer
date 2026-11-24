@@ -4,7 +4,8 @@ namespace AudioPlayer;
 
 public static class AudioLibrary
 {
-    public static List<AudioTrack> LoadFolder(string folderPath, CancellationToken cancellation = default)
+    public static List<AudioTrack> LoadFolder(string folderPath, CancellationToken cancellation = default,
+        IReadOnlySet<string>? excludedNames = null)
     {
         string root = Path.GetFullPath(folderPath);
         var options = new EnumerationOptions
@@ -14,11 +15,11 @@ public static class AudioLibrary
             AttributesToSkip = FileAttributes.ReparsePoint
         };
         cancellation.ThrowIfCancellationRequested();
-        return LoadPaths(root, EnumerateMediaPaths(root, options, cancellation), cancellation);
+        return LoadPaths(root, EnumerateMediaPaths(root, options, cancellation, excludedNames), cancellation);
     }
 
     private static IEnumerable<string> EnumerateMediaPaths(string root, EnumerationOptions options,
-        CancellationToken cancellation)
+        CancellationToken cancellation, IReadOnlySet<string>? excludedNames)
     {
         var pending = new Stack<string>();
         pending.Push(root);
@@ -29,7 +30,7 @@ public static class AudioLibrary
             foreach (string child in Directory.EnumerateDirectories(folder, "*", options))
             {
                 cancellation.ThrowIfCancellationRequested();
-                if (!IsExcludedDirectoryName(Path.GetFileName(child))) pending.Push(child);
+                if (excludedNames?.Contains(Path.GetFileName(child)) != true) pending.Push(child);
             }
             foreach (string file in Directory.EnumerateFiles(folder, "*", options))
             {
@@ -39,26 +40,24 @@ public static class AudioLibrary
         }
     }
 
-    private static bool IsExcludedDirectoryName(string name)
-        => string.Equals(name, "audio", StringComparison.OrdinalIgnoreCase);
-
-    internal static bool IsPlaylistPath(string root, string path)
+    internal static bool IsPlaylistPath(string root, string path, IReadOnlySet<string>? excludedNames = null)
     {
         if (!IsWithinFolder(root, path) || !IsSupportedFile(path) || IsTrimTemporaryFile(path))
             return false;
+        if (excludedNames is null || excludedNames.Count == 0) return true;
         string[] parts = Path.GetRelativePath(root, path).Split(Path.DirectorySeparatorChar);
-        return !parts.Take(parts.Length - 1).Any(IsExcludedDirectoryName);
+        return !parts.Take(parts.Length - 1).Any(excludedNames.Contains);
     }
 
     internal static List<AudioTrack> LoadPaths(string root, IEnumerable<string> paths,
-        CancellationToken cancellation = default, bool restore = false)
+        CancellationToken cancellation = default, bool restore = false, IReadOnlySet<string>? excludedNames = null)
     {
         var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (string candidate in paths)
         {
             cancellation.ThrowIfCancellationRequested();
             string path = Path.GetFullPath(candidate);
-            if (IsPlaylistPath(root, path) && (!restore || IsRestorablePath(root, path, cancellation)))
+            if (IsPlaylistPath(root, path, excludedNames) && (!restore || IsRestorablePath(root, path, cancellation)))
                 files.Add(path);
         }
         cancellation.ThrowIfCancellationRequested();

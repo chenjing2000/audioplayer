@@ -215,6 +215,50 @@ internal static class UiChecks
                     }
 
 
+                    // Exercise row realization and recycling without optional MP3 fixtures.
+                    string scrollFolder = Path.Combine(audioFolder, "ui-scroll-" + Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(scrollFolder);
+                    try
+                    {
+                        string sample = Path.Combine(scrollFolder, "001.wav");
+                        using (var writer = new WaveFileWriter(sample, WaveFormat.CreateIeeeFloatWaveFormat(8000, 1)))
+                            writer.WriteSamples(new float[800], 0, 800);
+                        for (int i = 2; i <= 120; i++)
+                            File.Copy(sample, Path.Combine(scrollFolder, $"{i:D3}.wav"));
+                        await window.LoadFolderAsync(scrollFolder);
+                        Assert(list.Items.Count == 120 && list.EnableRowVirtualization && list.RowHeaderWidth == 0,
+                            "Playlist keeps virtualization and eliminates row header width");
+                        Assert(list.HeadersVisibility == DataGridHeadersVisibility.Column,
+                            "Playlist displays column headers only");
+                        foreach (int index in new[] { 0, 30, 75, 119, 40, 1, 0 })
+                        {
+                            list.ScrollIntoView(list.Items[index]);
+                            list.UpdateLayout();
+                            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                            list.UpdateLayout();
+                            var row = list.ItemContainerGenerator.ContainerFromIndex(index) as DataGridRow;
+                            Assert(row is not null, $"Scrolled row {index} is realized");
+                            var header = FindVisual<System.Windows.Controls.Primitives.DataGridRowHeader>(row!);
+                            Assert(row!.BorderThickness == new Thickness(0),
+                                $"Scrolled row {index} has no row border");
+                            Assert(header is null || !header.IsVisible || header.ActualWidth < 0.01,
+                                $"Scrolled row {index} has no visible row header");
+                            int alternation = ItemsControl.GetAlternationIndex(row);
+                            Assert(alternation is 0 or 1
+                                && ColorOf(row.Background) == (alternation == 0 ? "#FFFFFFFF" : "#FFF0F0F0"),
+                                $"Scrolled row {index} follows its WPF alternation index {alternation}");
+                            foreach (int neighbor in new[] { index - 1, index + 1 })
+                            {
+                                if (neighbor < 0 || neighbor >= list.Items.Count) continue;
+                                if (list.ItemContainerGenerator.ContainerFromIndex(neighbor) is DataGridRow adjacent)
+                                    Assert(ItemsControl.GetAlternationIndex(adjacent) != alternation,
+                                        $"Realized adjacent rows {index} and {neighbor} alternate");
+                            }
+                        }
+                        await window.LoadFolderAsync(audioFolder);
+                    }
+                    finally { Directory.Delete(scrollFolder, true); }
+
                     // Selection must inspect only existing results and never analyze an unopened audio file.
                     string resultFolder = Path.Combine(audioFolder, "ui-results-" + Guid.NewGuid().ToString("N"));
                     Directory.CreateDirectory(resultFolder);
@@ -258,6 +302,31 @@ internal static class UiChecks
                     }
                     finally { Directory.Delete(resultFolder, true); }
 
+                    var modeButton = (Button)window.FindName("PlaybackModeButton");
+                    var modeImage = (Image)window.FindName("PlaybackModeImage");
+                    Assert(modeButton.ToolTip?.ToString() == "单曲播放", "Playback mode defaults to Play One");
+                    string[] modeLabels = { "单曲循环", "顺序播放", "列表循环", "单曲播放" };
+                    PlaybackMode[] modeOrder = { PlaybackMode.RepeatOne, PlaybackMode.Sequential, PlaybackMode.RepeatAll, PlaybackMode.PlayOne };
+                    for (int i = 0; i < modeOrder.Length; i++)
+                    {
+                        modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        Assert(modeButton.ToolTip?.ToString() == modeLabels[i]
+                            && ReferenceEquals(modeImage.Source, window.FindResource(modeOrder[i] + "Icon"))
+                            && settingsStore.LoadOrCreate().PlaybackMode == modeOrder[i],
+                            "Mode cycles, updates icon and persists " + modeOrder[i]);
+                    }
+                    modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    var modeDialog = new SilenceSettingsWindow(settingsStore.LoadOrCreate());
+                    var readModeValues = typeof(SilenceSettingsWindow).GetMethod("TryReadValues", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                    object?[] modeArgs = { null };
+                    Assert((bool)readModeValues.Invoke(modeDialog, modeArgs)! && ((SilenceSettings)modeArgs[0]!).PlaybackMode == PlaybackMode.RepeatOne,
+                        "Normal settings validation preserves playback mode");
+                    ((Button)modeDialog.FindName("RestoreDefaultsButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert((bool)readModeValues.Invoke(modeDialog, modeArgs)! && ((SilenceSettings)modeArgs[0]!).PlaybackMode == PlaybackMode.PlayOne
+                        && settingsStore.LoadOrCreate().PlaybackMode == PlaybackMode.RepeatOne,
+                        "Restore Defaults stages Play One without saving until confirmation");
+                    modeDialog.Close();
+                    for (int i = 0; i < 3; i++) modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     settingsButton.ApplyTemplate();
                     var settingsBorder = (Border)settingsButton.Template.FindName("ButtonBorder", settingsButton);
                     var settingsImage = FindVisual<Image>(settingsButton)!;
@@ -267,11 +336,11 @@ internal static class UiChecks
                     Assert(settingsBorder.BorderThickness == new Thickness(0) && ColorOf(settingsBorder.Background) == "#00FFFFFF",
                         "Settings button has no border or visible background");
                     Assert(Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 &&
-                        Grid.GetColumn(refreshButton) == 6 && Grid.GetColumn(settingsButton) == 7,
-                        "Refresh button is placed between trim and settings");
-                    Assert(new[] { playButton, stopButton, trimButton, refreshButton }
+                        Grid.GetColumn(refreshButton) == 6 && Grid.GetColumn(modeButton) == 7 && Grid.GetColumn(settingsButton) == 8,
+                        "Playback mode button is placed between refresh and settings");
+                    Assert(new[] { playButton, stopButton, trimButton, refreshButton, modeButton }
                         .All(button => Math.Abs(button.Margin.Right - 5) < 0.01),
-                        "Five right toolbar buttons use 5-unit gaps");
+                        "Six right toolbar buttons use 5-unit gaps");
                     Assert(Math.Abs(slider.Height - 36) < 0.01, "Progress slider has the same control height as the buttons");
                     window.UpdateLayout();
                     var sliderTrack = FindVisual<System.Windows.Controls.Primitives.Track>(slider);
@@ -285,7 +354,7 @@ internal static class UiChecks
                     Assert(settingsButton.ToolTip?.ToString() == "设置", "Settings gear has the updated name");
                     Assert(settingsButton.HorizontalAlignment == HorizontalAlignment.Center && settingsButton.VerticalAlignment == VerticalAlignment.Center, "Settings button is centered in the top row");
                     Assert(settingsButton.FocusVisualStyle is null, "Settings button has no focus visual");
-                    foreach (string key in new[] { "OpenFolderIcon", "PlayIcon", "PauseIcon", "StopIcon", "TrimIcon", "RefreshIcon", "SettingsIcon" })
+                    foreach (string key in new[] { "OpenFolderIcon", "PlayIcon", "PauseIcon", "StopIcon", "TrimIcon", "RefreshIcon", "SettingsIcon", "PlayOneIcon", "RepeatOneIcon", "SequentialIcon", "RepeatAllIcon" })
                     {
                         var drawing = (DrawingGroup)((DrawingImage)window.FindResource(key)).Drawing;
                         var background = (GeometryDrawing)drawing.Children[1];
@@ -314,16 +383,50 @@ internal static class UiChecks
 
                     var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
-                    Assert(Math.Abs(settingsWindow.Width - 324) < 0.01, "Settings window width is 324");
-                    Assert(Math.Abs(settingsWindow.Height - 390) < 0.01, "Settings window height is 390");
-                    foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox" })
+                    Assert(Math.Abs(settingsWindow.Width - 480) < 0.01, "Settings window width is 480");
+                    Assert(Math.Abs(settingsWindow.Height - 420) < 0.01, "Settings window height is 420");
+                    foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox", "BackwardStepTextBox", "ForwardStepTextBox" })
                     {
                         var textBox = (TextBox)settingsWindow.FindName(textBoxName);
                         Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop, textBoxName + " retains input size and alignment");
                         textBox.ApplyTemplate();
                         Assert(FindVisual<Border>(textBox)!.CornerRadius.TopLeft == 6, "Input has rounded corners");
                     }
-                    MethodInfo positiveInput = typeof(SilenceSettingsWindow).GetMethod("IsPositiveIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                    var excludedBox = (TextBox)settingsWindow.FindName("ExcludedFolderNamesTextBox");
+                     Assert(excludedBox.Text == "" && excludedBox.TextAlignment == TextAlignment.Left && Grid.GetRow(excludedBox) == 6, "Exclusion field defaults empty below explanatory text");
+                     var help = (TextBlock)settingsWindow.FindName("HelpText");
+                     var exclusionLabel = (TextBlock)settingsWindow.FindName("ExcludedFolderNamesLabel");
+                     Assert(help.Text == "允许静音时长只影响裁剪，不影响左右跳转。", "Only essential help text remains");
+                     settingsWindow.ShowInTaskbar = false;
+                     settingsWindow.ShowActivated = false;
+                     settingsWindow.Left = -20000;
+                     settingsWindow.Top = -20000;
+                     settingsWindow.Show();
+                     settingsWindow.UpdateLayout();
+                     var layoutRoot = (Grid)excludedBox.Parent;
+                     Rect Bounds(FrameworkElement element) => element.TransformToAncestor(layoutRoot)
+                         .TransformBounds(new Rect(new Point(), element.RenderSize));
+                     Rect helpBounds = Bounds(help);
+                     Rect exclusionBounds = Bounds(excludedBox);
+                     Rect labelBounds = Bounds(exclusionLabel);
+                     Rect buttonsBounds = Bounds((Button)settingsWindow.FindName("OkButton"));
+                     Assert(helpBounds.Height > 0 && exclusionBounds.Height > 0 && labelBounds.Height > 0
+                         && helpBounds.Bottom <= Math.Min(exclusionBounds.Top, labelBounds.Top)
+                         && labelBounds.Right <= exclusionBounds.Left
+                         && Math.Max(exclusionBounds.Bottom, labelBounds.Bottom) <= buttonsBounds.Top
+                         && buttonsBounds.Bottom <= layoutRoot.ActualHeight + 0.5,
+                         "Settings help, exclusion controls and buttons do not overlap or overflow");
+                     settingsWindow.Hide();
+                     var backwardBox = (TextBox)settingsWindow.FindName("BackwardStepTextBox");
+                     var forwardBox = (TextBox)settingsWindow.FindName("ForwardStepTextBox");
+                     Assert(backwardBox.Text == "5" && forwardBox.Text == "4" && backwardBox.MaxLength == 2 && forwardBox.MaxLength == 2, "Step defaults and length");
+                     MethodInfo stepInput = typeof(SilenceSettingsWindow).GetMethod("IsStepText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     Assert(new[] { "", "0", "99", "05" }.All(v => (bool)stepInput.Invoke(null, new object[] { v })!)
+                         && new[] { "+5", "-1", "100", "2.5", "５", "a" }.All(v => !(bool)stepInput.Invoke(null, new object[] { v })!), "Step input is ASCII digits only");
+                     Assert(MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control) && MainWindow.IsPlaybackShortcut(Key.Right, ModifierKeys.Control)
+                         && MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.None) && !MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.Control)
+                         && !MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control | ModifierKeys.Shift), "Shortcut modifier routing");
+                     MethodInfo positiveInput = typeof(SilenceSettingsWindow).GetMethod("IsPositiveIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
                     MethodInfo signedInput = typeof(SilenceSettingsWindow).GetMethod("IsSignedIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
                     Assert((bool)positiveInput.Invoke(null, new object[] { "+123" })! && !(bool)positiveInput.Invoke(null, new object[] { "-1" })! && !(bool)positiveInput.Invoke(null, new object[] { "1.5" })! && !(bool)positiveInput.Invoke(null, new object[] { "abc" })!, "Positive parameter boxes accept only digits and optional leading plus sign");
                     Assert((bool)signedInput.Invoke(null, new object[] { "-45" })! && (bool)signedInput.Invoke(null, new object[] { "+45" })! && !(bool)signedInput.Invoke(null, new object[] { "4-5" })! && !(bool)signedInput.Invoke(null, new object[] { "-4.5" })!, "Silence threshold box accepts digits and one leading sign only");
@@ -346,6 +449,17 @@ internal static class UiChecks
                      var allowedBox = (TextBox)settingsWindow.FindName("AllowedSilenceTextBox");
                      MethodInfo readValues = typeof(SilenceSettingsWindow).GetMethod("TryReadValues",
                          BindingFlags.Instance | BindingFlags.NonPublic)!;
+                     excludedBox.Text = " audio , video; AUDIO；中文 文件夹，";
+                     Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })! && excludedBox.Text == "audio, video, 中文 文件夹", "Folder names normalize on validation");
+                     excludedBox.Text = "audio*";
+                     Assert(!(bool)readValues.Invoke(settingsWindow, new object?[] { null })!, "Invalid folder name prevents confirmation");
+                     var exclusionToasts = (ToastHost)settingsWindow.FindName("ToastMessages");
+                     Assert(excludedBox.BorderBrush == Brushes.IndianRed
+                         && FindVisual<StackPanel>(exclusionToasts)!.Children.Count == 1,
+                         "Invalid folder name shows one warning");
+                     excludedBox.Text = "";
+                     Assert(excludedBox.BorderBrush != Brushes.IndianRed, "Correcting folder name clears red border");
+                     exclusionToasts.Clear(); // Isolate the next independent validation scenario.
                      allowedBox.Text = "2.";
                      Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })!
                          && allowedBox.Text == "2.0", "Confirming 2. normalizes it to 2.0");
@@ -411,7 +525,7 @@ internal static class UiChecks
 
                     Assert(Math.Abs(window.FontSize - 12) < 0.01 && Math.Abs(timeText.FontSize - 12) < 0.01 && Math.Abs(list.FontSize - 12) < 0.01, "UI font size is 12");
                     Assert(Grid.GetColumn(slider) == 1 && Grid.GetColumn(timeText) == 2 && Grid.GetColumn(playButton) == 3, "Time display sits between progress slider and play button");
-                    foreach (Button button in new[] { openButton, playButton, stopButton, trimButton })
+                    foreach (Button button in new[] { openButton, playButton, stopButton, trimButton, modeButton })
                     {
                         button.ApplyTemplate();
                         var border = (Border)button.Template.FindName("ButtonBorder", button);
@@ -465,6 +579,131 @@ internal static class UiChecks
                     {
                         Console.WriteLine("SKIP UI audio-device playback checks: no waveOut device is available.");
                         return;
+                    }
+                    string modeFolder = Path.Combine(audioFolder, "ui-modes-" + Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(modeFolder);
+                    try
+                    {
+                        string firstModePath = Path.Combine(modeFolder, "01.wav");
+                        string secondModePath = Path.Combine(modeFolder, "02.wav");
+                        using (var writer = new WaveFileWriter(firstModePath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                            writer.WriteSamples(new float[44100], 0, 44100);
+                        File.Copy(firstModePath, secondModePath);
+                        await window.LoadFolderAsync(modeFolder);
+                        var modePlayer = Field<PlayerEngine>(window, "player")!;
+                        var modalField = typeof(MainWindow).GetField("modalDialogOpen", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                        async Task WaitModeAsync(Func<bool> condition)
+                        {
+                            var deadline = DateTime.UtcNow.AddSeconds(8);
+                            while ((!condition() || FieldValue<bool>(window, "operationBusy")) && DateTime.UtcNow < deadline) await Task.Delay(25);
+                            Assert(condition() && !FieldValue<bool>(window, "operationBusy"), "Playback mode transition completes");
+                        }
+                        async Task ClickModeStop()
+                        {
+                            stopButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                            await WaitModeAsync(() => !FieldValue<bool>(window, "operationBusy") && !modePlayer.IsPlaying);
+                        }
+                        async Task StartModeTrack(int index)
+                        {
+                            // Use the normal play shortcut with the selected file on a fresh playlist.
+                            if (modePlayer.IsLoaded && !ReferenceEquals(Field<AudioTrack>(window, "loadedTrack"), list.Items[index]))
+                                await window.LoadFolderAsync(modeFolder);
+                            list.SelectedIndex = index;
+                            await window.HandleShortcutAsync(Key.Space);
+                        }
+                        bool LoadedModeTrack(int index) => ReferenceEquals(Field<AudioTrack>(window, "loadedTrack"), list.Items[index]);
+                        await StartModeTrack(0);
+                        await WaitModeAsync(() => !modePlayer.IsPlaying && modePlayer.GetCurrentTime() == modePlayer.GetDuration());
+                        Assert(LoadedModeTrack(0), "Play One stops on current file");
+                        modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        int completions = 0;
+                        EventHandler countCompletion = (_, _) => Interlocked.Increment(ref completions);
+                        modePlayer.NaturalPlaybackEnded += countCompletion;
+                        await StartModeTrack(0);
+                        await WaitModeAsync(() => Volatile.Read(ref completions) >= 1 && modePlayer.IsPlaying && modePlayer.GetCurrentTime() < modePlayer.GetDuration());
+                        Assert(LoadedModeTrack(0), "Repeat One restarts same file");
+                        await ClickModeStop();
+                        await Task.Delay(300);
+                        Assert(!modePlayer.IsPlaying, "Manual Stop does not repeat");
+                        modePlayer.NaturalPlaybackEnded -= countCompletion;
+                        modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        await StartModeTrack(0);
+                        await WaitModeAsync(() => LoadedModeTrack(1) && modePlayer.IsPlaying);
+                        await WaitModeAsync(() => !modePlayer.IsPlaying && modePlayer.GetCurrentTime() == modePlayer.GetDuration());
+                        Assert(LoadedModeTrack(1), "Sequential advances and stops at last file");
+                        modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        await StartModeTrack(1);
+                        await WaitModeAsync(() => LoadedModeTrack(0) && modePlayer.IsPlaying);
+                        Assert(LoadedModeTrack(0), "Repeat All wraps to first file");
+                        await window.HandleShortcutAsync(Key.Right, ModifierKeys.Control);
+                        await Task.Delay(300);
+                        Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying, "Manual timed seek to end does not advance");
+
+                        // Simulate the shared modal guard, then exercise actual Stop/seek routing.
+                        modalField.SetValue(window, true);
+                        try
+                        {
+                            await modePlayer.PlayAsync();
+                            await WaitModeAsync(() => modePlayer.NaturalCompletion is not null);
+                            Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying,
+                                "Natural completion is deferred during a modal dialog");
+                        }
+                        finally { modalField.SetValue(window, false); }
+                        await ClickModeStop();
+                        await Task.Delay(300);
+                        Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying && modePlayer.NaturalCompletion is null,
+                            "Stop supersedes deferred natural completion");
+
+                        modalField.SetValue(window, true);
+                        try
+                        {
+                            await modePlayer.PlayAsync();
+                            await WaitModeAsync(() => modePlayer.NaturalCompletion is not null);
+                        }
+                        finally { modalField.SetValue(window, false); }
+                        await window.HandleShortcutAsync(Key.Left, ModifierKeys.Control);
+                        await Task.Delay(300);
+                        Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying && modePlayer.NaturalCompletion is null
+                            && modePlayer.GetCurrentTime() < modePlayer.GetDuration(),
+                            "Backward seek supersedes deferred natural completion");
+
+                        // In Repeat All, an unreadable next track must stop instead of cycling.
+                        string brokenModePath = Path.Combine(modeFolder, "03.wav");
+                        File.WriteAllText(brokenModePath, "not audio");
+                        await window.LoadFolderAsync(modeFolder);
+                        await StartModeTrack(1);
+                        await WaitModeAsync(() => !modePlayer.IsLoaded && !FieldValue<bool>(window, "operationBusy"));
+                        Assert(!modePlayer.IsPlaying && modePlayer.NaturalCompletion is null,
+                            "Unreadable automatic next file stops playback");
+
+                        File.Delete(brokenModePath);
+                        string emptyModePath = Path.Combine(modeFolder, "03.wav");
+                        using (var emptyWriter = new WaveFileWriter(emptyModePath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1))) { }
+                        await window.LoadFolderAsync(modeFolder);
+                        await StartModeTrack(1);
+                        await WaitModeAsync(() => !modePlayer.IsLoaded && !FieldValue<bool>(window, "operationBusy"));
+                        Assert(!modePlayer.IsPlaying && modePlayer.NaturalCompletion is null,
+                            "Zero-duration automatic next file stops playback");
+                        File.Delete(emptyModePath);
+
+                        modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        string shortModePath = Path.Combine(modeFolder, "03.wav");
+                        using (var shortWriter = new WaveFileWriter(shortModePath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                            shortWriter.WriteSamples(new float[44], 0, 44);
+                        await window.LoadFolderAsync(modeFolder);
+                        for (int attempt = 0; attempt < 4; attempt++)
+                        {
+                            await StartModeTrack(2);
+                            await WaitModeAsync(() => !modePlayer.IsPlaying && modePlayer.GetCurrentTime() == modePlayer.GetDuration());
+                            Assert(LoadedModeTrack(2), "Very short audio completes without stale Playing state");
+                        }
+                    }
+                    finally
+                    {
+                        await window.LoadFolderAsync(audioFolder);
+                        await Task.WhenAll(Field<List<Task>>(window, "runningAnalyses")!);
+                        await Task.WhenAll(Field<List<Task>>(window, "runningSelectionChecks")!);
+                        Directory.Delete(modeFolder, true);
                     }
                     string recoveryPath = Path.Combine(audioFolder, "recovery.wav");
                     using (var writer = new WaveFileWriter(recoveryPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
@@ -523,7 +762,12 @@ internal static class UiChecks
                     double before = player.GetCurrentTime().TotalSeconds;
                     await window.HandleShortcutAsync(Key.Right);
                     Assert(player.PlaybackState == PlaybackState.Paused && player.GetCurrentTime().TotalSeconds > before, "Paused navigation remains paused");
-                    var ranges = Field<List<SilenceRange>>(window, "ranges")!;
+                    await player.SeekAsync(TimeSpan.FromSeconds(1));
+                     await window.HandleShortcutAsync(Key.Left, ModifierKeys.Control);
+                     Assert(player.GetCurrentTime() == TimeSpan.Zero && player.IsPaused, "Timed backward seek clamps to zero and stays paused");
+                     await window.HandleShortcutAsync(Key.Right, ModifierKeys.Control);
+                     Assert(Math.Abs(player.GetCurrentTime().TotalSeconds - Math.Min(4, player.GetDuration().TotalSeconds)) < 0.1 && player.IsPaused, "Timed forward seek uses default step and stays paused");
+                     var ranges = Field<List<SilenceRange>>(window, "ranges")!;
                     await player.SeekAsync(ranges[0].Middle);
                     await window.HandleShortcutAsync(Key.Space);
                     double first = player.GetCurrentTime().TotalSeconds;

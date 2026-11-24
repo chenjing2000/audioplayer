@@ -48,10 +48,12 @@ public partial class MainWindow : Window
     private Task? activeOperation;
     private Task? analysisTask;
     private CancellationTokenSource? analysisCancellation;
-    private readonly Queue<Key> navigationKeys = new();
+    private readonly Queue<(Key Key, bool Timed)> navigationKeys = new();
     private bool navigating;
     private Task navigationTask = Task.CompletedTask;
     private Exception? displayedPlaybackError;
+    private bool modalDialogOpen;
+    private bool completionQueued;
 
     public MainWindow() : this(new SettingsStore(),
         new PlaylistStore(PlaylistStore.GetFilePath(SettingsStore.GetExecutablePath())))
@@ -76,6 +78,7 @@ public partial class MainWindow : Window
         AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler(ProgressSlider_MouseUp), true);
         TrackList.ItemsSource = tracks;
         player.StateChanged += Player_StateChanged;
+        player.NaturalPlaybackEnded += Player_NaturalPlaybackEnded;
         timer.Tick += (_, _) => RefreshProgress();
         timer.Start();
         try
@@ -87,6 +90,8 @@ public partial class MainWindow : Window
         {
             ToastMessages.Show($"配置读取或初始化失败，暂用默认参数：{ex.Message}", ToastLevel.Error);
         }
+        UpdatePlaybackModeButton();
+        PlaybackModeButton.IsEnabled = settingsFileReady;
         Loaded += RestorePlaylistOnLoad;
     }
 
@@ -114,7 +119,7 @@ public partial class MainWindow : Window
                 }
                 catch (FileNotFoundException) { return null; }
                 catch (DirectoryNotFoundException) { return null; }
-                return AudioLibrary.LoadPaths(root, snapshot.Files, cancellation, restore: true);
+                return AudioLibrary.LoadPaths(root, snapshot.Files, cancellation, restore: true, excludedNames: silenceSettings.GetExcludedFolderNames());
             }, cancellation);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -150,9 +155,15 @@ public partial class MainWindow : Window
 
     private async void OpenButton_Click(object sender, RoutedEventArgs e)
     {
-        if (operationBusy || closing) return;
+        if (operationBusy || closing || modalDialogOpen) return;
         var dialog = new OpenFolderDialog { Title = "选择教材音频文件夹" };
-        if (dialog.ShowDialog(this) == true) await RunActionAsync(() => LoadFolderAsync(dialog.FolderName));
+        modalDialogOpen = true;
+        try
+        {
+            if (dialog.ShowDialog(this) == true)
+                await RunActionAsync(() => LoadFolderAsync(dialog.FolderName));
+        }
+        finally { modalDialogOpen = false; QueueNaturalCompletion(); }
     }
 
     internal async Task LoadFolderAsync(string path)
@@ -169,7 +180,8 @@ public partial class MainWindow : Window
 
         List<AudioTrack> files;
         CancellationToken cancellation = scanCancellation.Token;
-        try { files = await Task.Run(() => AudioLibrary.LoadFolder(path, cancellation), cancellation); }
+        var excludedNames = silenceSettings.GetExcludedFolderNames();
+        try { files = await Task.Run(() => AudioLibrary.LoadFolder(path, cancellation, excludedNames), cancellation); }
         catch
         {
             // An unfinished scan canceled on exit must not erase the last saved list.
@@ -243,9 +255,15 @@ public partial class MainWindow : Window
         // OpenAsync releases the previous reader even if the replacement cannot open.
         loadedTrack = null;
         await player.OpenAsync(track.FilePath);
-        loadedTrack = track;
         if (closing) return;
-        await player.PlayAsync();
+        if (player.GetDuration() <= TimeSpan.Zero)
+        {
+            await player.CloseAsync();
+            throw new InvalidOperationException("音频文件没有可播放的内容：" + track.DisplayName);
+        }
+        loadedTrack = track;
+        try { await player.PlayAsync(); }
+        catch { loadedTrack = null; await player.CloseAsync(); throw; }
         if (!trimming) StartAnalysis(track);
     }
 
@@ -477,7 +495,7 @@ public partial class MainWindow : Window
 
     internal void AddTrimmedOutput(string path)
     {
-        if (currentFolder is not string root || !AudioLibrary.IsPlaylistPath(root, path)
+        if (currentFolder is not string root || !AudioLibrary.IsPlaylistPath(root, path, silenceSettings.GetExcludedFolderNames())
             || tracks.Any(track => string.Equals(track.FilePath, path, StringComparison.OrdinalIgnoreCase)))
             return;
         var added = AudioLibrary.ReadTrack(path);
@@ -505,9 +523,91 @@ public partial class MainWindow : Window
     private async void PlayButton_Click(object sender, RoutedEventArgs e) => await RunActionAsync(TogglePlaybackAsync);
     private async void StopButton_Click(object sender, RoutedEventArgs e) => await RunActionAsync(player.StopAsync);
 
+    internal static int NextPlaybackIndex(PlaybackMode mode, int index, int count)
+    {
+        if (index < 0 || index >= count) return -1;
+        return mode switch
+        {
+            PlaybackMode.RepeatOne => index,
+            PlaybackMode.Sequential when index + 1 < count => index + 1,
+            PlaybackMode.RepeatAll => (index + 1) % count,
+            _ => -1
+        };
+    }
+
+    private void UpdatePlaybackModeButton()
+    {
+        PlaybackMode mode = silenceSettings.PlaybackMode;
+        string name = mode switch
+        {
+            PlaybackMode.RepeatOne => "单曲循环",
+            PlaybackMode.Sequential => "顺序播放",
+            PlaybackMode.RepeatAll => "列表循环",
+            _ => "单曲播放"
+        };
+        PlaybackModeImage.Source = (ImageSource)FindResource(mode + "Icon");
+        PlaybackModeButton.ToolTip = name;
+        AutomationProperties.SetName(PlaybackModeButton, "播放模式：" + name);
+    }
+
+    private void PlaybackModeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (operationBusy || closing || modalDialogOpen || !settingsFileReady) return;
+        PlaybackMode previous = silenceSettings.PlaybackMode;
+        silenceSettings.PlaybackMode = (PlaybackMode)(((int)previous + 1) % 4);
+        try { settingsStore.Save(silenceSettings); }
+        catch (Exception ex) when (IsSettingsFileError(ex))
+        {
+            silenceSettings.PlaybackMode = previous;
+            ToastMessages.Show($"配置保存失败，播放模式未更改：{ex.Message}", ToastLevel.Error);
+            return;
+        }
+        UpdatePlaybackModeButton();
+    }
+
+    private void Player_NaturalPlaybackEnded(object? sender, EventArgs e)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(() => Player_NaturalPlaybackEnded(sender, e));
+            return;
+        }
+        QueueNaturalCompletion();
+    }
+
+    private bool CanContinuePlayback()
+        => !closing && !operationBusy && !dragging && !navigating && !modalDialogOpen;
+
+    private void QueueNaturalCompletion()
+    {
+        if (!CanContinuePlayback() || completionQueued || player.NaturalCompletion is null) return;
+        completionQueued = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(async () =>
+        {
+            completionQueued = false;
+            if (!CanContinuePlayback() || player.NaturalCompletion is not object token) return;
+            await RunActionAsync(async () =>
+            {
+                if (!player.ConsumeNaturalCompletion(token) || loadedTrack is null) return;
+                int index = NextPlaybackIndex(silenceSettings.PlaybackMode, tracks.IndexOf(loadedTrack), tracks.Count);
+                if (index < 0) return;
+                AudioTrack next = tracks[index];
+                if (ReferenceEquals(next, loadedTrack))
+                {
+                    await player.PlayAsync();
+                }
+                else
+                {
+                    await LoadTrackAsync(next);
+                    if (!closing) TrackList.ScrollIntoView(next);
+                }
+            });
+        }));
+    }
+
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        if (operationBusy || closing) return;
+        if (operationBusy || closing || modalDialogOpen) return;
 
         if (!settingsFileReady)
         {
@@ -515,7 +615,11 @@ public partial class MainWindow : Window
             return;
         }
         var dialog = new SilenceSettingsWindow(silenceSettings) { Owner = this };
-        if (dialog.ShowDialog() != true) return;
+        bool? confirmed;
+        modalDialogOpen = true;
+        try { confirmed = dialog.ShowDialog(); }
+        finally { modalDialogOpen = false; QueueNaturalCompletion(); }
+        if (confirmed != true) return;
 
         try { settingsStore.Save(dialog.Settings); }
         catch (Exception ex) when (IsSettingsFileError(ex))
@@ -527,6 +631,7 @@ public partial class MainWindow : Window
             || silenceSettings.MinimumSilenceMilliseconds != dialog.Settings.MinimumSilenceMilliseconds
             || silenceSettings.SilenceThresholdDb != dialog.Settings.SilenceThresholdDb;
         silenceSettings = dialog.Settings;
+        UpdatePlaybackModeButton();
         if (detectionChanged && loadedTrack is not null)
         {
             if (trimming) CancelAnalysis(); // Defer the new settings' analysis until trimming ends.
@@ -537,25 +642,32 @@ public partial class MainWindow : Window
 
     private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (Keyboard.Modifiers != ModifierKeys.None || !IsPlaybackKey(e.Key)) return;
+        if (!IsPlaybackShortcut(e.Key, Keyboard.Modifiers)) return;
         e.Handled = true;
         if (e.IsRepeat) return;
-        await HandleShortcutAsync(e.Key);
+        await HandleShortcutAsync(e.Key, Keyboard.Modifiers);
     }
 
     private void Window_PreviewKeyUp(object sender, KeyEventArgs e)
     {
-        if (Keyboard.Modifiers == ModifierKeys.None && IsPlaybackKey(e.Key)) e.Handled = true;
+        if (IsPlaybackShortcut(e.Key, Keyboard.Modifiers)) e.Handled = true;
     }
 
-    private static bool IsPlaybackKey(Key key) => key == Key.Space || key == Key.Left || key == Key.Right;
+    internal static bool IsPlaybackShortcut(Key key, ModifierKeys modifiers)
+        => (modifiers == ModifierKeys.None && key == Key.Space)
+            || ((modifiers == ModifierKeys.None || modifiers == ModifierKeys.Control)
+                && (key == Key.Left || key == Key.Right));
 
-    internal Task HandleShortcutAsync(Key key)
+    internal Task HandleShortcutAsync(Key key, ModifierKeys modifiers = ModifierKeys.None)
     {
+        if (modalDialogOpen || !IsPlaybackShortcut(key, modifiers)) return Task.CompletedTask;
         if (key == Key.Space) return RunActionAsync(TogglePlaybackAsync);
-        if (key != Key.Left && key != Key.Right) return Task.CompletedTask;
-        if (closing || dragging || analyzing || !analysisReady || (operationBusy && !navigating)) return Task.CompletedTask;
-        navigationKeys.Enqueue(key);
+        bool timed = modifiers == ModifierKeys.Control;
+        if (closing || dragging || !player.IsLoaded || (operationBusy && !navigating)
+            || (!timed && (analyzing || !analysisReady))) return Task.CompletedTask;
+        if (timed && (key == Key.Left ? silenceSettings.BackwardStepSeconds : silenceSettings.ForwardStepSeconds) == 0)
+            return Task.CompletedTask;
+        navigationKeys.Enqueue((key, timed));
         if (!navigating)
         {
             navigating = true;
@@ -570,18 +682,21 @@ public partial class MainWindow : Window
         {
             while (navigationKeys.Count > 0 && !closing)
             {
-                Key key = navigationKeys.Dequeue();
+                var (key, timed) = navigationKeys.Dequeue();
                 await RunActionAsync(async () =>
                 {
                     TimeSpan current = player.GetCurrentTime();
-                    TimeSpan? target = key == Key.Left
+                    TimeSpan? target = timed
+                        ? current + TimeSpan.FromSeconds(key == Key.Left ? -silenceSettings.BackwardStepSeconds : silenceSettings.ForwardStepSeconds)
+                        : key == Key.Left
                         ? SilenceDetector.FindPrevious(ranges, current, silenceSettings)
                         : SilenceDetector.FindNext(ranges, current, silenceSettings);
+                    // An actual user seek supersedes any pending natural continuation.
                     if (target.HasValue) await player.SeekAsync(target.Value);
                 });
             }
         }
-        finally { navigationKeys.Clear(); navigating = false; }
+        finally { navigationKeys.Clear(); navigating = false; QueueNaturalCompletion(); }
     }
 
     private async Task RunActionAsync(Func<Task> action)
@@ -596,7 +711,7 @@ public partial class MainWindow : Window
         {
             activeOperation = null;
             operationBusy = false;
-            if (!closing) { UpdateControls(); RefreshProgress(); }
+            if (!closing) { UpdateControls(); RefreshProgress(); QueueNaturalCompletion(); }
         }
     }
 
@@ -631,6 +746,7 @@ public partial class MainWindow : Window
         bool available = !operationBusy && !closing;
         OpenButton.IsEnabled = available;
         SettingsButton.IsEnabled = available;
+        PlaybackModeButton.IsEnabled = available && settingsFileReady;
         RefreshButton.IsEnabled = available && !trimming && currentFolder is not null;
         TrimButton.IsEnabled = !closing && !operationBusy && !analyzing && !trimming && selectedCanTrim;
         TrackList.IsEnabled = available;
@@ -738,6 +854,7 @@ public partial class MainWindow : Window
         finally
         {
             player.StateChanged -= Player_StateChanged;
+            player.NaturalPlaybackEnded -= Player_NaturalPlaybackEnded;
             player.Dispose();
             scanCancellation.Dispose();
             allowClose = true;

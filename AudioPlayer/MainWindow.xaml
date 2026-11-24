@@ -23,6 +23,7 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button x:Name="OpenButton" Style="{StaticResource CircleButtonStyle}" ToolTip="打开文件夹" AutomationProperties.Name="打开文件夹" VerticalAlignment="Center" Click="OpenButton_Click">
                 <Image Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform" Source="{StaticResource OpenFolderIcon}"/>
@@ -56,7 +57,13 @@
                 <Image Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"
                        Source="{StaticResource RefreshIcon}"/>
             </Button>
-            <Button x:Name="SettingsButton" Grid.Column="7" Style="{StaticResource CircleButtonStyle}"
+            <Button x:Name="PlaybackModeButton" Grid.Column="7" Style="{StaticResource CircleButtonStyle}"
+                    ToolTip="单曲播放" AutomationProperties.Name="播放模式：单曲播放"
+                    VerticalAlignment="Center" Margin="0,0,5,0" Click="PlaybackModeButton_Click">
+                <Image x:Name="PlaybackModeImage" Width="28" Height="28" HorizontalAlignment="Center"
+                       VerticalAlignment="Center" Stretch="Uniform" Source="{StaticResource PlayOneIcon}"/>
+            </Button>
+            <Button x:Name="SettingsButton" Grid.Column="8" Style="{StaticResource CircleButtonStyle}"
                     ToolTip="设置" AutomationProperties.Name="设置"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Click="SettingsButton_Click">
                 <Image Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"
@@ -68,7 +75,7 @@
             <DataGrid x:Name="TrackList" AutoGenerateColumns="False" IsReadOnly="True"
                   CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
                   CanUserReorderColumns="False" SelectionMode="Single" SelectionUnit="FullRow"
-                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                  HeadersVisibility="Column" RowHeaderWidth="0" GridLinesVisibility="Horizontal"
                   HorizontalGridLinesBrush="#EEF1F5" Background="White" BorderThickness="0"
                   RowHeight="25" ColumnHeaderHeight="32" AlternationCount="2"
                   MouseDoubleClick="TrackList_MouseDoubleClick" SelectionChanged="TrackList_SelectionChanged">
@@ -102,7 +109,12 @@
                     <Setter Property="Margin" Value="12,0"/>
                     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                 </Style>
+                <Style TargetType="DataGridRowHeader">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                </Style>
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource NoFocusVisual}">
+                    <Setter Property="BorderThickness" Value="0"/>
                     <EventSetter Event="PreviewKeyDown" Handler="TrackRow_PreviewKeyDown"/>
                     <Setter Property="ToolTip">
                         <Setter.Value>
