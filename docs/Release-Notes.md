@@ -18,4 +18,4 @@ PR #16 was squash merged at `af27658` with successful post-merge Windows CI and 
 - Optional Script companion window with ReadArticles JSON, progressive word coloring, 50 ms automatic visual-line follow, direct wheel scrolling and 150 ms debounced seeking.
 - Persistent typography and color settings, with preview in the existing settings dialog.
 - Microsoft Edge WebView2 Runtime required only for the Script window; not bundled. Portable single EXE remains.
-- CI passed at application revision `14a354a`; real reader and audio-device acceptance pending. Do not treat this section as a released feature until authorized merge and release.
+- CI passed at feature revision `6789ffd`; local Windows automated checks and 10 focused manual reader checks passed. Remaining edge-case acceptance is pending. Do not treat this section as a released feature until authorized merge and release.

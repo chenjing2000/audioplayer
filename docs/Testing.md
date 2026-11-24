@@ -466,3 +466,24 @@ No item above is marked passed until user reports actual Windows results. Timing
 ### Local Windows result at 0ada0d9 (2026-11-24)
 
 User-supplied PowerShell log: 58 Core, 260 UI, 5 publishing safeguards, 4 published EXE checks passed; optional MP3 skipped. All seven wheel-related assertion lines passed (the prior skip label counted six grouped scenarios). Manual launch of the published EXE displayed the companion but reported “原文页面加载失败。”; reader acceptance failed and further manual checks are pending. The navigation implementation is corrected to serve the embedded reader through a fixed local HTTPS resource response, as in ReadArticles, with exact navigation/message source checks and diagnostic errors. A real WebView2 ready/render smoke test now runs before the audio-device gate when the runtime is available. This correction still requires CI and local re-verification.
+
+### Local Windows result at 6789ffd (2026-11-24)
+
+Both [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45402314948) and [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45402326844) passed: 58 Core, 223 UI, 5 publishing safeguards and 4 published EXE checks (290 total, zero failures; workflow smoke also passed). Both real WebView2 handshake/render assertions and stabilized Toast checks ran successfully. Hosted WaveOut-dependent assertions remain skipped.
+
+User-supplied Windows PowerShell log at `6789ffd`: 58 Core, 262 UI, 5 publishing safeguards and 4 published EXE checks (329 total, zero failures). Both actual WebView2 assertions and all seven wheel playback assertion lines passed. Optional MP3-specific cases skipped. Temporary WebView2 test cache was still in use during cleanup (nonfatal); no production data loss reported. Publish and published EXE checks passed. The published EXE screenshot and user report confirm the earlier reader initialization failure is resolved: real Script JSON loads, played/unplayed coloring is visible, direct wheel scrolling and double-click update playback progress.
+
+User explicitly confirmed all 10 focused manual checks on 2026-11-24:
+
+1. Continuous playback with progressive partial-word coloring.
+2. Automatic active visual-line centering.
+3. Smooth automatic line transition (visual assessment, not instrumented timing).
+4. Wheel scrolling during playback pauses, seeks and resumes.
+5. Wheel scrolling while paused seeks without resuming.
+6. Top and bottom scrolling boundaries.
+7. Appearance changes persist after restart.
+8. Switching audio files loads corresponding scripts.
+9. Hide and reopen during playback.
+10. Space, Left/Right and Ctrl+Left/Right in reader.
+
+These results establish core reader acceptance, not completion of the full 48-item matrix above. Remaining compound or unconfirmed cases include exact window geometry and monitor/DPI behavior, missing/invalid and untimed script fixtures, precise debounce/animation timing if required, all cancellation paths, settings option/cancel/default coverage, all playback modes with the reader visible, long-script performance, missing runtime isolation, cache placement and legacy regression/data-protection checks not separately confirmed. Do not infer full passes from partial evidence. No merge or release authorization.

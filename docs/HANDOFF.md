@@ -1,10 +1,10 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-24 — PR #17 feature branch, awaiting Windows acceptance  
+**Updated:** 2026-11-24 — PR #17 feature branch, core Windows acceptance passed; remaining edge cases pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Merged main baseline:** `52bb0b8` (application from PR #16, `af27658`).  
-**Feature branch:** `feature/script-companion-window`; latest application revision `14a354a`; [draft PR #17](https://github.com/chenjing2000/audioplayer/pull/17). Do not merge without separate explicit user authorization. Local checkout not independently verified.
+**Feature branch:** `feature/script-companion-window`; latest verified feature revision `6789ffd`; [draft PR #17](https://github.com/chenjing2000/audioplayer/pull/17). Do not merge without separate explicit user authorization. Local checkout not independently verified.
 
 ## Current feature branch
 
@@ -12,7 +12,7 @@ All five implementation stages and source-review remediation are committed: mode
 
 ## Verification and next action
 
-Application revision `14a354a` passed [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45398456432) and [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45398466410): 58 Core, 221 UI, 5 publishing safeguards, 4 published EXE checks, no failures. Six new audio-device-dependent wheel assertions explicitly skipped because the hosted runner has no WaveOut device. Physical reader interaction, WebView2 startup, mixed-DPI positioning and long-script performance are not verified. Follow the pending Windows checklist in [Testing](Testing.md), record the actual revision, logs and user-confirmed results; resolve failures on the branch. No release tag or merge has been authorized.
+Feature revision `6789ffd` passed [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45402314948) and [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45402326844): 58 Core, 223 UI, 5 publishing safeguards and 4 published EXE checks. User's local Windows run passed 58 Core, 262 UI, 5 publishing safeguards and 4 published checks (329 total), including WebView2 and all seven wheel assertion lines. The prior published reader initialization defect is resolved on the user's computer. All 10 focused manual reader checks passed; remaining full-matrix edge cases are not yet confirmed. Optional MP3-specific cases skipped; a temporary test WebView2 cache remained in use during cleanup. See [Testing](Testing.md) for exact scope and limitations. No release tag or merge authorized.
 
 ```powershell
 cd C:\Projects\AudioPlayer
@@ -34,4 +34,4 @@ Follow root AGENTS.md and WindowsAppPlaybook; discuss new requirements before co
 
 ## Local acceptance update (2026-11-24)
 
-At `0ada0d9`, user logs confirmed 58 Core, 260 UI, 5 publishing safeguards and 4 published checks passed, including all actual WAV wheel assertions. Optional MP3 checks skipped. Manual published reader failed with “原文页面加载失败。”; do not mark reader accepted. The follow-up fixes local document navigation using the ReadArticles embedded-resource approach, reports diagnostic failures and adds actual reader integration coverage. Re-run UI, publish and manual reader checks before resuming the checklist. No merge authorization.
+At `0ada0d9`, user logs confirmed 58 Core, 260 UI, 5 publishing safeguards and 4 published checks passed, including all actual WAV wheel assertions. Optional MP3 checks skipped. Manual published reader failed with “原文页面加载失败。”; do not mark reader accepted. The follow-up fixes local document navigation using the ReadArticles embedded-resource approach, reports diagnostic failures and adds actual reader integration coverage. Subsequent revision `6789ffd` passed the local rerun and focused manual acceptance, as recorded above. Remaining checklist cases and separate merge authorization are pending.
