@@ -1,47 +1,33 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-24 — PR #16 merged; post-merge CI passed  
+**Updated:** 2026-11-24 — PR #17 feature branch, awaiting Windows acceptance  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Latest merged application baseline:** `af27658` ([PR #16](https://github.com/chenjing2000/audioplayer/pull/16), squash merged).  
-**Remote branches:** Only `main` remained when checked; local checkout synchronization and branch cleanup have not been independently confirmed.
+**Merged main baseline:** `52bb0b8` (application from PR #16, `af27658`).  
+**Feature branch:** `feature/script-companion-window`; latest application revision `14a354a`; [draft PR #17](https://github.com/chenjing2000/audioplayer/pull/17). Do not merge without separate explicit user authorization. Local checkout not independently verified.
 
-## Current application
+## Current feature branch
 
-C# / WPF / .NET 10, NAudio 2.2.1, TagLibSharp 2.3.0. Portable framework-dependent Windows x64 executable `dist/AudioPlayer.exe`. Current behavior and data ownership are defined by [program overview](program-overview.md), [project contract](project-contract.md) and [configuration](Configuration.md); publishing is described in [Publishing](Publishing.md).
+All five implementation stages and source-review remediation are committed: modeless owned WPF Script window; ReadArticles Script JSON discovery and read-only rendering; progressive foreground coloring and visual-line follow; direct wheel navigation with 150 ms debounced seek and playback restoration; two-tab settings and persistent appearance. See [program overview](program-overview.md), [project contract](project-contract.md), [configuration](Configuration.md) and [publishing](Publishing.md). WebView2 is an optional runtime for the reader, not audio playback. The existing single EXE publish shape, user data and PlaybackEngine are retained.
 
-PR #16 adds:
-- Configurable Ctrl+Left/Right timed seek (default 5/4 seconds, 0–99), preserving Space and plain Left/Right silence navigation.
-- Configurable exact-name, case-insensitive folder exclusions (empty by default; explicit root exempt), consistent across scans, restoration and trimmed-output insertion.
-- Fixed 480 × 420 DIP settings dialog and virtualized playlist row-header/border correction.
-- Four persistent playback modes (单曲播放 → 单曲循环 → 顺序播放 → 列表循环), one button between Refresh and Settings, concise mode-only tooltips.
-- Playback lifecycle remediation: startup state ordering, empty-media rejection, shared modal deferral, explicit-command priority and stale-completion protection; simplified exclusion processing and strengthened regression coverage.
+## Verification and next action
 
-Startup restores saved playlists without autoplay. Source audio and existing outputs remain protected. Settings and playlist JSON stay beside the actual EXE.
-
-## Verification and remaining limits
-
-Final feature head `c3a4c21` passed both [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45382457033) and [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45382467366). Merged application baseline `af27658` passed [post-merge Windows CI](https://github.com/chenjing2000/audioplayer/actions/runs/45382847185). The user authorized merging on 2026-11-24.
-
-The user confirmed 70 cumulative manual checks across successive feature revisions (16 seek, 16 exclusions, 6 scrolling, 20 modes, 12 remediation). Local `3321875` passed 55 Core and 225 UI checks plus 5 publishing safeguards, including actual synthetic WAV playback; optional MP3 checks skipped. A new local automated log for remediation or a separate manual result for the final tooltip refinement was not supplied. Historical evidence and limitations are maintained in [Testing](Testing.md).
-
-Real long-pause MP3/WAV listening, dedicated directory-access-denial checks, selected FFmpeg fault scenarios and actual tagged Release assets remain deferred. No new release tag was created.
-
-## Next development round
-
-- Read this handoff, [program overview](program-overview.md), [project contract](project-contract.md) and root AGENTS.md; verify current main and source before changes.
-- Discuss new requirements first, then use a new feature branch. Follow [WindowsAppPlaybook](https://github.com/chenjing2000/windowsappplaybook): first principles, minimum necessary design, remove redundancy before adding entities, no unnecessary frameworks or broad refactoring.
-- Protect source audio, outputs, settings, playlists and installed FFmpeg. Use English commit messages, hosted CI and focused Windows acceptance. Do not merge without separate explicit authorization.
+Application revision `14a354a` passed [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45398456432) and [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45398466410): 58 Core, 221 UI, 5 publishing safeguards, 4 published EXE checks, no failures. Six new audio-device-dependent wheel assertions explicitly skipped because the hosted runner has no WaveOut device. Physical reader interaction, WebView2 startup, mixed-DPI positioning and long-script performance are not verified. Follow the pending Windows checklist in [Testing](Testing.md), record the actual revision, logs and user-confirmed results; resolve failures on the branch. No release tag or merge has been authorized.
 
 ```powershell
 cd C:\Projects\AudioPlayer
-git switch main
-git pull --ff-only origin main
-git fetch --prune
-git status
+git status --short
+git fetch origin --prune
+git switch feature/script-companion-window
+git pull --ff-only origin feature/script-companion-window
 git log -1 --oneline
-.\tools\Test.ps1 -Suite Core
 .\tools\Test.ps1 -Suite UI
 .\tools\Publish.ps1
 .\tools\Test-PublishedApp.ps1
 ```
+
+## Prior merged baseline
+
+PR #16 was squash merged at `af27658`; [post-merge CI](https://github.com/chenjing2000/audioplayer/actions/runs/45382847185) passed. The user confirmed 70 cumulative manual checks across successive revisions. Local `3321875` passed 55 Core, 225 UI and 5 publishing safeguards, including synthetic WAV playback; optional MP3 skipped. Real long-pause MP3/WAV listening, directory access denial, selected FFmpeg failure paths and tagged release assets remain deferred. Historical evidence is in [Testing](Testing.md).
+
+Follow root AGENTS.md and WindowsAppPlaybook; discuss new requirements before coding; protect user data, use English commit messages and avoid unnecessary abstractions. Keep main unchanged until explicit merge authorization.

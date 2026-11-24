@@ -12,3 +12,10 @@ Windows x64; requires **.NET 10 Windows Desktop Runtime x64**. Version in the pr
 - Existing user audio, settings JSON, playlist JSON and old executables are not automatically removed or migrated by publishing.
 
 PR #16 was squash merged at `af27658` with successful post-merge Windows CI and 70 cumulative user-reported manual checks across successive revisions. Core/UI/portable checks do not replace manual listening. Real long-pause MP3/WAV testing and selected FFmpeg failure-path tests remain outstanding; see [Testing](Testing.md).
+
+## Pending PR #17 (not merged or released)
+
+- Optional Script companion window with ReadArticles JSON, progressive word coloring, 50 ms automatic visual-line follow, direct wheel scrolling and 150 ms debounced seeking.
+- Persistent typography and color settings, with preview in the existing settings dialog.
+- Microsoft Edge WebView2 Runtime required only for the Script window; not bundled. Portable single EXE remains.
+- CI passed at application revision `14a354a`; real reader and audio-device acceptance pending. Do not treat this section as a released feature until authorized merge and release.

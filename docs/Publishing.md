@@ -42,3 +42,7 @@ MSBuild copies `FFmpeg-Setup.txt` to development output; `Publish.ps1` copies it
 ## Rename to AudioPlayer (PR #10)
 
 The merged `main` publishes `dist/AudioPlayer.exe` from `AudioPlayer/AudioPlayer.csproj`. Older EXE files in `dist/` are not automatically removed or migrated. After acceptance, close any old instance, optionally copy previous settings to `AudioPlayer.settings.json` if the new file is absent, and manually remove obsolete executables if desired. The release workflow builds the EXE from a clean checkout.
+
+## Script companion runtime (PR #17, pending Windows acceptance)
+
+The embedded reader uses Microsoft.Web.WebView2 1.0.4314.35. The existing single-EXE publish shape remains unchanged; the separate FFmpeg setup TXT is still provided. The Microsoft Edge WebView2 Runtime is not bundled. It is needed only for the Script window; initialization failure must be reported without preventing audio playback. Install it using Microsoft's official WebView2 Runtime installer if missing. Reader runtime cache is created under `cache/webview2` beside the actual EXE and is not a source of user scripts. Hosted CI verified publication and main-window launch at `14a354a`, not actual reader startup from the published EXE. Verify that separately before merge.

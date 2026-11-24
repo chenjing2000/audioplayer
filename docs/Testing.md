@@ -403,3 +403,62 @@ The user explicitly confirmed all 12 focused WindowsAppPlaybook remediation manu
 ### PR #16 final merge and post-merge verification
 
 Final tooltip revision `c3a4c21` removes the visible `播放模式：` prefix while preserving accessible names and updates UI assertions. Both [push CI #45382457033](https://github.com/chenjing2000/audioplayer/actions/runs/45382457033) and [PR CI #45382467366](https://github.com/chenjing2000/audioplayer/actions/runs/45382467366) passed. No separate manual tooltip result was supplied. The user explicitly authorized merging on 2026-11-24; [PR #16](https://github.com/chenjing2000/audioplayer/pull/16) was squash merged into `main@af27658`. [Post-merge Windows CI #45382847185](https://github.com/chenjing2000/audioplayer/actions/runs/45382847185) passed. Remote branch listing verified only `main` remains. Local branch cleanup/synchronization and a new local automated/publishing log for the remediation revision have not been independently confirmed. The 70 user-reported manual checks are cumulative, not a full rerun on the merge commit. Earlier pending/deferred merge statements above describe historical stages. Optional MP3 and previously deferred real-media/failure-path checks remain unverified; no release tag was created.
+
+## PR #17 — Script companion Windows acceptance (pending)
+
+Application revision `14a354a`, 2026-11-24: [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45398456432), [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45398466410), 58 Core + 221 UI + 5 publishing safeguards + 4 published EXE checks passed; zero failures. Workflow smoke also passed. Six script wheel playback assertions explicitly skipped because hosted runner has no WaveOut device; other audio-device and optional MP3 checks also skipped. This is not evidence of real WebView2 interaction. No manual result yet.
+
+On Windows, close running AudioPlayer, switch to the feature branch and pull fast-forward only; do not discard local changes. Run UI, publish and published checks as in HANDOFF. Check the actual log contains the six wheel playback assertions and no WaveOut skip. Use a separate copied media folder with one correctly matched ReadArticles Script JSON, including multiple pages of text, timing gaps and null intervals. Use disposable copies for malformed/missing cases and test configuration; do not modify originals. Record commit, test logs, pass/fail per ID, environment/DPI and any skipped scenarios. Do not merge before separate authorization.
+
+| ID | Windows manual acceptance check |
+| --- | --- |
+| A01 | Icon order, consistent shape, tooltip show/hide, minimum main width without overlap |
+| A02 | Opens right of main, initial 400 DIP width and same height |
+| A03 | Minimum 200 × 300 DIP; independent resize |
+| A04 | Main movement and horizontal resize follow right edge |
+| A05 | Main vertical resize preserves independent script height |
+| A06 | Hide, reopen and close button; main minimize/restore and close |
+| A07 | Maximize and insufficient space keep reader accessible |
+| A08 | Secondary monitor and mixed DPI; report unavailable hardware as skipped |
+| B01 | Arbitrary JSON filename, only current loaded audio parent searched |
+| B02 | Ignore unrelated JSON and nonmatching selected row |
+| B03 | Missing script message; audio continues |
+| B04 | Recognizable Script with invalid schema/interval shows error; audio continues |
+| B05 | Empty/nonempty title and original punctuation/text |
+| B06 | Null/unmatched units and empty timed_units remain visible without coloring |
+| B07 | Switch tracks/folders without stale original text |
+| B08 | Source JSON unchanged; no auto timestamp repair |
+| C01 | Progressive partial-word color follows actual playback |
+| C02 | Wrapped timed unit retains one interval |
+| C03 | Top boundary stationary until active line reaches center |
+| C04 | Middle visual line centered; gaps hold prior line |
+| C05 | Bottom natural scroll limit, short document no extra padding |
+| C06 | Automatic line transition smooth, approximately 50 ms |
+| C07 | Pause/resume, forward/backward seek, Stop and natural end |
+| C08 | Resize/font changes recalculate layout without audio seek |
+| D01 | Wheel both directions directly scrolls, no auto animation |
+| D02 | Rapid wheel input previews latest target on main slider |
+| D03 | One committed seek after approximately 150 ms idle |
+| D04 | Playing resumes, paused/stopped behavior remains consistent |
+| D05 | Top/bottom first/last timed line; untimed line and no movement behavior |
+| D06 | Double-click text seeks; left selection/copy and middle press behavior |
+| D07 | Hide/close, Stop, Space and main slider/keyboard supersede pending seek correctly |
+| D08 | Switch track, refresh, open/settings dialogs and close app during pending navigation |
+| E01 | Two tabs, original audio settings controls and footer fit |
+| E02 | All fonts and font sizes, missing font fallback |
+| E03 | Line height, paragraph spacing and first-line indentation |
+| E04 | Normal, playback and background color changes and preview |
+| E05 | Cancel leaves saved appearance unchanged; OK persists |
+| E06 | Restart restores settings; Restore Defaults stages values until confirmation |
+| E07 | Older config defaults; invalid config retained and reported |
+| E08 | Appearance edits do not trigger silence reanalysis; shortcuts and copying remain usable |
+| F01 | All four playback modes, repeat reset and next-track script |
+| F02 | Long script performance and responsiveness |
+| F03 | Resize and scroll during playback; no unexpected seek |
+| F04 | Hidden reader and reopen synchronize without stale playback |
+| F05 | WebView2 unavailable/failure does not stop audio (only isolated safe environment) |
+| F06 | Published single EXE opens actual script, runtime cache beside EXE |
+| F07 | Existing settings/playlist/media and trim outputs retained |
+| F08 | Existing playback, silence navigation, scan and trim regression smoke |
+
+No item above is marked passed until user reports actual Windows results. Timing estimates based on observation are qualitative unless instrumented. Real device failure scenarios or mixed-DPI hardware unavailable locally must be marked skipped, not passed.

@@ -3,9 +3,9 @@
 参考：[WindowsAppPlaybook](https://github.com/chenjing2000/windowsappplaybook)。
 
 - **用途**：Windows 英语学习音频播放器，提供基于 RMS 的静音导航与长静音压缩。
-- **技术**：C#、WPF、.NET 10、NAudio 2.2.1、TagLibSharp 2.3.0；AAC/M4A 裁剪可选使用用户安装的 FFmpeg stream copy。
+- **技术**：C#、WPF、.NET 10、NAudio 2.2.1、TagLibSharp 2.3.0、Microsoft.Web.WebView2 1.0.4314.35（原文窗口）；AAC/M4A 裁剪可选使用用户安装的 FFmpeg stream copy。
 - **工程入口**：`AudioPlayer/AudioPlayer.csproj`；测试：`tests/AudioPlayer.Tests/`；发布：`tools/Publish.ps1`，正式产物 `dist/AudioPlayer.exe`。
-- **运行时**：Windows x64，要求 .NET 10 Desktop Runtime；现有 framework-dependent single-file 形态保留。
+- **运行时**：Windows x64，要求 .NET 10 Desktop Runtime；现有 framework-dependent single-file 形态保留；原文窗口需要本机 WebView2 Runtime，缺失不应影响音频播放。
 - **配置**：`<实际EXE名>.settings.json` 位于 EXE 同目录，作为原有应用约定保留（区别于 Playbook 的默认 `userdata` 路径）；保存失败不覆盖旧配置。
 - **播放列表**：EXE 同目录 `<实际EXE名>.playlist.json` 保存根目录和绝对音频路径；启动只恢复已保存且存在的文件，不自动播放；名称不显示扩展名，父目录见可换行圆角行提示，中文路径以可读 UTF-8 保存；播放列表是可重建索引，不需要自动备份。启动时确认缺失的路径才移除，访问错误保留旧 JSON 并提示；手动扫描失败保存空状态，保存失败提示且不清除内存列表。
 - **音频素材**：由用户选择的外部文件夹拥有，源音频只读；长静音处理的新文件放在源文件同目录 `<stem>.new.<ext>`，如果目标文件已存在则自动避让；按 ` (1)`、` (2)` 等递增命名并始终禁止覆盖。
@@ -16,4 +16,6 @@
 - **图标/UI 基线**：当前采用固定浅色界面，不承诺完整深色主题支持；PR #4/#5 已合并；工具栏按钮点击区域 36×36、图标 28×28，墨青蓝 `#26798A` 圆底与白色图形、无外框；Play/Pause 同一按钮切换，Stop 方块高度为圆形直径 35%；程序 ICO 使用叶片标识。下一轮入口为 [HANDOFF](HANDOFF.md)。
 - **测试入口**：`tools/Test.ps1 -Suite Core|UI|Full`；发布验证 `tools/Test-PublishedApp.ps1`；真实 MP3/M4A/WAV 的编解码和声音验证需在 Windows 实机执行。
 - **Git**：按用户授权，在功能分支修改；未经另外授权不合并 `main`。重大验证节点以描述实际修改的英文提交消息记录。
-- **播放模式**：刷新与设置之间的单个按钮依次循环四种模式，默认单曲播放，持久化保存，恢复默认经确认后重置。仅自然结束触发续播；单曲循环复用已加载媒体，顺序播放到末项停止，列表循环末项回首项。手动停止、定位到结尾、刷新、关闭及设备错误不触发续播；无可播放内容或下一文件打开失败停止并提示。模态对话框暂缓自动续播，实际手动停止或定位优先于待处理的续播。启动恢复不自动播放。
+- **播放模式**：刷新与原文按钮之间的单个按钮依次循环四种模式，默认单曲播放，持久化保存，恢复默认经确认后重置。仅自然结束触发续播；单曲循环复用已加载媒体，顺序播放到末项停止，列表循环末项回首项。手动停止、定位到结尾、刷新、关闭及设备错误不触发续播；无可播放内容或下一文件打开失败停止并提示。模态对话框暂缓自动续播，实际手动停止或定位优先于待处理的续播。启动恢复不自动播放。
+
+- **原文窗口（PR #17 待验收）**：读取当前加载音频所在目录的首个可识别 Script JSON（ReadArticles 格式）；原文只读，不按文件名匹配或修正时间轴。WPF 所有者窗口默认 400 DIP 宽、首次高度同主窗口、最小 200 × 300 DIP，按当前监视器工作区约束。50 ms 自动换行半余弦动画，滚轮直接滚动、150 ms 去抖定位，主播放器是唯一音频状态来源。原文显示配置位于现有 JSON 的 ScriptAppearance 字段。WebView2 用户数据缓存位于实际 EXE 旁 cache/webview2，不迁移或删除旧缓存。实机验收与合并授权仍待完成。
