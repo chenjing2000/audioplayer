@@ -48,7 +48,7 @@ public partial class MainWindow : Window
     private Task? activeOperation;
     private Task? analysisTask;
     private CancellationTokenSource? analysisCancellation;
-    private readonly Queue<Key> navigationKeys = new();
+    private readonly Queue<(Key Key, bool Timed)> navigationKeys = new();
     private bool navigating;
     private Task navigationTask = Task.CompletedTask;
     private Exception? displayedPlaybackError;
@@ -537,25 +537,32 @@ public partial class MainWindow : Window
 
     private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (Keyboard.Modifiers != ModifierKeys.None || !IsPlaybackKey(e.Key)) return;
+        if (!IsPlaybackShortcut(e.Key, Keyboard.Modifiers)) return;
         e.Handled = true;
         if (e.IsRepeat) return;
-        await HandleShortcutAsync(e.Key);
+        await HandleShortcutAsync(e.Key, Keyboard.Modifiers);
     }
 
     private void Window_PreviewKeyUp(object sender, KeyEventArgs e)
     {
-        if (Keyboard.Modifiers == ModifierKeys.None && IsPlaybackKey(e.Key)) e.Handled = true;
+        if (IsPlaybackShortcut(e.Key, Keyboard.Modifiers)) e.Handled = true;
     }
 
-    private static bool IsPlaybackKey(Key key) => key == Key.Space || key == Key.Left || key == Key.Right;
+    internal static bool IsPlaybackShortcut(Key key, ModifierKeys modifiers)
+        => (modifiers == ModifierKeys.None && key == Key.Space)
+            || ((modifiers == ModifierKeys.None || modifiers == ModifierKeys.Control)
+                && (key == Key.Left || key == Key.Right));
 
-    internal Task HandleShortcutAsync(Key key)
+    internal Task HandleShortcutAsync(Key key, ModifierKeys modifiers = ModifierKeys.None)
     {
+        if (!IsPlaybackShortcut(key, modifiers)) return Task.CompletedTask;
         if (key == Key.Space) return RunActionAsync(TogglePlaybackAsync);
-        if (key != Key.Left && key != Key.Right) return Task.CompletedTask;
-        if (closing || dragging || analyzing || !analysisReady || (operationBusy && !navigating)) return Task.CompletedTask;
-        navigationKeys.Enqueue(key);
+        bool timed = modifiers == ModifierKeys.Control;
+        if (closing || dragging || !player.IsLoaded || (operationBusy && !navigating)
+            || (!timed && (analyzing || !analysisReady))) return Task.CompletedTask;
+        if (timed && (key == Key.Left ? silenceSettings.BackwardStepSeconds : silenceSettings.ForwardStepSeconds) == 0)
+            return Task.CompletedTask;
+        navigationKeys.Enqueue((key, timed));
         if (!navigating)
         {
             navigating = true;
@@ -570,11 +577,13 @@ public partial class MainWindow : Window
         {
             while (navigationKeys.Count > 0 && !closing)
             {
-                Key key = navigationKeys.Dequeue();
+                var (key, timed) = navigationKeys.Dequeue();
                 await RunActionAsync(async () =>
                 {
                     TimeSpan current = player.GetCurrentTime();
-                    TimeSpan? target = key == Key.Left
+                    TimeSpan? target = timed
+                        ? current + TimeSpan.FromSeconds(key == Key.Left ? -silenceSettings.BackwardStepSeconds : silenceSettings.ForwardStepSeconds)
+                        : key == Key.Left
                         ? SilenceDetector.FindPrevious(ranges, current, silenceSettings)
                         : SilenceDetector.FindNext(ranges, current, silenceSettings);
                     if (target.HasValue) await player.SeekAsync(target.Value);

@@ -14,8 +14,17 @@ public sealed class SilenceSettings
     public int NavigationToleranceMilliseconds { get; set; } = DefaultNavigationToleranceMilliseconds;
     public decimal AllowedSilenceSeconds { get; set; } = DefaultAllowedSilenceSeconds;
 
+    public const int DefaultBackwardStepSeconds = 5;
+    public const int DefaultForwardStepSeconds = 4;
+    public int BackwardStepSeconds { get; set; } = DefaultBackwardStepSeconds;
+    public int ForwardStepSeconds { get; set; } = DefaultForwardStepSeconds;
+
     public void Validate()
     {
+        if (BackwardStepSeconds is < 0 or > 99)
+            throw new ArgumentOutOfRangeException(nameof(BackwardStepSeconds), "后退步长必须在 0 到 99 s 之间。");
+        if (ForwardStepSeconds is < 0 or > 99)
+            throw new ArgumentOutOfRangeException(nameof(ForwardStepSeconds), "前进步长必须在 0 到 99 s 之间。");
         if (FrameMilliseconds < 1 || FrameMilliseconds > 100)
             throw new ArgumentOutOfRangeException(nameof(FrameMilliseconds), "分析帧长度必须在 1 到 100 ms 之间。");
         if (MinimumSilenceMilliseconds < 50 || MinimumSilenceMilliseconds > 5000)

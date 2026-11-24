@@ -43,3 +43,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Test-PublishedAp
 ## Completed feature (PR #15)
 
 PR #15 added recursive scanning and persistent playlists, filename-only display, wrapped parent-directory tooltips, readable Chinese JSON, WindowsAppPlaybook lifecycle and data-safety remediation, and pronunciation-directory exclusion. The final feature head `10f2aee` passed [PR CI #45332463717](https://github.com/chenjing2000/audioplayer/actions/runs/45332463717) and [push CI #45332456815](https://github.com/chenjing2000/audioplayer/actions/runs/45332456815). The user confirmed 27 manual acceptance checks in four stages (10 + 6 + 7 + 4) and authorized squash merge. All changes are in `main@7cb288e`; post-merge CI passed. Detailed stage-specific evidence and limitations are maintained in [Testing](Testing.md#windows-acceptance--pr-15), not duplicated here.
+
+## Active feature — configurable seek shortcuts
+
+Branch `feature/configurable-seek-shortcuts` starts at `main@00d4928`. Settings dialog widened to 480 × 390 DIP, adds backward/forward steps (5/4 seconds by default, 0–99), and Ctrl+Left/Right timed seeking. Space remains window-wide. Automated CI and Windows manual acceptance pending; no merge authorized.

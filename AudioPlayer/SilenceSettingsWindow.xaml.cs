@@ -37,6 +37,8 @@ public partial class SilenceSettingsWindow : Window
 
     private void LoadValues(SilenceSettings settings)
     {
+        BackwardStepTextBox.Text = settings.BackwardStepSeconds.ToString(CultureInfo.InvariantCulture);
+        ForwardStepTextBox.Text = settings.ForwardStepSeconds.ToString(CultureInfo.InvariantCulture);
         FrameMillisecondsTextBox.Text = settings.FrameMilliseconds.ToString(CultureInfo.InvariantCulture);
         MinimumSilenceTextBox.Text = settings.MinimumSilenceMilliseconds.ToString(CultureInfo.InvariantCulture);
         SilenceThresholdTextBox.Text = settings.SilenceThresholdDb.ToString(CultureInfo.InvariantCulture);
@@ -62,6 +64,12 @@ public partial class SilenceSettingsWindow : Window
                 CultureInfo.InvariantCulture, out decimal allowedSeconds))
             return ShowValueError("允许静音时长不能为空，且最多只能有一位小数。", AllowedSilenceTextBox);
 
+        if (!IsStepText(BackwardStepTextBox.Text) || !int.TryParse(BackwardStepTextBox.Text, out int backward))
+            return ShowValueError("后退步长必须是 0 到 99 的整数。", BackwardStepTextBox);
+        if (!IsStepText(ForwardStepTextBox.Text) || !int.TryParse(ForwardStepTextBox.Text, out int forward))
+            return ShowValueError("前进步长必须是 0 到 99 的整数。", ForwardStepTextBox);
+        settings.BackwardStepSeconds = backward;
+        settings.ForwardStepSeconds = forward;
         settings.FrameMilliseconds = frameMilliseconds;
         settings.MinimumSilenceMilliseconds = minimumSilenceMilliseconds;
         settings.SilenceThresholdDb = silenceThresholdDb;
@@ -80,14 +88,30 @@ public partial class SilenceSettingsWindow : Window
                 nameof(SilenceSettings.MinimumSilenceMilliseconds) => MinimumSilenceTextBox,
                 nameof(SilenceSettings.SilenceThresholdDb) => SilenceThresholdTextBox,
                 nameof(SilenceSettings.NavigationToleranceMilliseconds) => NavigationToleranceTextBox,
+                nameof(SilenceSettings.BackwardStepSeconds) => BackwardStepTextBox,
+                nameof(SilenceSettings.ForwardStepSeconds) => ForwardStepTextBox,
                 _ => AllowedSilenceTextBox
             };
             return ShowValueError(ex.Message.Split('\n')[0], field);
         }
 
+        BackwardStepTextBox.Text = backward.ToString(CultureInfo.InvariantCulture);
+        ForwardStepTextBox.Text = forward.ToString(CultureInfo.InvariantCulture);
         AllowedSilenceTextBox.Text = allowedSeconds.ToString("0.0", CultureInfo.InvariantCulture);
         ClearValueError();
         return true;
+    }
+
+    private static bool IsStepText(string text) => text.Length <= 2 && text.All(c => c is >= '0' and <= '9');
+
+    private void StepTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        => e.Handled = !IsStepText(BuildCandidateText((TextBox)sender, e.Text));
+
+    private void StepTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
+    {
+        if (!e.DataObject.GetDataPresent(DataFormats.Text)
+            || !IsStepText(BuildCandidateText((TextBox)sender, (string)e.DataObject.GetData(DataFormats.Text))))
+            e.CancelCommand();
     }
 
     private void PositiveIntegerTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
@@ -201,6 +225,8 @@ public partial class SilenceSettingsWindow : Window
 
     private bool IsFieldValid(TextBox box)
     {
+        if (ReferenceEquals(box, BackwardStepTextBox) || ReferenceEquals(box, ForwardStepTextBox))
+            return box.Text.Length > 0 && IsStepText(box.Text);
         if (ReferenceEquals(box, FrameMillisecondsTextBox))
             return int.TryParse(box.Text, out int frameValue) && frameValue is >= 1 and <= 100;
         if (ReferenceEquals(box, MinimumSilenceTextBox))

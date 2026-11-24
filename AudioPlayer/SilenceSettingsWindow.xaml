@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AudioPlayer"
         Title="设置" PreviewKeyDown="Window_PreviewKeyDown"
-        Width="324" Height="390"
+        Width="480" Height="390"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
@@ -41,35 +41,46 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="80"/>
+            <ColumnDefinition Width="24"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="80"/>
         </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="0" Text="分析帧长度（ms）" VerticalAlignment="Center" Margin="0,0,16,14"/>
+        <TextBlock Grid.Row="0" Text="分析帧长度（ms）" VerticalAlignment="Center" Margin="0,0,4,14"/>
         <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="FrameMillisecondsTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="0" Grid.Column="1" Margin="0,0,0,14" Padding="6,4"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"/>
 
-        <TextBlock Grid.Row="1" Text="最短停顿时长（ms）" VerticalAlignment="Center" Margin="0,0,16,14"/>
+        <TextBlock Grid.Row="1" Text="最短停顿时长（ms）" VerticalAlignment="Center" Margin="0,0,4,14"/>
         <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="MinimumSilenceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="1" Grid.Column="1" Margin="0,0,0,14" Padding="6,4"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"
                  LostKeyboardFocus="SilenceInput_LostKeyboardFocus"/>
 
-        <TextBlock Grid.Row="2" Text="静音阈值（dBFS）" VerticalAlignment="Center" Margin="0,0,16,14"/>
+        <TextBlock Grid.Row="2" Text="静音阈值（dBFS）" VerticalAlignment="Center" Margin="0,0,4,14"/>
         <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="SilenceThresholdTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="2" Grid.Column="1" Margin="0,0,0,14" Padding="6,4"
                  PreviewTextInput="SignedIntegerTextBox_PreviewTextInput" DataObject.Pasting="SignedIntegerTextBox_Pasting"/>
 
-        <TextBlock Grid.Row="3" Text="前后跳转容差（ms）" VerticalAlignment="Center" Margin="0,0,16,14"/>
+        <TextBlock Grid.Row="3" Text="前后跳转容差（ms）" VerticalAlignment="Center" Margin="0,0,4,14"/>
         <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="NavigationToleranceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="3" Grid.Column="1" Margin="0,0,0,14" Padding="6,4"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"/>
 
-        <TextBlock Grid.Row="4" Text="允许静音时长 (s)" VerticalAlignment="Center" Margin="0,0,16,14"/>
+        <TextBlock Grid.Row="4" Text="允许静音时长 (s)" VerticalAlignment="Center" Margin="0,0,4,14"/>
         <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="AllowedSilenceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center"
                  AllowDrop="False" Grid.Row="4" Grid.Column="1" Margin="0,0,0,14" Padding="6,4"
                  PreviewTextInput="AllowedSilenceTextBox_PreviewTextInput" DataObject.Pasting="AllowedSilenceTextBox_Pasting"
                  LostKeyboardFocus="SilenceInput_LostKeyboardFocus"/>
 
-        <TextBlock x:Name="HelpText" Grid.Row="5" Grid.ColumnSpan="2" Foreground="#6B7280" TextWrapping="Wrap"
-                   Text="默认：10 ms、300 ms、-45 dBFS、200 ms、2.0 s。允许静音时长只影响裁剪，不影响左右跳转。"/>
+        <TextBlock Grid.Row="0" Grid.Column="3" Text="后退步长 (s)" VerticalAlignment="Center" Margin="0,0,4,14"/>
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="BackwardStepTextBox" Width="80" MaxLength="2" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="0" Grid.Column="4" Margin="0,0,0,14" Padding="6,4"
+                 PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting"/>
 
-        <Grid Grid.Row="6" Grid.ColumnSpan="2" Margin="0,20,0,0">
+        <TextBlock Grid.Row="1" Grid.Column="3" Text="前进步长 (s)" VerticalAlignment="Center" Margin="0,0,4,14"/>
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="ForwardStepTextBox" Width="80" MaxLength="2" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="1" Grid.Column="4" Margin="0,0,0,14" Padding="6,4"
+                 PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting"/>
+
+        <TextBlock x:Name="HelpText" Grid.Row="5" Grid.ColumnSpan="5" Foreground="#6B7280" TextWrapping="Wrap"
+                   Text="默认：10 ms、300 ms、-45 dBFS、200 ms、2.0 s。允许静音时长只影响裁剪，不影响左右跳转。&#x0a;Ctrl + ← / →：按设定步长后退 / 前进。"/>
+
+        <Grid Grid.Row="6" Grid.ColumnSpan="5" Margin="0,20,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>

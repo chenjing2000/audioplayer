@@ -33,6 +33,12 @@ Check("Settings initialize beside executable, persist and preserve invalid files
         Assert(!File.Exists(store.FilePath));
         var settings = store.LoadOrCreate();
         Assert(File.Exists(store.FilePath) && settings.FrameMilliseconds == 10);
+        Assert(settings.BackwardStepSeconds == 5 && settings.ForwardStepSeconds == 4);
+        File.WriteAllText(store.FilePath, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0}""");
+        settings = store.LoadOrCreate();
+        Assert(settings.BackwardStepSeconds == 5 && settings.ForwardStepSeconds == 4);
+        settings.BackwardStepSeconds = 0;
+        settings.ForwardStepSeconds = 99;
         settings.FrameMilliseconds = 20;
         settings.MinimumSilenceMilliseconds = 500;
         settings.SilenceThresholdDb = -40;
@@ -41,7 +47,14 @@ Check("Settings initialize beside executable, persist and preserve invalid files
         var loaded = new SettingsStore(store.FilePath).LoadOrCreate();
         Assert(loaded.FrameMilliseconds == 20 && loaded.MinimumSilenceMilliseconds == 500
             && loaded.SilenceThresholdDb == -40 && loaded.NavigationToleranceMilliseconds == 250);
+        Assert(loaded.BackwardStepSeconds == 0 && loaded.ForwardStepSeconds == 99);
         string previous = File.ReadAllText(store.FilePath);
+        foreach (var invalidStep in new[] { new SilenceSettings { BackwardStepSeconds = -1 }, new SilenceSettings { ForwardStepSeconds = 100 } })
+        {
+            try { store.Save(invalidStep); throw new Exception("Invalid step accepted"); }
+            catch (ArgumentOutOfRangeException) { }
+            Assert(File.ReadAllText(store.FilePath) == previous);
+        }
         settings.FrameMilliseconds = 0;
         try { store.Save(settings); throw new Exception("Invalid settings accepted"); }
         catch (ArgumentOutOfRangeException) { }

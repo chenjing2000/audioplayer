@@ -314,16 +314,25 @@ internal static class UiChecks
 
                     var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
-                    Assert(Math.Abs(settingsWindow.Width - 324) < 0.01, "Settings window width is 324");
+                    Assert(Math.Abs(settingsWindow.Width - 480) < 0.01, "Settings window width is 480");
                     Assert(Math.Abs(settingsWindow.Height - 390) < 0.01, "Settings window height is 390");
-                    foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox" })
+                    foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox", "BackwardStepTextBox", "ForwardStepTextBox" })
                     {
                         var textBox = (TextBox)settingsWindow.FindName(textBoxName);
                         Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop, textBoxName + " retains input size and alignment");
                         textBox.ApplyTemplate();
                         Assert(FindVisual<Border>(textBox)!.CornerRadius.TopLeft == 6, "Input has rounded corners");
                     }
-                    MethodInfo positiveInput = typeof(SilenceSettingsWindow).GetMethod("IsPositiveIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                    var backwardBox = (TextBox)settingsWindow.FindName("BackwardStepTextBox");
+                     var forwardBox = (TextBox)settingsWindow.FindName("ForwardStepTextBox");
+                     Assert(backwardBox.Text == "5" && forwardBox.Text == "4" && backwardBox.MaxLength == 2 && forwardBox.MaxLength == 2, "Step defaults and length");
+                     MethodInfo stepInput = typeof(SilenceSettingsWindow).GetMethod("IsStepText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     Assert(new[] { "", "0", "99", "05" }.All(v => (bool)stepInput.Invoke(null, new object[] { v })!)
+                         && new[] { "+5", "-1", "100", "2.5", "５", "a" }.All(v => !(bool)stepInput.Invoke(null, new object[] { v })!), "Step input is ASCII digits only");
+                     Assert(MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control) && MainWindow.IsPlaybackShortcut(Key.Right, ModifierKeys.Control)
+                         && MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.None) && !MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.Control)
+                         && !MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control | ModifierKeys.Shift), "Shortcut modifier routing");
+                     MethodInfo positiveInput = typeof(SilenceSettingsWindow).GetMethod("IsPositiveIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
                     MethodInfo signedInput = typeof(SilenceSettingsWindow).GetMethod("IsSignedIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
                     Assert((bool)positiveInput.Invoke(null, new object[] { "+123" })! && !(bool)positiveInput.Invoke(null, new object[] { "-1" })! && !(bool)positiveInput.Invoke(null, new object[] { "1.5" })! && !(bool)positiveInput.Invoke(null, new object[] { "abc" })!, "Positive parameter boxes accept only digits and optional leading plus sign");
                     Assert((bool)signedInput.Invoke(null, new object[] { "-45" })! && (bool)signedInput.Invoke(null, new object[] { "+45" })! && !(bool)signedInput.Invoke(null, new object[] { "4-5" })! && !(bool)signedInput.Invoke(null, new object[] { "-4.5" })!, "Silence threshold box accepts digits and one leading sign only");
@@ -523,7 +532,12 @@ internal static class UiChecks
                     double before = player.GetCurrentTime().TotalSeconds;
                     await window.HandleShortcutAsync(Key.Right);
                     Assert(player.PlaybackState == PlaybackState.Paused && player.GetCurrentTime().TotalSeconds > before, "Paused navigation remains paused");
-                    var ranges = Field<List<SilenceRange>>(window, "ranges")!;
+                    await player.SeekAsync(TimeSpan.FromSeconds(1));
+                     await window.HandleShortcutAsync(Key.Left, ModifierKeys.Control);
+                     Assert(player.GetCurrentTime() == TimeSpan.Zero && player.IsPaused, "Timed backward seek clamps to zero and stays paused");
+                     await window.HandleShortcutAsync(Key.Right, ModifierKeys.Control);
+                     Assert(Math.Abs(player.GetCurrentTime().TotalSeconds - Math.Min(4, player.GetDuration().TotalSeconds)) < 0.1 && player.IsPaused, "Timed forward seek uses default step and stays paused");
+                     var ranges = Field<List<SilenceRange>>(window, "ranges")!;
                     await player.SeekAsync(ranges[0].Middle);
                     await window.HandleShortcutAsync(Key.Space);
                     double first = player.GetCurrentTime().TotalSeconds;
