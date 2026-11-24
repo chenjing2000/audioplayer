@@ -779,6 +779,7 @@ public partial class MainWindow : Window
 
     private void RefreshProgress()
     {
+        if (scriptWindow?.IsVisible == true && !closing) scriptWindow.SetAudio(loadedTrack?.FilePath);
         if (dragging || closing) return;
         double duration = player.GetDuration().TotalSeconds;
         ProgressSlider.Maximum = Math.Max(duration, 0.001);
@@ -845,6 +846,7 @@ public partial class MainWindow : Window
         {
             PositionScriptWindow();
             scriptWindow.Show();
+            scriptWindow.SetAudio(loadedTrack?.FilePath);
         }
     }
 

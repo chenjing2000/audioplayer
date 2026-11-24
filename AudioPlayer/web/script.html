@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>
+html{background:#F8F8F6;color:#283747;font:18px/1.7 Georgia,"Segoe UI",serif}body{margin:16px;overflow-wrap:break-word}h1{font-size:1.2em;text-align:center}p{margin:0 0 16px}#status{color:#687783;font:14px "Segoe UI",sans-serif}
+</style></head><body><div id="status"></div><h1 id="title" hidden></h1><main id="text"></main><script>
+const title=document.getElementById('title'), body=document.getElementById('text'), status=document.getElementById('status');
+chrome.webview.addEventListener('message',({data})=>{
+  title.textContent=data.article?.title??'';title.hidden=!title.textContent;
+  status.textContent=data.message??'';body.replaceChildren();window.scrollTo(0,0);
+  for(const paragraph of data.article?.paragraphs??[]){
+    const p=document.createElement('p');
+    for(const [i,sentence] of paragraph.sentences.entries()){
+      if(i)p.append(' ');
+      const span=document.createElement('span');span.textContent=sentence.text;p.append(span);
+    }
+    body.append(p);
+  }
+});
+chrome.webview.postMessage('ready');
+</script></body></html>
