@@ -138,8 +138,36 @@ internal static class UiChecks
                         refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                         if (Field<Task>(window, "activeOperation") is Task failedAction) await failedAction;
                         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-                        Assert(list.Items.Count == 1 && refreshButton.IsEnabled,
-                            "Failed refresh retains the old list and folder selection");
+                        Assert(list.Items.Count == 0 && list.SelectedItem is null &&
+                            Field<string>(window, "currentFolder") is null &&
+                            !Field<PlayerEngine>(window, "player")!.IsLoaded &&
+                            !refreshButton.IsEnabled && !playButton.IsEnabled && !stopButton.IsEnabled,
+                            "Missing refresh folder clears playlist, folder path and playback controls");
+
+                        // A failed scan from the Open Folder path clears the old state too.
+                        await window.LoadFolderAsync(audioFolder);
+                        Assert(refreshButton.IsEnabled &&
+                            Field<string>(window, "currentFolder") == Path.GetFullPath(audioFolder),
+                            "Valid folder can reopen after failed refresh");
+                        bool failedScan = false;
+                        try { await window.LoadFolderAsync(refreshFolder); }
+                        catch (DirectoryNotFoundException) { failedScan = true; }
+                        Assert(failedScan && list.Items.Count == 0 &&
+                            Field<string>(window, "currentFolder") is null &&
+                            !refreshButton.IsEnabled && !playButton.IsEnabled,
+                            "Failed folder load clears previously loaded folder");
+                        // A successfully scanned empty folder is not a scan failure.
+                        string emptyFolder = Path.Combine(audioFolder, "ui-empty-" + Guid.NewGuid().ToString("N"));
+                        Directory.CreateDirectory(emptyFolder);
+                        try
+                        {
+                            await window.LoadFolderAsync(emptyFolder);
+                            Assert(list.Items.Count == 0 &&
+                                Field<string>(window, "currentFolder") == Path.GetFullPath(emptyFolder) &&
+                                refreshButton.IsEnabled,
+                                "Empty valid folder retains folder path and Refresh");
+                        }
+                        finally { Directory.Delete(emptyFolder); }
                         toasts.Clear();
                         await window.LoadFolderAsync(audioFolder);
                     }
