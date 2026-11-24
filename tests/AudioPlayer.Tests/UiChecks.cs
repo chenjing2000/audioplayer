@@ -17,7 +17,10 @@ internal static class UiChecks
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-    private static extern bool IsWindowVisible(IntPtr window);
+    private static extern bool IsWindow(IntPtr window);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
 
     public static Task<int> RunAsync(string audioFolder)
     {
@@ -745,30 +748,74 @@ internal static class UiChecks
                                 """);
                             Assert(wheelSensitivity == "true", "Reader wheel displacement is quartered for pixel, line and page deltas");
 
+                            string scrollBarNavigation = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const originalPreview=preview, savedLines=lines;
+                                  const spacer=document.createElement('div');
+                                  spacer.style.height='3000px';
+                                  let targets=[];
+                                  try {
+                                    body.append(spacer);
+                                    lines=[{y:window.innerHeight/2+200,first:7},
+                                           {y:window.innerHeight/2+400,first:9}];
+                                    preview=line=>targets.push(line.first);
+                                    scrollProgrammatically(200);
+                                    window.dispatchEvent(new Event('scroll'));
+                                    if(targets.length!==0)return false;
+                                    // Native scrollbar movement changes scrollY without
+                                    // going through scrollProgrammatically.
+                                    window.scrollTo(0,400);
+                                    window.dispatchEvent(new Event('scroll'));
+                                    if(targets.length!==1 || targets[0]!==9)return false;
+                                    window.dispatchEvent(new Event('scroll'));
+                                    if(targets.length!==1)return false;
+                                    const sentence=body.querySelector('.sentence');
+                                    sentence.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,clientY:window.innerHeight/2}));
+                                    return targets.length===1;
+                                  } finally {
+                                    preview=originalPreview;
+                                    lines=savedLines;
+                                    spacer.remove();
+                                    scrollProgrammatically(0);
+                                  }
+                                })()
+                                """);
+                            Assert(scrollBarNavigation == "true", "Reader native scroll previews seek, programmatic scroll and double-click do not");
+
                             // Keep the synthetic article isolated from MainWindow's playback timer
                             // until the rendering assertions finish. No real audio is loaded here.
                             typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
                                 .SetValue(window, readerWindow);
                             var readerHandle = new System.Windows.Interop.WindowInteropHelper(readerWindow).Handle;
-                            double readerWidth = readerWindow.Width, readerHeight = readerWindow.Height;
-                            var originalCore = reader.CoreWebView2;
-                            window.WindowState = WindowState.Minimized;
+                            int readerStyle = GetWindowLong(readerHandle, -16);
+                            Assert((readerStyle & 0x00030000) == 0 && (readerStyle & 0x00040000) != 0,
+                                "Reader disables minimize and maximize while retaining resize border");
+                            bool closedBeforeMinimize = false;
+                            readerWindow.Closed += (_, _) => closedBeforeMinimize = window.WindowState != WindowState.Minimized;
+                            SendMessage(new System.Windows.Interop.WindowInteropHelper(window).Handle, 0x0112, new IntPtr(0xf020), IntPtr.Zero);
                             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                            Assert(readerWindow.Visibility != Visibility.Visible && !IsWindowVisible(readerHandle),
-                                "Minimizing owner explicitly hides native reader window");
+                            Assert(closedBeforeMinimize && window.WindowState == WindowState.Minimized && !IsWindow(readerHandle) &&
+                                Field<ScriptWindow>(window, "scriptWindow") is null,
+                                "Native minimize command closes reader before minimizing owner");
                             window.WindowState = WindowState.Normal;
                             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                            Assert(readerWindow.IsVisible && IsWindowVisible(readerHandle) &&
-                                readerWindow.ReaderReady && ReferenceEquals(originalCore, reader.CoreWebView2) &&
-                                readerWindow.Width == readerWidth && readerWindow.Height == readerHeight,
-                                "Restoring owner shows same reader and preserves dimensions");
-                            readerWindow.Hide();
-                            window.WindowState = WindowState.Minimized;
-                            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                            window.WindowState = WindowState.Normal;
-                            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                            Assert(!readerWindow.IsVisible && !IsWindowVisible(readerHandle),
-                                "Restoring owner leaves previously hidden reader hidden");
+                            Assert(Field<ScriptWindow>(window, "scriptWindow") is null && !IsWindow(readerHandle),
+                                "Restoring owner does not reopen closed reader");
+                            var hiddenReader = new ScriptWindow(Path.Combine(readerFolder, "cache"));
+                            try
+                            {
+                                typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
+                                    .SetValue(window, hiddenReader);
+                                bool hiddenClosed = false;
+                                hiddenReader.Closed += (_, _) => hiddenClosed = true;
+                                window.WindowState = WindowState.Minimized;
+                                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                                Assert(hiddenClosed && Field<ScriptWindow>(window, "scriptWindow") is null,
+                                    "Programmatic minimize closes even a hidden reader");
+                                window.WindowState = WindowState.Normal;
+                            }
+                            finally { hiddenReader.CloseForOwner(); }
                         }
                         finally
                         {

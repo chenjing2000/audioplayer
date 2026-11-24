@@ -37,6 +37,25 @@ public partial class ScriptWindow : Window
         Loaded += InitializeReader;
     }
 
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        // Keep native resizing and Close, but remove both caption size buttons.
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        const int GwlStyle = -16, WsMinimizeBox = 0x00020000, WsMaximizeBox = 0x00010000;
+        SetWindowLong(handle, GwlStyle, GetWindowLong(handle, GwlStyle) & ~(WsMinimizeBox | WsMaximizeBox));
+        // SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
+        SetWindowPos(handle, IntPtr.Zero, 0, 0, 0, 0, 0x0037);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    private static extern int GetWindowLong(IntPtr handle, int index);
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    private static extern int SetWindowLong(IntPtr handle, int index, int value);
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(IntPtr handle, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
+
     internal bool ReaderReady => ready;
     internal string? ReaderFailure => readerFailed ? Status.Text : null;
 
@@ -251,9 +270,11 @@ public partial class ScriptWindow : Window
 
     internal void CloseForOwner()
     {
+        if (ownerClosing) return;
         ownerClosing = true;
         scriptLoadCancellation?.Cancel();
         scriptLoadCancellation = null;
+        if (IsVisible) Hide();
         Reader.Dispose();
         Close();
     }

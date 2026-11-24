@@ -55,7 +55,6 @@ public partial class MainWindow : Window
     private bool modalDialogOpen;
     private bool completionQueued;
     private ScriptWindow? scriptWindow;
-    private bool restoreScriptAfterMinimize;
     private const int ScriptSeekDebounceMs = 150;
     private const int ReaderPlaybackUpdateMs = 25;
     private const int NormalProgressUpdateMs = 100;
@@ -107,6 +106,22 @@ public partial class MainWindow : Window
         LocationChanged += (_, _) => PositionScriptWindow();
         SizeChanged += (_, _) => PositionScriptWindow();
         StateChanged += (_, _) => UpdateScriptWindowState();
+    }
+
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        var source = System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
+        source?.AddHook(MainWindowMessage);
+    }
+
+    private IntPtr MainWindowMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        // Native caption/system-menu minimize: close the reader synchronously
+        // before Windows processes SC_MINIMIZE. Leave the default action intact.
+        if (message == 0x0112 && (wParam.ToInt64() & 0xfff0) == 0xf020)
+            CloseScriptForMinimize();
+        return IntPtr.Zero;
     }
 
     private async void RestorePlaylistOnLoad(object sender, RoutedEventArgs e)
@@ -891,9 +906,11 @@ public partial class MainWindow : Window
             scriptWindow.NavigationPreview += PreviewScriptSeek;
             scriptWindow.NavigationCanceled += async () => await RestoreCanceledScriptSeekAsync();
             scriptWindow.Shortcut += async (key, modifiers) => await HandleShortcutAsync(key, modifiers);
-            scriptWindow.IsVisibleChanged += async (_, _) =>
+            var reader = scriptWindow;
+            reader.IsVisibleChanged += async (_, _) =>
             {
-                string label = scriptWindow?.IsVisible == true || restoreScriptAfterMinimize ? "隐藏原文" : "显示原文";
+                if (!ReferenceEquals(scriptWindow, reader)) return;
+                string label = reader.IsVisible ? "隐藏原文" : "显示原文";
                 ScriptButton.ToolTip = label;
                 AutomationProperties.SetName(ScriptButton, label);
                 if (scriptWindow?.IsVisible != true) await RestoreCanceledScriptSeekAsync();
@@ -917,29 +934,23 @@ public partial class MainWindow : Window
 
     private void UpdateScriptWindowState()
     {
-        if (closing || scriptWindow is null) return;
-        if (WindowState == WindowState.Minimized)
-        {
-            // IsVisible may already reflect native owner minimization. Visibility
-            // retains the WPF show/hide request until we explicitly hide the window.
-            if (scriptWindow.Visibility == Visibility.Visible)
-            {
-                restoreScriptAfterMinimize = true;
-                scriptWindow.Hide();
-            }
-            return;
-        }
-
-        if (restoreScriptAfterMinimize)
-        {
-            restoreScriptAfterMinimize = false;
-            // Restoring the owner must not steal keyboard focus into the reader.
-            bool showActivated = scriptWindow.ShowActivated;
-            scriptWindow.ShowActivated = false;
-            try { ShowScriptWindow(); }
-            finally { scriptWindow.ShowActivated = showActivated; }
-        }
+        if (closing) return;
+        // Fallback for programmatic WindowState changes or shell paths that
+        // bypass the native system command.
+        if (WindowState == WindowState.Minimized) CloseScriptForMinimize();
         else PositionScriptWindow();
+    }
+
+    private void CloseScriptForMinimize()
+    {
+        if (closing || scriptWindow is not { } reader) return;
+        // Detach before closing: visibility callbacks must not act on a
+        // disposed reader or automatically reopen it on owner restore.
+        scriptWindow = null;
+        reader.CloseForOwner();
+        ScriptButton.ToolTip = "显示原文";
+        AutomationProperties.SetName(ScriptButton, "显示原文");
+        _ = RestoreCanceledScriptSeekAsync();
     }
 
     internal void PreviewScriptSeek(double seconds)
@@ -1074,7 +1085,6 @@ public partial class MainWindow : Window
         e.Cancel = true;
         if (closing) return;
         closing = true;
-        restoreScriptAfterMinimize = false;
         CancelScriptSeek();
         scriptWindow?.CloseForOwner();
         scanCancellation.Cancel();

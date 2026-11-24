@@ -417,8 +417,8 @@ On Windows, close running AudioPlayer, switch to the feature branch and pull fas
 | A03 | Minimum 200 × 300 DIP; independent resize |
 | A04 | Main movement and horizontal resize follow right edge |
 | A05 | Main vertical resize preserves independent script height |
-| A06 | Hide, reopen and close button; main minimize/restore and close |
-| A07 | Maximize and insufficient space keep reader accessible |
+| A06 | Hide, reopen and close button; native main minimize closes reader first, restore leaves closed, main close |
+| A07 | Main maximize and insufficient space keep reader accessible; reader minimize/maximize disabled, resize remains enabled |
 | A08 | Secondary monitor and mixed DPI; report unavailable hardware as skipped |
 | B01 | Arbitrary JSON filename, only current loaded audio parent searched |
 | B02 | Ignore unrelated JSON and nonmatching selected row |
@@ -436,12 +436,12 @@ On Windows, close running AudioPlayer, switch to the feature branch and pull fas
 | C06 | Continuous automatic scrolling within and across lines, no per-line dwell |
 | C07 | Pause/resume, forward/backward seek, Stop and natural end |
 | C08 | Resize/font changes recalculate layout without audio seek |
-| D01 | Wheel both directions directly scrolls at 25% of original displacement, no auto animation |
+| D01 | Wheel at 25% of original displacement and native scrollbar both directions directly scroll, no auto animation |
 | D02 | Rapid wheel input previews latest target on main slider |
 | D03 | One committed seek after approximately 150 ms idle |
 | D04 | Playing resumes, paused/stopped behavior remains consistent |
 | D05 | Top/bottom first/last timed line; untimed line and no movement behavior |
-| D06 | Double-click text seeks; left selection/copy and middle press behavior |
+| D06 | Double-click text does not seek; left selection/copy and middle press behavior |
 | D07 | Hide/close, Stop, Space and main slider/keyboard supersede pending seek correctly |
 | D08 | Switch track, refresh, open/settings dialogs and close app during pending navigation |
 | E01 | Two tabs, original audio settings controls and footer fit |
@@ -522,3 +522,7 @@ The user requested about half the manual wheel navigation span. The subsequent c
 #### Further reduction of wheel sensitivity (pending)
 
 The user reported the 50% setting at `ba1f351` still moves too far and requested another 50% reduction. The normalized wheel displacement is now 25% of the original (half of the preceding setting). Updated the browser assertion for pixel, line and page wheel modes; continuous follow, visual-line seek selection and 150 ms debounce remain unchanged. Fresh CI and local wheel acceptance pending. No merge authorized.
+
+### Reader controls and close-before-minimize (pending)
+
+User requested no reader minimize/maximize buttons (retain resize/close), native scrollbar movement to preview/seek like wheel, removal of double-click seek, and actual reader close before main minimize. Native SC_MINIMIZE closes/disposes reader synchronously before default minimize; StateChanged closes as fallback for programmatic/shell paths. Restoring owner leaves reader closed until the user opens it. Scroll events distinguish actual external movement from programmatic scrollTo (including clamping/rounding), reuse center-line preview and 150 ms debounce; automatic scroll does not seek. Wheel remains 25%. New WebView2 and native lifecycle assertions are pending CI and Windows visual acceptance, including real scrollbar drag, track clicks, ongoing playback and residual shadow. No merge authorized.
