@@ -779,8 +779,19 @@ public partial class MainWindow : Window
 
     private void RefreshProgress()
     {
-        if (scriptWindow?.IsVisible == true && !closing) scriptWindow.SetAudio(loadedTrack?.FilePath);
-        if (dragging || closing) return;
+        if (closing) return;
+        bool scriptVisible = scriptWindow?.IsVisible == true && WindowState != WindowState.Minimized;
+        var interval = TimeSpan.FromMilliseconds(scriptVisible && player.IsPlaying ? 25 : 100);
+        if (timer.Interval != interval) timer.Interval = interval;
+        if (scriptVisible)
+        {
+            scriptWindow!.SetAudio(loadedTrack?.FilePath);
+            double position = player.GetCurrentTime().TotalSeconds;
+            bool reset = !player.IsLoaded || (!player.IsPlaying && !player.IsPaused &&
+                (position <= 0 || position >= player.GetDuration().TotalSeconds));
+            scriptWindow.UpdatePlayback(position, player.IsPlaying, reset);
+        }
+        if (dragging) return;
         double duration = player.GetDuration().TotalSeconds;
         ProgressSlider.Maximum = Math.Max(duration, 0.001);
         ProgressSlider.Value = Math.Min(player.GetCurrentTime().TotalSeconds, duration);
@@ -846,7 +857,11 @@ public partial class MainWindow : Window
         {
             PositionScriptWindow();
             scriptWindow.Show();
-            scriptWindow.SetAudio(loadedTrack?.FilePath);
+            RefreshProgress();
+            double position = player.GetCurrentTime().TotalSeconds;
+            scriptWindow.UpdatePlayback(position, player.IsPlaying, !player.IsLoaded ||
+                (!player.IsPlaying && !player.IsPaused && (position <= 0 ||
+                position >= player.GetDuration().TotalSeconds)), immediate: true);
         }
     }
 

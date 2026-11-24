@@ -1,19 +1,139 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>
-html{background:#F8F8F6;color:#283747;font:18px/1.7 Georgia,"Segoe UI",serif}body{margin:16px;overflow-wrap:break-word}h1{font-size:1.2em;text-align:center}p{margin:0 0 16px}#status{color:#687783;font:14px "Segoe UI",sans-serif}
+html{background:#F8F8F6;color:#283747;font:18px/1.7 Georgia,"Segoe UI",serif;scroll-behavior:auto;overflow-anchor:none}
+body{margin:16px;overflow-wrap:break-word}h1{font-size:1.2em;text-align:center}p{margin:0 0 16px;position:relative}
+#status{color:#687783;font:14px "Segoe UI",sans-serif}
+.paint{position:absolute;inset:0;color:#B64550;pointer-events:none;user-select:none}
+.clips{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
 </style></head><body><div id="status"></div><h1 id="title" hidden></h1><main id="text"></main><script>
+"use strict";
 const title=document.getElementById('title'), body=document.getElementById('text'), status=document.getElementById('status');
-chrome.webview.addEventListener('message',({data})=>{
+const ns='http://www.w3.org/2000/svg';
+const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
+const progress=(t,start,end)=>clamp((t-start)/(end-start),0,1);
+const scrollTarget=(y,height,total)=>clamp(y-height/2,0,Math.max(0,total-height));
+const cosine=u=>(1-Math.cos(Math.PI*clamp(u,0,1)))/2;
+let geometry=[],lines=[],playback={position:0,playing:false,reset:true},activeLine=null;
+let animation=0,measureFrame=0,lastTarget=null,previousPosition=null;
+function cancelAnimation(){if(animation)cancelAnimationFrame(animation);animation=0;lastTarget=null;}
+function moveTo(target,immediate){
+  if(immediate){cancelAnimation();window.scrollTo(0,target);return;}
+  if(lastTarget===target && animation)return;
+  if(Math.abs(window.scrollY-target)<0.5){cancelAnimation();return;}
+  cancelAnimation();lastTarget=target;
+  const from=window.scrollY,begin=performance.now();
+  function step(now){
+    const u=clamp((now-begin)/50,0,1);
+    window.scrollTo(0,from+(target-from)*cosine(u));
+    if(u<1)animation=requestAnimationFrame(step);else{animation=0;lastTarget=null;}
+  }
+  animation=requestAnimationFrame(step);
+}
+function render(data){
+  cancelAnimation();geometry=[];lines=[];activeLine=null;previousPosition=null;
   title.textContent=data.article?.title??'';title.hidden=!title.textContent;
   status.textContent=data.message??'';body.replaceChildren();window.scrollTo(0,0);
-  for(const paragraph of data.article?.paragraphs??[]){
+  for(const [pi,paragraph] of (data.article?.paragraphs??[]).entries()){
     const p=document.createElement('p');
     for(const [i,sentence] of paragraph.sentences.entries()){
-      if(i)p.append(' ');
-      const span=document.createElement('span');span.textContent=sentence.text;p.append(span);
+      const raw=sentence.text;
+      if(i && !/\s$/u.test(paragraph.sentences[i-1].text) && !/^\s/u.test(raw))p.append(' ');
+      const span=document.createElement('span');span.className='sentence';
+      let cursor=0;
+      for(const unit of sentence.timedUnits){
+        if(!unit.canColor || unit.offset<cursor || unit.length<=0 ||
+          raw.slice(unit.offset,unit.offset+unit.length)!==unit.text)continue;
+        span.append(raw.slice(cursor,unit.offset));
+        const timed=document.createElement('span');timed.className='timed';
+        timed.textContent=unit.text;timed.dataset.start=unit.start;timed.dataset.end=unit.end;
+        span.append(timed);cursor=unit.offset+unit.length;
+      }
+      span.append(raw.slice(cursor));p.append(span);
     }
-    body.append(p);
+    const paint=document.createElement('span');paint.className='paint';paint.setAttribute('aria-hidden','true');
+    for(const child of [...p.childNodes])paint.append(child.cloneNode(true));
+    const svg=document.createElementNS(ns,'svg');svg.setAttribute('class','clips');svg.setAttribute('aria-hidden','true');
+    const clip=document.createElementNS(ns,'clipPath');clip.id='clip-'+pi;clip.setAttribute('clipPathUnits','userSpaceOnUse');
+    svg.append(clip);paint.style.clipPath='url(#'+clip.id+')';
+    p.append(paint,svg);body.append(p);
   }
+  scheduleMeasure();
+}
+function scheduleMeasure(){
+  if(!measureFrame)measureFrame=requestAnimationFrame(()=>{measureFrame=0;measure();});
+}
+function measure(){
+  cancelAnimation();geometry=[];lines=[];activeLine=null;
+  const y=window.scrollY;
+  function lineFor(rect){
+    const cy=rect.top+y+rect.height/2;
+    let line=lines.find(l=>Math.abs(l.y-cy)<2);
+    if(!line){line={y:cy,first:null};lines.push(line);}
+    return line;
+  }
+  for(const p of body.querySelectorAll('p')){
+    const paint=p.querySelector(':scope > .paint'),clip=p.querySelector('clipPath');
+    clip.replaceChildren();const base=paint.getBoundingClientRect();
+    // Measure untimed text too, including lines containing no timed units.
+    for(const sentence of p.querySelectorAll(':scope > .sentence')){
+      const range=document.createRange();range.selectNodeContents(sentence);
+      for(const rect of range.getClientRects())if(rect.width>0.25&&rect.height>0.25)lineFor(rect);
+    }
+    for(const span of p.querySelectorAll(':scope > .sentence .timed')){
+      const start=Number(span.dataset.start),end=Number(span.dataset.end);
+      const range=document.createRange();range.selectNodeContents(span);
+      const rects=[...range.getClientRects()].filter(r=>r.width>0.25&&r.height>0.25).sort((a,b)=>a.top-b.top||a.left-b.left);
+      const segments=rects.map(r=>{
+        const line=lineFor(r);if(line.first===null)line.first=start;
+        const element=document.createElementNS(ns,'rect');
+        element.setAttribute('x',r.left-base.left);element.setAttribute('y',r.top-base.top-1);
+        element.setAttribute('width','0');element.setAttribute('height',r.height+2);clip.append(element);
+        return {element,width:r.width,line,painted:0};
+      });
+      if(segments.length)geometry.push({start,end,segments,total:segments.reduce((sum,s)=>sum+s.width,0),last:NaN});
+    }
+  }
+  lines.sort((a,b)=>a.y-b.y);
+  update(playback,true);
+}
+function update(state,immediate=false){
+  playback=state;
+  const t=state.position;
+  let current=null,latest=-Infinity;
+  for(const unit of geometry){
+    const fraction=state.reset?0:progress(t,unit.start,unit.end);
+    if(unit.last!==fraction){
+      unit.last=fraction;let remaining=fraction*unit.total;
+      for(const seg of unit.segments){
+        const width=clamp(remaining,0,seg.width);
+        if(width!==seg.painted){seg.element.setAttribute('width',width);seg.painted=width;}
+        remaining-=seg.width;
+      }
+    }
+    // Retain the preceding line through timestamp gaps; a wrapped unit
+    // follows the fragment reached by its cumulative painted width.
+    if(!state.reset && t>=unit.start && unit.start>=latest){
+      latest=unit.start;let remaining=fraction*unit.total;
+      current=unit.segments.at(-1).line;
+      for(const seg of unit.segments){
+        if(remaining<seg.width){current=seg.line;break;}remaining-=seg.width;
+      }
+    }
+  }
+  const jumped=previousPosition!==null && (t<previousPosition || t-previousPosition>0.35);
+  previousPosition=t;
+  if(state.reset){activeLine=null;moveTo(0,true);return;}
+  if(!current)return;
+  if(current!==activeLine || immediate || jumped){
+    activeLine=current;
+    moveTo(scrollTarget(current.y,window.innerHeight,document.documentElement.scrollHeight),immediate||jumped||!state.playing);
+  }
+}
+chrome.webview.addEventListener('message',({data})=>{
+  if(data.type==='article')render(data);
+  else if(data.type==='playback')update(data,data.immediate===true);
 });
+window.addEventListener('resize',scheduleMeasure);
+document.fonts.ready.then(scheduleMeasure);
 chrome.webview.postMessage('ready');
 </script></body></html>

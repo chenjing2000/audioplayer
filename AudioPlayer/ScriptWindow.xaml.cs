@@ -11,6 +11,8 @@ public partial class ScriptWindow : Window
     private bool ownerClosing;
     private bool initialized;
     private bool ready;
+    private (double Position, bool Playing, bool Reset)? playback;
+    private (double Position, bool Playing, bool Reset)? sentPlayback;
     private string? audioPath;
     private int generation;
     private ScriptArticle? article;
@@ -73,6 +75,7 @@ public partial class ScriptWindow : Window
         audioPath = path;
         int request = ++generation;
         article = null;
+        sentPlayback = null;
         message = path is null ? "尚未加载原文" : "正在加载原文…";
         SendArticle();
         if (path is null) return;
@@ -93,10 +96,31 @@ public partial class ScriptWindow : Window
         SendArticle();
     }
 
+    internal void UpdatePlayback(double position, bool playing, bool reset, bool immediate = false)
+    {
+        playback = (position, playing, reset);
+        if (!ready || ownerClosing || !IsVisible || article is null) return;
+        if (!immediate && sentPlayback == playback) return;
+        sentPlayback = playback;
+        Post(new { type = "playback", position, playing, reset, immediate });
+    }
+
+    private void Post(object payload)
+    {
+        try { Reader.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(payload, JsonOptions)); }
+        catch (Exception ex) when (ex is InvalidOperationException or System.Runtime.InteropServices.COMException)
+        {
+            if (!ownerClosing) ShowFailure("原文阅读器通信失败：" + ex.Message);
+        }
+    }
+
     private void SendArticle()
     {
-        if (ready && !ownerClosing)
-            Reader.CoreWebView2.PostWebMessageAsJson(JsonSerializer.Serialize(new { article, message }, JsonOptions));
+        if (!ready || ownerClosing) return;
+        Post(new { type = "article", article, message });
+        sentPlayback = null;
+        if (playback is { } current)
+            UpdatePlayback(current.Position, current.Playing, current.Reset, immediate: true);
     }
 
     private void ShowFailure(string text)

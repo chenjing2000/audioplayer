@@ -23,6 +23,41 @@ float[] Signal(int soundBefore, int silence, int soundAfter)
     => Enumerable.Repeat(0.5f, soundBefore).Concat(new float[silence]).Concat(Enumerable.Repeat(0.5f, soundAfter)).ToArray();
 
 
+Check("Script discovery uses filetype and preserves aligned and untimed text", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "script-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        File.WriteAllText(Path.Combine(folder, "a.json"), "{broken");
+        File.WriteAllText(Path.Combine(folder, "b.json"), """{"filetype":"passage"}""");
+        string path = Path.Combine(folder, "unrelated-name.json");
+        string source = """{"filetype":"script","title":"","paragraphs":[[{"text":"Go go again.","timed_units":[["Go",0,0.5],["go",0.5,1],["again.",null,null],["missing",1,2]]}]]}""";
+        File.WriteAllText(path, source);
+        var article = ScriptContent.Find(Path.Combine(folder, "audio.wav"))!;
+        var sentence = article.Paragraphs[0].Sentences[0];
+        Assert(article.Title == "" && sentence.Text == "Go go again.");
+        Assert(sentence.TimedUnits[0].Offset == 0 && sentence.TimedUnits[1].Offset == 3);
+        Assert(sentence.TimedUnits[0].CanColor && !sentence.TimedUnits[2].CanColor && !sentence.TimedUnits[3].CanColor);
+        Assert(File.ReadAllText(path) == source);
+        File.Delete(path);
+        Assert(ScriptContent.Find(Path.Combine(folder, "audio.wav")) is null);
+    }
+    finally { Directory.Delete(folder, true); }
+});
+Check("Script parser rejects invalid intervals and accepts empty timed units", () =>
+{
+    foreach (string pair in new[] { "null,1", "1,1", "2,1", "-1,1" })
+    {
+        using var invalid = System.Text.Json.JsonDocument.Parse(
+            "{\"filetype\":\"script\",\"title\":\"\",\"paragraphs\":[[{\"text\":\"a\",\"timed_units\":[[\"a\"," + pair + "]]}]]}");
+        try { ScriptContent.Parse(invalid.RootElement); throw new Exception("Invalid interval accepted"); }
+        catch (InvalidDataException) { }
+    }
+    using var valid = System.Text.Json.JsonDocument.Parse("""{"filetype":"script","title":"A","paragraphs":[[{"text":"a","timed_units":[]}]]}""");
+    Assert(ScriptContent.Parse(valid.RootElement).Paragraphs[0].Sentences[0].TimedUnits.Count == 0);
+});
+
 Check("Settings initialize beside executable, persist and preserve invalid files", () =>
 {
     string folder = Path.Combine(AppContext.BaseDirectory, "settings-" + Guid.NewGuid().ToString("N"));
