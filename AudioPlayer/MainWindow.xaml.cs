@@ -477,7 +477,7 @@ public partial class MainWindow : Window
 
     internal void AddTrimmedOutput(string path)
     {
-        if (currentFolder is not string root || !AudioLibrary.IsWithinFolder(root, path)
+        if (currentFolder is not string root || !AudioLibrary.IsPlaylistPath(root, path)
             || tracks.Any(track => string.Equals(track.FilePath, path, StringComparison.OrdinalIgnoreCase)))
             return;
         var added = AudioLibrary.ReadTrack(path);

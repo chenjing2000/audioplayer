@@ -458,6 +458,31 @@ try
         Assert(tooltipTrack.RowToolTip == fixture);
     });
 
+    Check("Recursive scan and restore skip exact audio subdirectories", () =>
+    {
+        string root = Path.Combine(fixture, "exclusion");
+        string[] excluded = { Path.Combine(root, "audio", "word.mp3"),
+            Path.Combine(root, "Book", "Audio", "deep", "word.m4a") };
+        string[] included = { Path.Combine(root, "audio.mp3"),
+            Path.Combine(root, "AudioBooks", "book.wav"),
+            Path.Combine(root, "Book", "audio-files", "lesson.mp3") };
+        try
+        {
+            foreach (string path in excluded.Concat(included))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path, "metadata fixture");
+            }
+            var expected = included.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            Assert(AudioLibrary.LoadFolder(root).Select(t => t.FilePath).ToHashSet().SetEquals(expected));
+            Assert(AudioLibrary.LoadPaths(root, excluded.Concat(included), restore: true)
+                .Select(t => t.FilePath).ToHashSet().SetEquals(expected));
+            Assert(excluded.All(path => !AudioLibrary.IsPlaylistPath(root, path)));
+            Assert(AudioLibrary.LoadFolder(Path.Combine(root, "audio")).Count == 1);
+        }
+        finally { Directory.Delete(root, true); }
+    });
+
     Check("Playlist JSON uses executable stem, preserves full paths and replaces safely", () =>
     {
         string path = PlaylistStore.GetFilePath(Path.Combine(fixture, "Renamed Player.exe"));

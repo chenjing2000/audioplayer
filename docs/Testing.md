@@ -268,3 +268,7 @@ The user explicitly confirmed all seven focused Windows acceptance checks passed
 7. Republish while preserving the existing playlist and settings.
 
 This records user-reported manual acceptance, not new local automated test counts. The sixteen prior checks and seven focused checks total 23 accepted checks across successive revisions, not a complete rerun on one commit. Dedicated real Windows directory-access-denial testing and previously deferred real-media/failure-path cases are not claimed by this acceptance. PR #15 remains unmerged at the user's request.
+
+### PR #15 pronunciation directory exclusion
+
+Added a Core regression for nested exact-name `audio` exclusions, case-insensitive matching, similarly named directories, ordinary `audio.mp3` files, saved-path filtering, and explicit root selection. New CI and manual acceptance pending.

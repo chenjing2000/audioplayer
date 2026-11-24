@@ -9,12 +9,45 @@ public static class AudioLibrary
         string root = Path.GetFullPath(folderPath);
         var options = new EnumerationOptions
         {
-            RecurseSubdirectories = true,
+            RecurseSubdirectories = false,
             IgnoreInaccessible = false,
             AttributesToSkip = FileAttributes.ReparsePoint
         };
         cancellation.ThrowIfCancellationRequested();
-        return LoadPaths(root, Directory.EnumerateFiles(root, "*", options), cancellation);
+        return LoadPaths(root, EnumerateMediaPaths(root, options, cancellation), cancellation);
+    }
+
+    private static IEnumerable<string> EnumerateMediaPaths(string root, EnumerationOptions options,
+        CancellationToken cancellation)
+    {
+        var pending = new Stack<string>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            string folder = pending.Pop();
+            foreach (string child in Directory.EnumerateDirectories(folder, "*", options))
+            {
+                cancellation.ThrowIfCancellationRequested();
+                if (!IsExcludedDirectoryName(Path.GetFileName(child))) pending.Push(child);
+            }
+            foreach (string file in Directory.EnumerateFiles(folder, "*", options))
+            {
+                cancellation.ThrowIfCancellationRequested();
+                yield return file;
+            }
+        }
+    }
+
+    private static bool IsExcludedDirectoryName(string name)
+        => string.Equals(name, "audio", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool IsPlaylistPath(string root, string path)
+    {
+        if (!IsWithinFolder(root, path) || !IsSupportedFile(path) || IsTrimTemporaryFile(path))
+            return false;
+        string[] parts = Path.GetRelativePath(root, path).Split(Path.DirectorySeparatorChar);
+        return !parts.Take(parts.Length - 1).Any(IsExcludedDirectoryName);
     }
 
     internal static List<AudioTrack> LoadPaths(string root, IEnumerable<string> paths,
@@ -25,8 +58,7 @@ public static class AudioLibrary
         {
             cancellation.ThrowIfCancellationRequested();
             string path = Path.GetFullPath(candidate);
-            if (IsWithinFolder(root, path) && IsSupportedFile(path) && !IsTrimTemporaryFile(path)
-                && (!restore || IsRestorablePath(root, path, cancellation)))
+            if (IsPlaylistPath(root, path) && (!restore || IsRestorablePath(root, path, cancellation)))
                 files.Add(path);
         }
         cancellation.ThrowIfCancellationRequested();
