@@ -722,6 +722,29 @@ internal static class UiChecks
                                 """);
                             Assert(followFrames == "true", "Reader frame clock advances continuously, is bounded and cancels on pause");
 
+                            string wheelSensitivity = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const originalScroll=window.scrollTo;
+                                  const before=window.scrollY;
+                                  let target;
+                                  try {
+                                    // Intercept the actual wheel handler's requested displacement,
+                                    // avoiding document-boundary clamping and host seek side effects.
+                                    window.scrollTo=(_,y)=>{target=y;};
+                                    const lineHeight=parseFloat(getComputedStyle(document.documentElement).lineHeight);
+                                    const cases=[[120,0,60],[-120,0,-60],[2,1,lineHeight],[-2,1,-lineHeight],[1,2,window.innerHeight/2]];
+                                    return cases.every(([deltaY,deltaMode,expected])=>{
+                                      target=undefined;
+                                      const event=new WheelEvent('wheel',{deltaY,deltaMode,cancelable:true});
+                                      window.dispatchEvent(event);
+                                      return event.defaultPrevented && Math.abs(target-before-expected)<0.001;
+                                    });
+                                  } finally {window.scrollTo=originalScroll;}
+                                })()
+                                """);
+                            Assert(wheelSensitivity == "true", "Reader wheel displacement is halved for pixel, line and page deltas");
+
                             // Keep the synthetic article isolated from MainWindow's playback timer
                             // until the rendering assertions finish. No real audio is loaded here.
                             typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!

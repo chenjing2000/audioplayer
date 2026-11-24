@@ -436,7 +436,7 @@ On Windows, close running AudioPlayer, switch to the feature branch and pull fas
 | C06 | Continuous automatic scrolling within and across lines, no per-line dwell |
 | C07 | Pause/resume, forward/backward seek, Stop and natural end |
 | C08 | Resize/font changes recalculate layout without audio seek |
-| D01 | Wheel both directions directly scrolls, no auto animation |
+| D01 | Wheel both directions directly scrolls at 50% of prior displacement, no auto animation |
 | D02 | Rapid wheel input previews latest target on main slider |
 | D03 | One committed seek after approximately 150 ms idle |
 | D04 | Playing resumes, paused/stopped behavior remains consistent |
@@ -500,6 +500,21 @@ At `f900adb`, [push CI](https://github.com/chenjing2000/audioplayer/actions/runs
 
 Automatic visual-line follow now uses a 180 ms half-cosine animation rather than 50 ms; the existing frame-driven interpolation, progressive coloring and 150 ms wheel-seek debounce remain unchanged. A browser assertion drives synthetic frame timestamps and checks intermediate displacement and the exact final target. That implementation was superseded by continuous time-driven follow below; no visual acceptance was recorded. Recheck C06, C07, D01–D04, F02 and rapid line changes; previous manual passes do not establish acceptance of the new duration. No merge authorized.
 
-### Continuous audio-time-driven scroll (pending)
+### Continuous audio-time-driven scroll (accepted, focused Windows checks)
 
-The user requested continuously moving text rather than per-line animations with dwell. The reader now interpolates document Y between strictly increasing visual-line timestamps and uses requestAnimationFrame with bounded 50 ms clock extrapolation between host samples. Natural scroll boundaries, paused/reset states, direct wheel/150 ms debounced seek, and confirmed-clock coloring are retained. New synthetic WebView2 assertions cover intermediate offsets across line boundaries, irregular timestamps, limits and frame lifecycle. Recheck C03–C08, D01–D07 and F02/F03: uninterrupted in-line motion, speed changes with line duration, pause/resume, seek, resize, wheel interaction and long recordings. No real Windows visual acceptance or merge authorization yet.
+The user requested continuously moving text rather than per-line animations with dwell. The reader now interpolates document Y between strictly increasing visual-line timestamps and uses requestAnimationFrame with bounded 50 ms clock extrapolation between host samples. Natural scroll boundaries, paused/reset states, direct wheel/150 ms debounced seek, and confirmed-clock coloring are retained. New synthetic WebView2 assertions cover intermediate offsets across line boundaries, irregular timestamps, limits and frame lifecycle. Recheck C03–C08, D01–D07 and F02/F03: uninterrupted in-line motion, speed changes with line duration, pause/resume, seek, resize, wheel interaction and long recordings. The user subsequently confirmed the eight focused Windows checks below; no full-matrix acceptance or merge authorization.
+
+#### User-reported Windows acceptance of continuous scrolling (2026-11-24)
+
+Baseline: continuous-scroll revision `8cc723e` (user did not provide a separate local SHA or automated test log). The user confirmed all eight focused manual checks:
+
+1. Normal playback continuously scrolls upward without obvious per-line dwell.
+2. Scroll speed responds to speech-rate changes.
+3. No obvious jumps across visual lines.
+4. Scrolling remains synchronized with progressive coloring.
+5. Pause stops scrolling immediately; resume continues scrolling.
+6. Manual and automatic scrolling hand off correctly.
+7. Forward/backward seek and Stop behave correctly.
+8. Long IELTS listening material plays smoothly.
+
+The user requested about half the manual wheel navigation span. The subsequent change scales normalized wheel displacement to 50% in both directions, without changing the center-line timestamp selection, 150 ms debounce, or automatic-follow algorithm. Because seek targets are discrete visual lines and speech timing varies, the time span is approximate rather than exactly halved. A synthetic WebView2 assertion checks pixel/line/page wheel modes and direction. Fresh CI and focused Windows wheel sensitivity regression remain pending; prior acceptance does not establish the new wheel behavior. The separate minimize-shadow visual check remains unresolved. No merge authorized.
