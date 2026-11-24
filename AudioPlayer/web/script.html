@@ -45,7 +45,7 @@ window.addEventListener('wheel',event=>{
   cancelAnimation();
   const before=window.scrollY;
   const delta=event.deltaY*(event.deltaMode===1?parseFloat(getComputedStyle(document.documentElement).lineHeight):event.deltaMode===2?window.innerHeight:1);
-  window.scrollTo(0,before+delta*0.5);
+  window.scrollTo(0,before+delta*0.25);
   if(Math.abs(window.scrollY-before)<0.01)return;
   const line=wheelLine();
   if(line?.first!==null && line?.first!==undefined)preview(line);

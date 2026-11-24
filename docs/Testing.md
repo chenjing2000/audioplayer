@@ -436,7 +436,7 @@ On Windows, close running AudioPlayer, switch to the feature branch and pull fas
 | C06 | Continuous automatic scrolling within and across lines, no per-line dwell |
 | C07 | Pause/resume, forward/backward seek, Stop and natural end |
 | C08 | Resize/font changes recalculate layout without audio seek |
-| D01 | Wheel both directions directly scrolls at 50% of prior displacement, no auto animation |
+| D01 | Wheel both directions directly scrolls at 25% of original displacement, no auto animation |
 | D02 | Rapid wheel input previews latest target on main slider |
 | D03 | One committed seek after approximately 150 ms idle |
 | D04 | Playing resumes, paused/stopped behavior remains consistent |
@@ -518,3 +518,7 @@ Baseline: continuous-scroll revision `8cc723e` (user did not provide a separate 
 8. Long IELTS listening material plays smoothly.
 
 The user requested about half the manual wheel navigation span. The subsequent change scales normalized wheel displacement to 50% in both directions, without changing the center-line timestamp selection, 150 ms debounce, or automatic-follow algorithm. Because seek targets are discrete visual lines and speech timing varies, the time span is approximate rather than exactly halved. A synthetic WebView2 assertion checks pixel/line/page wheel modes and direction. Fresh CI and focused Windows wheel sensitivity regression remain pending; prior acceptance does not establish the new wheel behavior. The separate minimize-shadow visual check remains unresolved. No merge authorized.
+
+#### Further reduction of wheel sensitivity (pending)
+
+The user reported the 50% setting at `ba1f351` still moves too far and requested another 50% reduction. The normalized wheel displacement is now 25% of the original (half of the preceding setting). Updated the browser assertion for pixel, line and page wheel modes; continuous follow, visual-line seek selection and 150 ms debounce remain unchanged. Fresh CI and local wheel acceptance pending. No merge authorized.

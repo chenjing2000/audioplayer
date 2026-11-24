@@ -733,7 +733,7 @@ internal static class UiChecks
                                     // avoiding document-boundary clamping and host seek side effects.
                                     window.scrollTo=(_,y)=>{target=y;};
                                     const lineHeight=parseFloat(getComputedStyle(document.documentElement).lineHeight);
-                                    const cases=[[120,0,60],[-120,0,-60],[2,1,lineHeight],[-2,1,-lineHeight],[1,2,window.innerHeight/2]];
+                                    const cases=[[120,0,30],[-120,0,-30],[2,1,lineHeight/2],[-2,1,-lineHeight/2],[1,2,window.innerHeight/4]];
                                     return cases.every(([deltaY,deltaMode,expected])=>{
                                       target=undefined;
                                       const event=new WheelEvent('wheel',{deltaY,deltaMode,cancelable:true});
@@ -743,7 +743,7 @@ internal static class UiChecks
                                   } finally {window.scrollTo=originalScroll;}
                                 })()
                                 """);
-                            Assert(wheelSensitivity == "true", "Reader wheel displacement is halved for pixel, line and page deltas");
+                            Assert(wheelSensitivity == "true", "Reader wheel displacement is quartered for pixel, line and page deltas");
 
                             // Keep the synthetic article isolated from MainWindow's playback timer
                             // until the rendering assertions finish. No real audio is loaded here.

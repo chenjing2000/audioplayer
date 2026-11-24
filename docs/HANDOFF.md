@@ -52,6 +52,10 @@ At the user's request, automatic visual-line follow now uses 180 ms half-cosine 
 
 The user clarified that subtitles should continuously move during playback, not ease between lines and stop. Replaced the 180 ms line-transition animation with an audio-time-to-position trajectory interpolated between visual-line anchors; frame callbacks extrapolate the host clock for at most 50 ms. Kept direct wheel navigation, 150 ms debounce, confirmed-clock coloring, natural bounds, pause/reset and immediate discontinuity handling. Replaced the prior animation assertion with continuous-offset and frame lifecycle checks. The feature validation workflow for `8cc723e` completed successfully; the user reported all eight focused Windows checks passed (see Testing). No separate local SHA or automated log was supplied. The separate minimization-shadow visual check is still unresolved. No merge authorized.
 
-## Reduced wheel sensitivity (pending verification)
+## Initial wheel sensitivity reduction (superseded)
 
 At the user's request, the original wheel displacement is multiplied by 0.5 after pixel/line/page normalization. Center-line seek, debounce (150 ms), direct wheel motion and continuous automatic scrolling are unchanged; elapsed-time navigation is approximate due to discrete lines and speech timing. A browser assertion checks both directions and wheel modes. New CI and Windows wheel acceptance remain pending. No merge authorized.
+
+## Further wheel sensitivity reduction (pending verification)
+
+The user found the 50% wheel displacement at `ba1f351` still too large. The normalized wheel multiplier is now 0.25 (another 50% reduction); automatic follow, line selection and 150 ms debounce are unchanged. The existing wheel regression assertion now checks quarter displacement. New CI and Windows acceptance are pending; no merge authorized.
