@@ -630,14 +630,14 @@ internal static class UiChecks
                                 await Task.Delay(100);
                             Assert(readerWindow.ReaderReady, "Embedded WebView2 reader completes ready handshake: " + readerWindow.ReaderFailure);
                             var reader = (Microsoft.Web.WebView2.Wpf.WebView2)readerWindow.FindName("Reader");
-                            string content = "";
+                            string renderedScriptText = "";
                             while (DateTime.UtcNow < deadline)
                             {
-                                content = await reader.CoreWebView2.ExecuteScriptAsync("document.querySelector('#text').textContent");
-                                if (content.Contains("Hello, world.")) break;
+                                renderedScriptText = await reader.CoreWebView2.ExecuteScriptAsync("document.querySelector('#text').textContent");
+                                if (renderedScriptText.Contains("Hello, world.")) break;
                                 await Task.Delay(100);
                             }
-                            Assert(content.Contains("Hello, world."), "Embedded WebView2 reader renders discovered Script JSON");
+                            Assert(renderedScriptText.Contains("Hello, world."), "Embedded WebView2 reader renders discovered Script JSON");
                         }
                         finally
                         {
