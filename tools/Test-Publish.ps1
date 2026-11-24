@@ -38,10 +38,13 @@ function Run-Case($name, [scriptblock]$body) {
     $settings = Join-Path $dist $settingsName
     [IO.File]::WriteAllText($release, 'old-release')
     [IO.File]::WriteAllText($settings, 'user-settings')
+    $playlist = Join-Path $dist 'AudioPlayer.playlist.json'
+    [IO.File]::WriteAllText($playlist, 'user-playlist')
     [IO.File]::WriteAllText((Join-Path $dist 'user-notes.txt'), 'keep-me')
     $global:publishTestBuildMode = 'success'
     try {
         & $body
+        Check ((Get-Content -LiteralPath $playlist -Raw) -eq 'user-playlist') 'Playlist changed.'
         Check ((Get-Content -LiteralPath (Join-Path $dist 'user-notes.txt') -Raw) -eq 'keep-me') 'User files changed.'
         Check (@(Get-ChildItem -LiteralPath $dist -Directory -Filter '.publish-*').Count -eq 0) 'Staging directory leaked.'
         $script:passed++

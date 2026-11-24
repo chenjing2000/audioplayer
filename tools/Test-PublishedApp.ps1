@@ -21,7 +21,15 @@ try {
         if (-not (Test-Path -LiteralPath $setup -PathType Leaf)) { throw 'Missing FFmpeg-Setup.txt.' }
         Copy-Item -LiteralPath $setup -Destination (Join-Path $appDirectory 'FFmpeg-Setup.txt')
     }
-    Invoke-TestCheck 'Isolated renamed EXE and configuration location' {
+    Invoke-TestCheck 'Isolated renamed EXE and configuration and playlist location' {
+        $media = Join-Path $temporary 'media'
+        New-Item -ItemType Directory -Path $media | Out-Null
+        $playlist = Join-Path $appDirectory 'Renamed App.playlist.json'
+        $missingAudio = Join-Path $media 'missing.mp3'
+        $existingAudio = Join-Path $media 'existing.wav'
+        [IO.File]::WriteAllText($existingAudio, 'metadata error fixture')
+        @{ rootFolder = $media; files = @($missingAudio, $existingAudio) } |
+            ConvertTo-Json | Set-Content -LiteralPath $playlist -Encoding UTF8
         $script:publishedProcess = Start-Process -FilePath $exe -WorkingDirectory $workingDirectory -WindowStyle Hidden -PassThru
         $deadline = [DateTime]::UtcNow.AddSeconds(20)
         do {
@@ -32,6 +40,13 @@ try {
         $settings = Join-Path $appDirectory $settingsName
         while (-not (Test-Path -LiteralPath $settings) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 100 }
         Get-Content -LiteralPath $settings -Raw | ConvertFrom-Json | Out-Null
+        do {
+            Start-Sleep -Milliseconds 100
+            $saved = Get-Content -LiteralPath $playlist -Raw | ConvertFrom-Json
+        } while ($saved.files.Count -ne 1 -and [DateTime]::UtcNow -lt $deadline)
+        if ($saved.rootFolder -ne $media -or $saved.files.Count -ne 1 -or $saved.files[0] -ne $existingAudio) {
+            throw 'Renamed EXE did not restore and prune its own playlist.'
+        }
         if (@(Get-ChildItem -LiteralPath $workingDirectory -File).Count) { throw 'Application files followed the working directory.' }
         $script:publishedProcess.CloseMainWindow() | Out-Null
         if (-not $script:publishedProcess.WaitForExit(5000)) { throw 'The main window did not close cleanly.' }

@@ -495,6 +495,66 @@ try
         File.Delete(path);
     });
 
+    Check("Playlist save failure preserves prior JSON", () =>
+    {
+        string path = Path.Combine(fixture, "locked.playlist.json");
+        var store = new PlaylistStore(path);
+        store.Save(fixture, new[] { Path.Combine(fixture, "01.mp3") });
+        string old = File.ReadAllText(path);
+        using (var locked = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            bool rejected = false;
+            try { store.Save(null, Array.Empty<string>()); }
+            catch (IOException) { rejected = true; }
+            Assert(rejected);
+        }
+        Assert(File.ReadAllText(path) == old && !Directory.EnumerateFiles(fixture, "*.tmp").Any());
+        File.Delete(path);
+    });
+
+    Check("Restore skips missing files and directories posing as audio", () =>
+    {
+        string fake = Path.Combine(fixture, "folder.wav");
+        Directory.CreateDirectory(fake);
+        try
+        {
+            var restored = AudioLibrary.LoadPaths(fixture, new[]
+            {
+                Path.Combine(fixture, "absent.mp3"), fake, Path.Combine(fixture, "01.mp3")
+            }, restore: true);
+            Assert(restored.Count == 1 && restored[0].DisplayName == "01");
+        }
+        finally { Directory.Delete(fake); }
+    });
+
+    Check("Recursive scan and restore exclude directory junctions", () =>
+    {
+        string junction = Path.Combine(fixture, "junction");
+        string target = Path.Combine(fixture, "nested");
+        using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe",
+            $"/c mklink /J \"{junction}\" \"{target}\"") { UseShellExecute = false, CreateNoWindow = true })!;
+        process.WaitForExit();
+        Assert(process.ExitCode == 0, "Could not create junction fixture");
+        try
+        {
+            Assert(!AudioLibrary.LoadFolder(fixture).Any(t => t.FilePath.StartsWith(junction + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)));
+            Assert(AudioLibrary.LoadPaths(fixture, new[] { Path.Combine(junction, "4.mp3") }, restore: true).Count == 0);
+        }
+        finally { Directory.Delete(junction); }
+    });
+
+    Check("Recursive scan and restore honor cancellation", () =>
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        bool scanCanceled = false, restoreCanceled = false;
+        try { AudioLibrary.LoadFolder(fixture, cancellation.Token); }
+        catch (OperationCanceledException) { scanCanceled = true; }
+        try { AudioLibrary.LoadPaths(fixture, new[] { Path.Combine(fixture, "01.mp3") }, cancellation.Token, restore: true); }
+        catch (OperationCanceledException) { restoreCanceled = true; }
+        Assert(scanCanceled && restoreCanceled);
+    });
+
     Check("Folder scans ignore only in-progress trim audio", () =>
     {
         string id = Guid.NewGuid().ToString("N");
