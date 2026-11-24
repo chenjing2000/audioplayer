@@ -325,6 +325,29 @@ internal static class UiChecks
                     }
                     var excludedBox = (TextBox)settingsWindow.FindName("ExcludedFolderNamesTextBox");
                      Assert(excludedBox.Text == "" && excludedBox.TextAlignment == TextAlignment.Left && Grid.GetRow(excludedBox) == 6, "Exclusion field defaults empty below explanatory text");
+                     var help = (TextBlock)settingsWindow.FindName("HelpText");
+                     var exclusionLabel = (TextBlock)settingsWindow.FindName("ExcludedFolderNamesLabel");
+                     Assert(help.Text == "允许静音时长只影响裁剪，不影响左右跳转。", "Only essential help text remains");
+                     settingsWindow.ShowInTaskbar = false;
+                     settingsWindow.ShowActivated = false;
+                     settingsWindow.Left = -20000;
+                     settingsWindow.Top = -20000;
+                     settingsWindow.Show();
+                     settingsWindow.UpdateLayout();
+                     var layoutRoot = (Grid)excludedBox.Parent;
+                     Rect Bounds(FrameworkElement element) => element.TransformToAncestor(layoutRoot)
+                         .TransformBounds(new Rect(new Point(), element.RenderSize));
+                     Rect helpBounds = Bounds(help);
+                     Rect exclusionBounds = Bounds(excludedBox);
+                     Rect labelBounds = Bounds(exclusionLabel);
+                     Rect buttonsBounds = Bounds((Button)settingsWindow.FindName("OkButton"));
+                     Assert(helpBounds.Height > 0 && exclusionBounds.Height > 0 && labelBounds.Height > 0
+                         && helpBounds.Bottom <= Math.Min(exclusionBounds.Top, labelBounds.Top)
+                         && labelBounds.Right <= exclusionBounds.Left
+                         && Math.Max(exclusionBounds.Bottom, labelBounds.Bottom) <= buttonsBounds.Top
+                         && buttonsBounds.Bottom <= layoutRoot.ActualHeight + 0.5,
+                         "Settings help, exclusion controls and buttons do not overlap or overflow");
+                     settingsWindow.Hide();
                      var backwardBox = (TextBox)settingsWindow.FindName("BackwardStepTextBox");
                      var forwardBox = (TextBox)settingsWindow.FindName("ForwardStepTextBox");
                      Assert(backwardBox.Text == "5" && forwardBox.Text == "4" && backwardBox.MaxLength == 2 && forwardBox.MaxLength == 2, "Step defaults and length");

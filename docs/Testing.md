@@ -308,3 +308,27 @@ The user explicitly confirmed all 16 Windows manual acceptance checks passed on 
 16. Changing only the step parameters does not trigger silence reanalysis.
 
 These are user-reported Windows manual results, separate from hosted automated CI. No new local automated assertion counts or previously deferred failure-path coverage are claimed.
+
+### PR #16 follow-up: configurable folder exclusion
+
+At `885cf2c`, the user-provided Windows log reported 54 Core passes, 5 publishing safeguard passes, successful publish and 4 published-app checks. The UI suite stopped after 94 passes and one failure because the invalid-folder test left a warning Toast in the shared dialog. Test-only correction `398b33b` was then locally verified: 54 Core and 148 UI checks passed, zero failures; 5 publishing safeguards passed. Optional valid-MP3 metadata and audio-dependent UI checks were skipped because no local MP3 was available.
+
+The user confirmed 15 of 16 manual checks passed on the folder-exclusion implementation:
+
+1. Empty default.
+2. Empty list includes `audio` folders.
+3. Mixed ASCII separators and whitespace normalize correctly.
+4. Chinese separators and folder names work.
+5. Duplicate names and empty entries are removed.
+6. Invalid Windows folder names are rejected.
+7. Excluded subtrees are skipped recursively.
+8. Exact case-insensitive matching preserves similarly named folders.
+9. Explicit root is exempt.
+10. Saving settings does not automatically refresh or interrupt playback.
+11. Refresh applies new exclusions.
+12. Settings persist after restart.
+13. Startup restoration respects exclusions.
+14. Cancel and Restore Defaults work.
+15. Existing playback and shortcuts remain functional.
+
+The remaining layout check failed: the new exclusion controls overlap the explanatory text. The layout correction retains only the allowed-silence explanation, reserves space for it, and adds a geometry assertion. Focused Windows visual acceptance and CI for that correction are pending. The 16 earlier seek-shortcut checks and these 15 checks are cumulative across revisions, not a full rerun on the new layout. No merge authorization.

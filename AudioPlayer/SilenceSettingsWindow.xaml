@@ -35,7 +35,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="*" MinHeight="24"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -79,9 +79,9 @@
                  PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting"/>
 
         <TextBlock x:Name="HelpText" Grid.Row="5" Grid.ColumnSpan="5" Foreground="#6B7280" TextWrapping="Wrap"
-                   Text="默认：10 ms、300 ms、-45 dBFS、200 ms、2.0 s。允许静音时长只影响裁剪，不影响左右跳转。&#x0a;Ctrl + ← / →：按设定步长后退 / 前进。"/>
+                   VerticalAlignment="Top" Text="允许静音时长只影响裁剪，不影响左右跳转。"/>
 
-        <TextBlock Grid.Row="6" Text="需排除的文件夹" VerticalAlignment="Center" Margin="0,0,4,0"/>
+        <TextBlock Grid.Row="6" x:Name="ExcludedFolderNamesLabel" Text="需排除的文件夹" VerticalAlignment="Center" Margin="0,0,4,0"/>
         <TextBox x:Name="ExcludedFolderNamesTextBox" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="4"
                  Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" Padding="6,4"
                  TextAlignment="Left" VerticalContentAlignment="Center" AllowDrop="False"
