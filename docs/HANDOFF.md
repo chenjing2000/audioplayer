@@ -35,3 +35,7 @@ Follow root AGENTS.md and WindowsAppPlaybook; discuss new requirements before co
 ## Local acceptance update (2026-11-24)
 
 At `0ada0d9`, user logs confirmed 58 Core, 260 UI, 5 publishing safeguards and 4 published checks passed, including all actual WAV wheel assertions. Optional MP3 checks skipped. Manual published reader failed with “原文页面加载失败。”; do not mark reader accepted. The follow-up fixes local document navigation using the ReadArticles embedded-resource approach, reports diagnostic failures and adds actual reader integration coverage. Subsequent revision `6789ffd` passed the local rerun and focused manual acceptance, as recorded above. Remaining checklist cases and separate merge authorization are pending.
+
+## Follow-up review remediation (pending verification)
+
+After the 10 focused manual passes, source review identified modal cancellation, seek rejection and device-error restoration risks. The branch now preserves playback intent when opening either modal, cancels on device errors, resynchronizes rejected browser previews at commit, retries a failed reader on reopen, cancels obsolete script loads, and indexes started/active timestamp intervals. The changes require fresh CI and targeted Windows regression. Playback-device clock calibration and mixed-DPI monitor sizing remain measurement-dependent; no speculative changes to the audio engine or geometry have been made.

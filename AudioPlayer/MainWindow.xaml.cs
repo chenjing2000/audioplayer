@@ -17,7 +17,7 @@ public partial class MainWindow : Window
 {
     private readonly PlaybackEngine player = new();
     private readonly ObservableCollection<AudioTrack> tracks = new();
-    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(NormalProgressUpdateMs) };
     private SilenceSettings silenceSettings = new();
     private readonly SettingsStore settingsStore;
     private readonly PlaylistStore playlistStore;
@@ -55,7 +55,10 @@ public partial class MainWindow : Window
     private bool modalDialogOpen;
     private bool completionQueued;
     private ScriptWindow? scriptWindow;
-    private readonly DispatcherTimer scriptSeekTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
+    private const int ScriptSeekDebounceMs = 150;
+    private const int ReaderPlaybackUpdateMs = 25;
+    private const int NormalProgressUpdateMs = 100;
+    private readonly DispatcherTimer scriptSeekTimer = new() { Interval = TimeSpan.FromMilliseconds(ScriptSeekDebounceMs) };
     private double? scriptSeekTarget;
     private bool scriptWasPlaying;
     private bool scriptSeekCommitting;
@@ -167,11 +170,11 @@ public partial class MainWindow : Window
     {
         if (operationBusy || closing || modalDialogOpen) return;
         var dialog = new OpenFolderDialog { Title = "选择教材音频文件夹" };
-        await RestoreCanceledScriptSeekAsync();
-        if (closing) return;
         modalDialogOpen = true;
         try
         {
+            await RestoreCanceledScriptSeekAsync();
+            if (closing) return;
             if (dialog.ShowDialog(this) == true)
                 await RunActionAsync(() => LoadFolderAsync(dialog.FolderName));
         }
@@ -590,7 +593,8 @@ public partial class MainWindow : Window
     }
 
     private bool CanContinuePlayback()
-        => !closing && !operationBusy && !dragging && !navigating && !modalDialogOpen && scriptSeekTarget is null;
+        => !closing && !operationBusy && !dragging && !navigating && !modalDialogOpen &&
+           !scriptSeekCommitting && scriptSeekTarget is null;
 
     private void QueueNaturalCompletion()
     {
@@ -630,9 +634,13 @@ public partial class MainWindow : Window
         }
         var dialog = new SilenceSettingsWindow(silenceSettings) { Owner = this };
         bool? confirmed;
-        CancelScriptSeek();
         modalDialogOpen = true;
-        try { confirmed = dialog.ShowDialog(); }
+        try
+        {
+            await RestoreCanceledScriptSeekAsync();
+            if (closing) return;
+            confirmed = dialog.ShowDialog();
+        }
         finally { modalDialogOpen = false; QueueNaturalCompletion(); }
         if (confirmed != true) return;
 
@@ -724,7 +732,7 @@ public partial class MainWindow : Window
         Task work = RunCoreAsync(async () =>
         {
             if (!(toggleScriptPlayback && resume)) await action();
-            if (restoreScriptPlayback && resume && !closing && player.IsLoaded &&
+            if (restoreScriptPlayback && resume && !closing && player.LastError is null && player.IsLoaded &&
                 player.IsPaused && player.GetCurrentTime() < player.GetDuration())
                 await player.PlayAsync();
         });
@@ -754,14 +762,15 @@ public partial class MainWindow : Window
     {
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(() => Player_StateChanged(sender, e)); return; }
         if (closing) return;
-        UpdateControls();
-        RefreshProgress();
         if (player.LastError is null) displayedPlaybackError = null;
         else if (!ReferenceEquals(player.LastError, displayedPlaybackError))
         {
             displayedPlaybackError = player.LastError;
+            CancelScriptSeek();
             ToastMessages.Show("播放设备异常：" + player.LastError.Message, ToastLevel.Error);
         }
+        UpdateControls();
+        RefreshProgress();
     }
 
     private void UpdateControls()
@@ -801,21 +810,25 @@ public partial class MainWindow : Window
     {
         if (closing || scriptSeekTarget.HasValue || scriptSeekCommitting) return;
         bool scriptVisible = scriptWindow?.IsVisible == true && WindowState != WindowState.Minimized;
-        var interval = TimeSpan.FromMilliseconds(scriptVisible && player.IsPlaying ? 25 : 100);
+        var interval = TimeSpan.FromMilliseconds(scriptVisible && player.IsPlaying ? ReaderPlaybackUpdateMs : NormalProgressUpdateMs);
         if (timer.Interval != interval) timer.Interval = interval;
-        if (scriptVisible)
-        {
-            scriptWindow!.SetAudio(player.IsLoaded ? loadedTrack?.FilePath : null);
-            double position = player.GetCurrentTime().TotalSeconds;
-            bool reset = !player.IsLoaded || (!player.IsPlaying && !player.IsPaused &&
-                (position <= 0 || position >= player.GetDuration().TotalSeconds));
-            scriptWindow.UpdatePlayback(position, player.IsPlaying, reset);
-        }
+        if (scriptVisible) SynchronizeScript();
+        else if (!player.IsLoaded || loadedTrack is null) scriptWindow?.SetAudio(null);
         if (dragging) return;
         double duration = player.GetDuration().TotalSeconds;
         ProgressSlider.Maximum = Math.Max(duration, 0.001);
         ProgressSlider.Value = Math.Min(player.GetCurrentTime().TotalSeconds, duration);
         UpdateTimeText();
+    }
+
+    private void SynchronizeScript(bool immediate = false)
+    {
+        if (scriptWindow is null) return;
+        scriptWindow.SetAudio(player.IsLoaded ? loadedTrack?.FilePath : null);
+        double position = player.GetCurrentTime().TotalSeconds;
+        bool reset = !player.IsLoaded || (!player.IsPlaying && !player.IsPaused &&
+            (position <= 0 || position >= player.GetDuration().TotalSeconds));
+        scriptWindow.UpdatePlayback(position, player.IsPlaying, reset, immediate);
     }
 
     private void PlaylistBorder_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -865,6 +878,11 @@ public partial class MainWindow : Window
     private void ScriptButton_Click(object sender, RoutedEventArgs e)
     {
         if (closing || modalDialogOpen || operationBusy) return;
+        if (scriptWindow is { IsVisible: false, ReaderFailure: not null })
+        {
+            scriptWindow.CloseForOwner();
+            scriptWindow = null;
+        }
         if (scriptWindow is null)
         {
             scriptWindow = new ScriptWindow { Owner = this, Height = Math.Max(300, ActualHeight) };
@@ -885,18 +903,15 @@ public partial class MainWindow : Window
         {
             PositionScriptWindow();
             scriptWindow.Show();
+            SynchronizeScript(immediate: true);
             RefreshProgress();
-            double position = player.GetCurrentTime().TotalSeconds;
-            scriptWindow.UpdatePlayback(position, player.IsPlaying, !player.IsLoaded ||
-                (!player.IsPlaying && !player.IsPaused && (position <= 0 ||
-                position >= player.GetDuration().TotalSeconds)), immediate: true);
         }
     }
 
     internal void PreviewScriptSeek(double seconds)
     {
         if (closing || operationBusy || modalDialogOpen || dragging || navigating ||
-            !player.IsLoaded || player.NaturalCompletion is not null || scriptWindow?.IsVisible != true)
+            !player.IsLoaded || player.LastError is not null || player.NaturalCompletion is not null || scriptWindow?.IsVisible != true)
         {
             scriptWindow?.CancelNavigation();
             return;
@@ -925,7 +940,7 @@ public partial class MainWindow : Window
     {
         scriptSeekTimer.Stop();
         if (scriptSeekTarget is not double target) return;
-        if (closing || operationBusy || modalDialogOpen || dragging || !player.IsLoaded)
+        if (closing || operationBusy || modalDialogOpen || dragging || !player.IsLoaded || player.LastError is not null)
         {
             await RestoreCanceledScriptSeekAsync();
             return;
@@ -939,7 +954,7 @@ public partial class MainWindow : Window
             await RunActionAsync(async () =>
             {
                 await player.SeekAsync(TimeSpan.FromSeconds(target));
-                if (resume && !closing && generation == scriptSeekGeneration &&
+                if (resume && !closing && generation == scriptSeekGeneration && player.LastError is null &&
                     player.GetCurrentTime() < player.GetDuration())
                     await player.PlayAsync();
             });
@@ -981,7 +996,7 @@ public partial class MainWindow : Window
             return;
         }
         bool resume = CancelScriptSeek();
-        if (resume && !closing && !operationBusy && player.IsPaused)
+        if (resume && !closing && !operationBusy && player.LastError is null && player.IsPaused)
             await RunActionAsync(player.PlayAsync);
         if (!closing) RefreshProgress();
     }

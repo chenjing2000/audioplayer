@@ -13,9 +13,12 @@ const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
 const progress=(t,start,end)=>clamp((t-start)/(end-start),0,1);
 const scrollTarget=(y,height,total)=>clamp(y-height/2,0,Math.max(0,total-height));
 const cosine=u=>(1-Math.cos(Math.PI*clamp(u,0,1)))/2;
+const LINE_TRANSITION_MS=50;
 let geometry=[],lines=[],playback={position:0,playing:false,reset:true},activeLine=null;
 let animation=0,measureFrame=0,lastTarget=null,previousPosition=null;
 let epoch=0,manual=false,pending=null;
+let started=0,paintPosition=null;
+const activeUnits=new Set();
 function cancelManual(){manual=false;pending=null;cancelAnimation();}
 function preview(line){
   if(!line || line.first===null)return;
@@ -24,7 +27,10 @@ function preview(line){
   chrome.webview.postMessage({type:'preview',epoch,position:pending});
 }
 function nearest(y){
-  return lines.reduce((best,line)=>!best||Math.abs(line.y-y)<Math.abs(best.y-y)?line:best,null);
+  let lo=0,hi=lines.length;
+  while(lo<hi){const mid=(lo+hi)>>>1;if(lines[mid].y<y)lo=mid+1;else hi=mid;}
+  const before=lines[lo-1],after=lines[lo];
+  return !before?after:!after?before:y-before.y<=after.y-y?before:after;
 }
 function wheelLine(){
   const max=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
@@ -64,7 +70,7 @@ function moveTo(target,immediate){
   cancelAnimation();lastTarget=target;
   const from=window.scrollY,begin=performance.now();
   function step(now){
-    const u=clamp((now-begin)/50,0,1);
+    const u=clamp((now-begin)/LINE_TRANSITION_MS,0,1);
     window.scrollTo(0,from+(target-from)*cosine(u));
     if(u<1)animation=requestAnimationFrame(step);else{animation=0;lastTarget=null;}
   }
@@ -72,6 +78,7 @@ function moveTo(target,immediate){
 }
 function render(data){
   cancelManual();epoch=data.epoch;geometry=[];lines=[];activeLine=null;previousPosition=null;
+  started=0;paintPosition=null;activeUnits.clear();
   playback={position:0,playing:false,reset:true};
   title.textContent=data.article?.title??'';title.hidden=!title.textContent;
   status.textContent=data.message??'';body.replaceChildren();window.scrollTo(0,0);
@@ -106,6 +113,7 @@ function scheduleMeasure(){
 }
 function measure(){
   cancelAnimation();geometry=[];lines=[];activeLine=null;
+  started=0;paintPosition=null;activeUnits.clear();
   const y=window.scrollY;
   const byY=new Map();
   function lineFor(rect){
@@ -141,7 +149,18 @@ function measure(){
     }
   }
   lines.sort((a,b)=>a.y-b.y);
+  // Stable sort preserves original document order for equal starts.
+  geometry.sort((a,b)=>a.start-b.start);
   update(playback,true,manual);
+}
+function paintUnit(unit,fraction){
+  if(unit.last===fraction)return;
+  unit.last=fraction;let remaining=fraction*unit.total;
+  for(const seg of unit.segments){
+    const width=clamp(remaining,0,seg.width);
+    if(width!==seg.painted){seg.element.setAttribute('width',width);seg.painted=width;}
+    remaining-=seg.width;
+  }
 }
 function update(state,immediate=false,previewOnly=false){
   if(manual && !previewOnly)return;
@@ -149,27 +168,31 @@ function update(state,immediate=false,previewOnly=false){
   if(!state.playing && wasAnimating)cancelAnimation();
   playback=state;
   const t=state.position;
-  let current=null,latest=-Infinity;
-  for(const unit of geometry){
-    const fraction=state.reset?0:progress(t,unit.start,unit.end);
-    if(unit.last!==fraction){
-      unit.last=fraction;let remaining=fraction*unit.total;
-      for(const seg of unit.segments){
-        const width=clamp(remaining,0,seg.width);
-        if(width!==seg.painted){seg.element.setAttribute('width',width);seg.painted=width;}
-        remaining-=seg.width;
-      }
+  // Forward playback visits newly started and still-active intervals only.
+  // Rewind/reset restores all painted intervals, including overlapping timestamps.
+  if(state.reset || (paintPosition!==null && t<paintPosition)){
+    for(let i=0;i<started;i++)paintUnit(geometry[i],0);
+    started=0;activeUnits.clear();
+  }
+  let current=null;
+  if(!state.reset){
+    while(started<geometry.length && geometry[started].start<=t)
+      activeUnits.add(geometry[started++]);
+    for(const unit of activeUnits){
+      paintUnit(unit,progress(t,unit.start,unit.end));
+      if(t>=unit.end)activeUnits.delete(unit);
     }
-    // Retain the preceding line through timestamp gaps; a wrapped unit
-    // follows the fragment reached by its cumulative painted width.
-    if(!state.reset && t>=unit.start && unit.start>=latest){
-      latest=unit.start;let remaining=fraction*unit.total;
+    // The last started unit also determines the visual line during a timestamp gap.
+    const unit=geometry[started-1];
+    if(unit){
+      let remaining=progress(t,unit.start,unit.end)*unit.total;
       current=unit.segments.at(-1).line;
       for(const seg of unit.segments){
         if(remaining<seg.width){current=seg.line;break;}remaining-=seg.width;
       }
     }
   }
+  paintPosition=state.reset?null:t;
   const jumped=previousPosition!==null && (t<previousPosition || t-previousPosition>0.35);
   previousPosition=t;
   if(previewOnly){activeLine=current;return;}
@@ -193,10 +216,14 @@ chrome.webview.addEventListener('message',({data})=>{
   }
   else if(data.type==='article')render(data);
   else if(data.type==='playback' && data.epoch===epoch)update(data,data.immediate===true);
-  else if(data.type==='cancel'){epoch=data.epoch;cancelManual();activeLine=null;previousPosition=null;}
+  else if(data.type==='cancel'){
+    epoch=data.epoch;
+    if(manual){cancelManual();activeLine=null;previousPosition=null;}
+  }
   else if(data.type==='commit'){
+    const preserveOffset=manual;
     epoch=data.epoch;manual=false;pending=null;
-    update(data,false,true); // Preserve manual offset until the next visual line.
+    update(data,!preserveOffset,preserveOffset);
   }
 });
 window.addEventListener('resize',scheduleMeasure);

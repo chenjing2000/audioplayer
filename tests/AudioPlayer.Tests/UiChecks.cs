@@ -636,7 +636,7 @@ internal static class UiChecks
                         try
                         {
                             File.WriteAllText(Path.Combine(readerFolder, "arbitrary.script.json"),
-                                """{"filetype":"script","title":"Reader test","paragraphs":[[{"text":"Hello, world.","timed_units":[["Hello",0,1],["world",1,2]]}]]}""");
+                                """{"filetype":"script","title":"Reader test","paragraphs":[[{"text":"Hello, world.","timed_units":[["Hello",1,3],["world",0,2]]}]]}""");
                             readerWindow.SetAudio(Path.Combine(readerFolder, "sample.wav"));
                             readerWindow.Show();
                             var deadline = DateTime.UtcNow.AddSeconds(25);
@@ -652,18 +652,33 @@ internal static class UiChecks
                                 await Task.Delay(100);
                             }
                             Assert(renderedScriptText.Contains("Hello, world."), "Embedded WebView2 reader renders discovered Script JSON");
+                            string measured = await reader.CoreWebView2.ExecuteScriptAsync(
+                                "measure(); update({position:1.5,playing:false,reset:false},true); geometry.length===2 && geometry[0].last===0.75 && geometry[1].last===0.25");
+                            Assert(measured == "true", "Reader paints overlapping out-of-order intervals");
+                            string rewind = await reader.CoreWebView2.ExecuteScriptAsync(
+                                "update({position:2.5,playing:false,reset:false},true); update({position:0.5,playing:false,reset:false},true); geometry[0].last===0.25 && geometry[1].segments.every(s=>s.painted===0)");
+                            Assert(rewind == "true", "Reader rewinds previously painted intervals");
+                            string cleared = await reader.CoreWebView2.ExecuteScriptAsync(
+                                "update({position:0,playing:false,reset:true},true); geometry.every(u=>u.segments.every(s=>s.painted===0))");
+                            Assert(cleared == "true", "Reader reset clears painted intervals");
                         }
                         finally
                         {
                             readerWindow.CloseForOwner();
-                            try { Directory.Delete(readerFolder, true); }
-                            catch (IOException) { Console.WriteLine("Temporary WebView2 cache still in use: " + readerFolder); }
-                            catch (UnauthorizedAccessException) { Console.WriteLine("Temporary WebView2 cache still in use: " + readerFolder); }
+                            for (int attempt = 0; attempt < 20; attempt++)
+                            {
+                                try { Directory.Delete(readerFolder, true); break; }
+                                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                                {
+                                    if (attempt == 19) Console.WriteLine("Temporary WebView2 cache still in use: " + readerFolder);
+                                    else await Task.Delay(250);
+                                }
+                            }
                         }
                     }
                     if (WaveOut.DeviceCount == 0)
                     {
-                        Console.WriteLine("SKIP UI script wheel playback checks (6 assertions): no waveOut device is available.");
+                        Console.WriteLine("SKIP UI script wheel playback checks (7 assertions plus Settings restoration): no waveOut device is available.");
                         Console.WriteLine("SKIP UI audio-device playback checks: no waveOut device is available.");
                         return;
                     }
@@ -832,6 +847,26 @@ internal static class UiChecks
                     await window.RestoreCanceledScriptSeekAsync();
                     Assert(scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime().TotalSeconds < 5,
                         "Cancel pending wheel navigation restores playback without seeking");
+                    window.BeginScriptSeek(6);
+                    var settingsClosed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var closeSettingsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+                    closeSettingsTimer.Tick += (_, _) =>
+                    {
+                        var activeDialog = app.Windows.OfType<SilenceSettingsWindow>().SingleOrDefault(w => w.IsVisible);
+                        if (activeDialog is null) return;
+                        closeSettingsTimer.Stop();
+                        activeDialog.Close();
+                        settingsClosed.TrySetResult();
+                    };
+                    closeSettingsTimer.Start();
+                    try
+                    {
+                        settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        await settingsClosed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                    }
+                    finally { closeSettingsTimer.Stop(); }
+                    Assert(scriptPlayer.IsPlaying && !FieldValue<double?>(window, "scriptSeekTarget").HasValue,
+                        "Opening and canceling Settings restores pending wheel playback intent");
                     window.BeginScriptSeek(6);
                     await window.HandleShortcutAsync(Key.Space);
                     Assert(scriptPlayer.IsPaused && !FieldValue<double?>(window, "scriptSeekTarget").HasValue,

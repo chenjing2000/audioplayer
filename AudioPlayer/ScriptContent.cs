@@ -18,27 +18,30 @@ public sealed record ScriptTimedUnit(string Text, double? Start, double? End, in
 
 internal static class ScriptContent
 {
-    internal static ScriptArticle? Find(string audioPath)
+    internal static ScriptArticle? Find(string audioPath, CancellationToken cancellation = default)
     {
         string directory = Path.GetDirectoryName(Path.GetFullPath(audioPath))!;
         foreach (string path in Directory.EnumerateFiles(directory, "*.json").OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ThenBy(p => p, StringComparer.Ordinal))
         {
+            cancellation.ThrowIfCancellationRequested();
             JsonDocument document;
             try { document = JsonDocument.Parse(File.ReadAllText(path)); }
             catch (JsonException) { continue; } // Cannot identify malformed unrelated JSON.
             using (document)
             {
+                cancellation.ThrowIfCancellationRequested();
                 var root = document.RootElement;
                 if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("filetype", out var type)
                     && type.ValueKind == JsonValueKind.String && type.GetString() == "script")
-                    return Parse(root);
+                    return Parse(root, cancellation);
             }
         }
         return null;
     }
 
-    internal static ScriptArticle Parse(JsonElement root)
+    internal static ScriptArticle Parse(JsonElement root, CancellationToken cancellation = default)
     {
+        cancellation.ThrowIfCancellationRequested();
         if (root.ValueKind != JsonValueKind.Object)
             throw new InvalidDataException("Script 根节点必须为对象。");
 
@@ -73,11 +76,13 @@ internal static class ScriptContent
                     unitsValue.ValueKind != JsonValueKind.Array)
                     throw new InvalidDataException("Script 句子缺少 timed_units 数组。");
 
+                cancellation.ThrowIfCancellationRequested();
                 string text = textValue.GetString()!;
                 int cursor = 0;
                 var units = new List<ScriptTimedUnit>();
                 foreach (var unit in unitsValue.EnumerateArray())
                 {
+                    cancellation.ThrowIfCancellationRequested();
                     if (unit.ValueKind != JsonValueKind.Array || unit.GetArrayLength() != 3)
                         throw new InvalidDataException("Script 的 timed_units 项必须为三元数组。");
                     JsonElement[] fields = unit.EnumerateArray().ToArray();

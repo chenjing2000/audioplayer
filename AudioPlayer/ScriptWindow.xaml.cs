@@ -23,7 +23,7 @@ public partial class ScriptWindow : Window
     private (double Position, bool Playing, bool Reset)? playback;
     private (double Position, bool Playing, bool Reset)? sentPlayback;
     private string? audioPath;
-    private int generation;
+    private CancellationTokenSource? scriptLoadCancellation;
     private ScriptArticle? article;
     private string message = "尚未加载原文";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -162,27 +162,35 @@ public partial class ScriptWindow : Window
 
     internal async void SetAudio(string? path)
     {
-        if (ownerClosing || string.Equals(path, audioPath, StringComparison.OrdinalIgnoreCase)) return;
+        if (ownerClosing || readerFailed || string.Equals(path, audioPath, StringComparison.OrdinalIgnoreCase)) return;
         CancelNavigation();
         audioPath = path;
-        int request = ++generation;
+        scriptLoadCancellation?.Cancel();
+        scriptLoadCancellation = null;
         article = null;
         sentPlayback = null;
         message = path is null ? "尚未加载原文" : "正在加载原文…";
         SendArticle();
         if (path is null) return;
+        using var cancellation = new CancellationTokenSource();
+        scriptLoadCancellation = cancellation;
         ScriptArticle? loaded = null;
         string result;
         try
         {
-            loaded = await Task.Run(() => ScriptContent.Find(path));
+            loaded = await Task.Run(() => ScriptContent.Find(path, cancellation.Token), cancellation.Token);
             result = loaded is null ? "未找到对应的原文文件" : "";
         }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return; }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException)
         {
             result = "原文加载失败：" + ex.Message;
         }
-        if (ownerClosing || request != generation) return;
+        finally
+        {
+            if (ReferenceEquals(scriptLoadCancellation, cancellation)) scriptLoadCancellation = null;
+        }
+        if (ownerClosing || cancellation.IsCancellationRequested) return;
         article = loaded;
         message = result;
         SendArticle();
@@ -227,6 +235,7 @@ public partial class ScriptWindow : Window
         if (ownerClosing || readerFailed) return;
         readerFailed = true;
         ready = false;
+        scriptLoadCancellation?.Cancel();
         NavigationCanceled?.Invoke();
         Reader.Visibility = Visibility.Collapsed;
         Status.Text = text;
@@ -243,7 +252,8 @@ public partial class ScriptWindow : Window
     internal void CloseForOwner()
     {
         ownerClosing = true;
-        generation++;
+        scriptLoadCancellation?.Cancel();
+        scriptLoadCancellation = null;
         Reader.Dispose();
         Close();
     }
