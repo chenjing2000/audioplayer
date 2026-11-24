@@ -361,7 +361,13 @@ internal static class UiChecks
                      Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })! && excludedBox.Text == "audio, video, 中文 文件夹", "Folder names normalize on validation");
                      excludedBox.Text = "audio*";
                      Assert(!(bool)readValues.Invoke(settingsWindow, new object?[] { null })!, "Invalid folder name prevents confirmation");
+                     var exclusionToasts = (ToastHost)settingsWindow.FindName("ToastMessages");
+                     Assert(excludedBox.BorderBrush == Brushes.IndianRed
+                         && FindVisual<StackPanel>(exclusionToasts)!.Children.Count == 1,
+                         "Invalid folder name shows one warning");
                      excludedBox.Text = "";
+                     Assert(excludedBox.BorderBrush != Brushes.IndianRed, "Correcting folder name clears red border");
+                     exclusionToasts.Clear(); // Isolate the next independent validation scenario.
                      allowedBox.Text = "2.";
                      Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })!
                          && allowedBox.Text == "2.0", "Confirming 2. normalizes it to 2.0");
