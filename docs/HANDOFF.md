@@ -1,9 +1,9 @@
 # AudioPlayer — development handoff
 
-**Updated:** Recursive persistent playlist feature (in development)  
+**Updated:** Recursive persistent playlist feature (Windows accepted)  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Latest merged application-code baseline:** `7c1def7` (PR #14, squash merged). [Post-merge Windows CI #45302461775](https://github.com/chenjing2000/audioplayer/actions/runs/45302461775) passed after user-confirmed Windows acceptance. Current feature branch: `feature/recursive-persistent-playlist`; not merged or manually accepted.
+**Latest merged application-code baseline:** `7c1def7` (PR #14, squash merged). [Post-merge Windows CI #45302461775](https://github.com/chenjing2000/audioplayer/actions/runs/45302461775) passed after user-confirmed Windows acceptance. Current feature branch: `feature/recursive-persistent-playlist`; Windows manual acceptance passed; awaiting merge authorization.
 
 ## Current application behavior
 
@@ -41,4 +41,4 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Test-PublishedAp
 
 ## Current feature: recursive persistent playlist
 
-The approved design scans all supported audio recursively, skips reparse points and temporary trim audio, sorts by relative path, and stores root folder plus absolute paths in `<exe stem>.playlist.json`. Startup restores existing saved paths without rescanning or playing. Refresh rescans and saves; failed scans save empty state, valid empty folders retain the root. Nested trim output is inserted and persisted, and save failures retain the in-memory list. Core and WPF regression checks have been added; feature CI and Windows manual acceptance are pending. PR #14's failed-scan behavior is already merged and accepted.
+The approved design scans all supported audio recursively, skips reparse points and temporary trim audio, sorts by relative path, and stores root folder plus absolute paths in `<exe stem>.playlist.json`. Startup restores existing saved paths without rescanning or playing. Refresh rescans and saves; failed scans save empty state, valid empty folders retain the root. Nested trim output is inserted and persisted, and save failures retain the in-memory list. Core and WPF regression checks passed in [PR CI #45305530107](https://github.com/chenjing2000/audioplayer/actions/runs/45305530107) and push CI #45305513723 at `9479bca`. The user confirmed all ten Windows manual acceptance checks passed; see [Testing](Testing.md#windows-acceptance--pr-15). PR #14's failed-scan behavior is already merged and accepted.

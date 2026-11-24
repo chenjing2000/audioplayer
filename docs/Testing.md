@@ -222,3 +222,20 @@ User-supplied Windows PowerShell 5.1 results for `feature/code-and-doc-cleanup`,
 The new `Folder scans ignore only in-progress trim audio` Core regression explicitly passed. The optional valid-MP3 metadata test and MP3-dependent UI checks printed **SKIP** because no MP3 test input was supplied; that is distinct from the test wrapper's zero skipped *groups*. The user did not report executing `-Suite Full -AudioFile` in this run. Real MP3/WAV long-pause listening and selected FFmpeg incomplete-DLL/cancellation/source-mutation failure cases remain deferred. A future tagged GitHub Release must still be inspected to verify that both downloadable assets actually appear, despite the local TXT publishing test passing.
 
 Revision `e392114` passed [Windows PR CI #45187026289](https://github.com/chenjing2000/audioplayer/actions/runs/45187026289). The final pre-merge revision `3cce00d` passed [Windows PR CI #45189289382](https://github.com/chenjing2000/audioplayer/actions/runs/45189289382); one simultaneous push check initially failed a Toast UI queueing assertion and [passed on retry](https://github.com/chenjing2000/audioplayer/actions/runs/45189280854). [PR #11](https://github.com/chenjing2000/audioplayer/pull/11) was squash merged into `main@c90afec`. [Post-merge Windows CI #45190102017](https://github.com/chenjing2000/audioplayer/actions/runs/45190102017) succeeded. The user verified their local `main` matches `origin/main`, the working tree is clean, and both local and remote feature branches have been removed. No new real-media or failure-path testing is claimed by this documentation update.
+
+## Windows acceptance — PR #15
+
+The user explicitly confirmed all ten Windows manual acceptance checks passed for the recursive persistent playlist feature:
+
+1. Recursive discovery of supported audio files in nested directories.
+2. Filename extensions hidden; complete path available in row tooltip.
+3. Natural relative-path sorting.
+4. Playlist JSON created beside the executable.
+5. Restart restores saved playlist without automatically playing audio.
+6. New files added while closed appear after Refresh, not merely startup restoration.
+7. Deleted saved files are removed after restarting.
+8. Trimmed audio in a subdirectory appears in the table and saved JSON.
+9. Missing root on Refresh clears the playlist and saved root path.
+10. Existing playback, silence navigation and settings continue working.
+
+User-reported manual acceptance is distinct from hosted automated verification. The accepted implementation at `9479bca` passed [Windows PR CI #45305530107](https://github.com/chenjing2000/audioplayer/actions/runs/45305530107) and [push CI #45305513723](https://github.com/chenjing2000/audioplayer/actions/runs/45305513723). The earlier local log was from the pre-feature version after a failed Git fetch, so its counts are not attributed to this feature. No new local automated counts or previously deferred real-media/failure-path coverage are claimed. Merge into main awaits separate authorization.
