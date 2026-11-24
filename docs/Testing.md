@@ -252,3 +252,7 @@ After the initial ten manual checks passed, the user requested parent-directory-
 6. Previously saved Unicode-escaped playlists still load normally.
 
 Together with the initial ten checks, sixteen user-reported manual acceptance checks have passed. No new local automated test counts are claimed. Merge remains deferred at the user's request.
+
+### PR #15 WindowsAppPlaybook review remediation
+
+Added targeted regression checks for locked playlist save, missing/non-file saved entries, directory junction exclusion, cancellation, preservation of playlist JSON during publishing and renamed published EXE startup restoration. Removed obsolete metadata-title checks while retaining album/duration and filename coverage. Prior sixteen manual checks apply to the earlier code revision; new CI and focused Windows acceptance are pending.

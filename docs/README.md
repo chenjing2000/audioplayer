@@ -21,4 +21,4 @@
 - [FFmpeg M4A stream-copy 规格](specs/FFmpeg-M4A-Stream-Copy.md)：PR #8 引入的 AAC 处理规则
 - [2026-10-13 代码审查](Code-Review-2026-10-13.md) 与 [体检记录](Health-Check-2026-10-13.md)：仅作为当时的事实记录，不代表当前提交重新验收
 
-已完成的实施计划不再作为日常维护入口；其历史内容可通过 Git 提交记录查看。最新可核实的已合并基线是 PR #10 的 `main@2be037f`，对应 [main CI #45182410792](https://github.com/chenjing2000/audioplayer/actions/runs/45182410792) 通过。后续修复分支的检查结果应另行记录，不能借用上述旧 CI。
+已完成的实施计划不再作为日常维护入口；其历史内容可通过 Git 提交记录查看。最新基线与验证状态统一见 [HANDOFF](HANDOFF.md)，历史 CI 证据见 [Testing](Testing.md)。

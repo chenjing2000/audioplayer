@@ -1,9 +1,9 @@
 # AudioPlayer — development handoff
 
-**Updated:** Recursive persistent playlist and tooltip/JSON refinements (Windows accepted)  
+**Updated:** Recursive playlist review remediation (verification pending)  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Latest merged application-code baseline:** `7c1def7` (PR #14, squash merged). [Post-merge Windows CI #45302461775](https://github.com/chenjing2000/audioplayer/actions/runs/45302461775) passed after user-confirmed Windows acceptance. Current feature branch: `feature/recursive-persistent-playlist`; All sixteen Windows manual acceptance checks passed, including tooltip and readable JSON refinements; awaiting merge authorization.
+**Latest merged application-code baseline:** `7c1def7` (PR #14, squash merged). [Post-merge Windows CI #45302461775](https://github.com/chenjing2000/audioplayer/actions/runs/45302461775) passed after user-confirmed Windows acceptance. Current feature branch: `feature/recursive-persistent-playlist`; All sixteen Windows manual acceptance checks passed before review remediation; new code requires verification. Merge remains deferred.
 
 ## Current application behavior
 
@@ -44,3 +44,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Test-PublishedAp
 The approved design scans all supported audio recursively, skips reparse points and temporary trim audio, sorts by relative path, and stores root folder plus absolute paths in `<exe stem>.playlist.json`. Startup restores existing saved paths without rescanning or playing. Refresh rescans and saves; failed scans save empty state, valid empty folders retain the root. Nested trim output is inserted and persisted, and save failures retain the in-memory list. Core and WPF regression checks passed in [PR CI #45305530107](https://github.com/chenjing2000/audioplayer/actions/runs/45305530107) and push CI #45305513723 at `9479bca`. The user confirmed all ten Windows manual acceptance checks passed; see [Testing](Testing.md#windows-acceptance--pr-15). PR #14's failed-scan behavior is already merged and accepted.
 
 The follow-up at `e42547c` limits the row tooltip to the parent directory (plus any read error), wraps it within main-window width minus 48 DIP, uses 8 DIP rounded corners, and writes literal Chinese characters in UTF-8 playlist JSON while retaining compatibility with escaped JSON. Both [PR CI #45328234578](https://github.com/chenjing2000/audioplayer/actions/runs/45328234578) and [push CI #45328228807](https://github.com/chenjing2000/audioplayer/actions/runs/45328228807) passed. The user confirmed all six follow-up manual checks passed. PR #15 remains unmerged at the user's request.
+
+## Review remediation
+
+The WindowsAppPlaybook review led to targeted changes: startup distinguishes confirmed missing paths from access errors, skips reparse points below the root, and preserves saved data on access failure; scans support cooperative cancellation; trim completion waits for an active folder operation; save failures explain stale disk state. Unused metadata title removed, executable-based store paths simplified, and playback indicators update only the affected tracks. Added focused regression and publishing coverage. No new packages or architecture. New CI/manual verification pending; prior sixteen checks remain historical evidence.
