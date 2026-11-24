@@ -641,9 +641,6 @@ internal static class UiChecks
                         {
                             File.WriteAllText(Path.Combine(readerFolder, "arbitrary.script.json"),
                                 """{"filetype":"script","title":"Reader test","paragraphs":[[{"text":"Hello, world.","timed_units":[["Hello",1,3],["world",0,2]]}]]}""");
-                            // Exercise the real owner lifecycle with this isolated reader/cache.
-                            typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
-                                .SetValue(window, readerWindow);
                             readerWindow.SetAudio(Path.Combine(readerFolder, "sample.wav"));
                             readerWindow.Show();
                             var deadline = DateTime.UtcNow.AddSeconds(25);
@@ -652,6 +649,7 @@ internal static class UiChecks
                             Assert(readerWindow.ReaderReady, "Embedded WebView2 reader completes ready handshake: " + readerWindow.ReaderFailure);
                             var reader = (Microsoft.Web.WebView2.Wpf.WebView2)readerWindow.FindName("Reader");
                             string renderedScriptText = "";
+                            deadline = DateTime.UtcNow.AddSeconds(25);
                             while (DateTime.UtcNow < deadline)
                             {
                                 renderedScriptText = await reader.CoreWebView2.ExecuteScriptAsync("document.querySelector('#text').textContent");
@@ -669,6 +667,10 @@ internal static class UiChecks
                                 "update({position:0,playing:false,reset:true},true); geometry.every(u=>u.segments.every(s=>s.painted===0))");
                             Assert(cleared == "true", "Reader reset clears painted intervals");
 
+                            // Keep the synthetic article isolated from MainWindow's playback timer
+                            // until the rendering assertions finish. No real audio is loaded here.
+                            typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
+                                .SetValue(window, readerWindow);
                             var readerHandle = new System.Windows.Interop.WindowInteropHelper(readerWindow).Handle;
                             double readerWidth = readerWindow.Width, readerHeight = readerWindow.Height;
                             var originalCore = reader.CoreWebView2;
