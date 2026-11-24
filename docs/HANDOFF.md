@@ -1,9 +1,9 @@
 # AudioPlayer — development handoff
 
-**Updated:** Recursive playlist review remediation (Windows accepted)  
+**Updated:** Recursive playlist and pronunciation-directory exclusion (Windows accepted)  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Latest merged application-code baseline:** `7c1def7` (PR #14, squash merged). [Post-merge Windows CI #45302461775](https://github.com/chenjing2000/audioplayer/actions/runs/45302461775) passed after user-confirmed Windows acceptance. Current feature branch: `feature/recursive-persistent-playlist`; All sixteen earlier Windows manual checks and seven focused remediation checks passed at their respective revisions. Merge remains deferred.
+**Latest merged application-code baseline:** `7c1def7` (PR #14, squash merged). [Post-merge Windows CI #45302461775](https://github.com/chenjing2000/audioplayer/actions/runs/45302461775) passed after user-confirmed Windows acceptance. Current feature branch: `feature/recursive-persistent-playlist`; All sixteen earlier Windows manual checks, seven focused remediation checks and four pronunciation-directory exclusion checks passed at their respective revisions (27 checks in total). Merge remains deferred.
 
 ## Current application behavior
 
@@ -51,4 +51,4 @@ The WindowsAppPlaybook review led to targeted changes: startup distinguishes con
 
 ## Pronunciation directory exclusion
 
-The user requested excluding vocabulary pronunciation assets in subdirectories named exactly `audio` (Windows case-insensitive match). Scans prune these subtrees before enumeration; restoration and trim insertion apply the same relative-path rule. An explicitly selected root remains allowed. Existing JSON is pruned on successful restoration. Regression verification and focused Windows acceptance pending; previous acceptance remains historical. Merge remains deferred.
+The user requested excluding vocabulary pronunciation assets in subdirectories named exactly `audio` (Windows case-insensitive match). Scans prune these subtrees before enumeration; restoration and trim insertion apply the same relative-path rule. An explicitly selected root remains allowed. Existing JSON is pruned on successful restoration. Revision `18e6fe0` passed [PR CI #45332081052](https://github.com/chenjing2000/audioplayer/actions/runs/45332081052) and [push CI #45332074251](https://github.com/chenjing2000/audioplayer/actions/runs/45332074251). The user confirmed all four focused Windows manual checks passed; see [Testing](Testing.md#pr-15-pronunciation-directory-exclusion). Previous acceptance remains historical. Merge remains deferred.

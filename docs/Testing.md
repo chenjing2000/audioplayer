@@ -271,4 +271,13 @@ This records user-reported manual acceptance, not new local automated test count
 
 ### PR #15 pronunciation directory exclusion
 
-Added a Core regression for nested exact-name `audio` exclusions, case-insensitive matching, similarly named directories, ordinary `audio.mp3` files, saved-path filtering, and explicit root selection. New CI and manual acceptance pending.
+Added a Core regression for nested exact-name `audio` exclusions, case-insensitive matching, similarly named directories, ordinary `audio.mp3` files, saved-path filtering, and explicit root selection. Revision `18e6fe0` passed [PR CI #45332081052](https://github.com/chenjing2000/audioplayer/actions/runs/45332081052) and [push CI #45332074251](https://github.com/chenjing2000/audioplayer/actions/runs/45332074251).
+
+The user explicitly confirmed all four focused Windows manual acceptance checks passed:
+
+1. Directories named exactly `audio` are excluded at every subdirectory level.
+2. Similarly named directories remain included.
+3. Previously saved vocabulary pronunciation files disappear from the playlist after restarting.
+4. Refresh does not reintroduce excluded pronunciation files.
+
+Together with the earlier 23 checks, this records 27 user-reported manual acceptance checks across successive revisions, not a full rerun on the latest commit. No new local automated test counts are claimed. Previously unverified access-denial and real-media failure scenarios remain unchanged. PR #15 remains unmerged.
