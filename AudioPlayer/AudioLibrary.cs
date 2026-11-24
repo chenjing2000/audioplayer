@@ -15,7 +15,7 @@ public static class AudioLibrary
             AttributesToSkip = FileAttributes.ReparsePoint
         };
         cancellation.ThrowIfCancellationRequested();
-        return LoadPaths(root, EnumerateMediaPaths(root, options, cancellation, excludedNames), cancellation, excludedNames: excludedNames);
+        return LoadPaths(root, EnumerateMediaPaths(root, options, cancellation, excludedNames), cancellation);
     }
 
     private static IEnumerable<string> EnumerateMediaPaths(string root, EnumerationOptions options,
@@ -44,8 +44,9 @@ public static class AudioLibrary
     {
         if (!IsWithinFolder(root, path) || !IsSupportedFile(path) || IsTrimTemporaryFile(path))
             return false;
+        if (excludedNames is null || excludedNames.Count == 0) return true;
         string[] parts = Path.GetRelativePath(root, path).Split(Path.DirectorySeparatorChar);
-        return excludedNames is null || !parts.Take(parts.Length - 1).Any(excludedNames.Contains);
+        return !parts.Take(parts.Length - 1).Any(excludedNames.Contains);
     }
 
     internal static List<AudioTrack> LoadPaths(string root, IEnumerable<string> paths,

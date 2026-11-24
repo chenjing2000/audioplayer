@@ -376,3 +376,7 @@ The user explicitly confirmed all 20 playback-mode Windows manual acceptance che
 18. PASS — Ordinary settings retain mode; confirmed defaults reset it.
 19. PASS — Existing shortcuts, exclusions and scrolling still work.
 20. PASS — Unreadable next file stops and reports error.
+
+### PR #16 review remediation
+
+Read-only review at `20b9e84` followed by user-authorized corrections: state is published before audio startup; zero-duration media stops with an error; folder selection and settings share modal protection; actual user seeks and Stop supersede pending completion; scan avoids redundant exclusion filtering and dialog validation reuses parsed names. Tests exercise real Stop and shortcut routing, shared modal deferral (simulated guard, not native folder picker), unreadable/empty next media and very short WAV completion. Settings class names retained. Documentation consolidated; previous 58 manual checks are historical, new CI and focused Windows acceptance pending.

@@ -47,9 +47,11 @@ public sealed class SilenceSettings
         return names;
     }
 
-    public void Validate()
+    public void Validate() => ValidateAndGetExcludedFolderNames();
+
+    internal HashSet<string> ValidateAndGetExcludedFolderNames()
     {
-        GetExcludedFolderNames();
+        var excludedNames = GetExcludedFolderNames();
         if (!Enum.IsDefined(PlaybackMode))
             throw new ArgumentOutOfRangeException(nameof(PlaybackMode), "无效的播放模式。");
         if (BackwardStepSeconds is < 0 or > 99)
@@ -68,5 +70,6 @@ public sealed class SilenceSettings
             || decimal.Round(AllowedSilenceSeconds, 1) != AllowedSilenceSeconds)
             throw new ArgumentOutOfRangeException(nameof(AllowedSilenceSeconds),
                 $"允许静音时长不得低于 {Math.Ceiling(MinimumSilenceMilliseconds / 100m) / 10m:0.0} 秒，且最多一位小数。");
+        return excludedNames;
     }
 }

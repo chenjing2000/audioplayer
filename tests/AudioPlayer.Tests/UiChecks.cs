@@ -591,15 +591,26 @@ internal static class UiChecks
                         File.Copy(firstModePath, secondModePath);
                         await window.LoadFolderAsync(modeFolder);
                         var modePlayer = Field<PlayerEngine>(window, "player")!;
-                        var playModeTrack = typeof(MainWindow).GetMethod("PlayTrackAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                        var modalField = typeof(MainWindow).GetField("modalDialogOpen", BindingFlags.Instance | BindingFlags.NonPublic)!;
                         async Task WaitModeAsync(Func<bool> condition)
                         {
                             var deadline = DateTime.UtcNow.AddSeconds(8);
-                            while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(25);
-                            Assert(condition(), "Playback mode transition completes");
+                            while ((!condition() || FieldValue<bool>(window, "operationBusy")) && DateTime.UtcNow < deadline) await Task.Delay(25);
+                            Assert(condition() && !FieldValue<bool>(window, "operationBusy"), "Playback mode transition completes");
+                        }
+                        async Task ClickModeStop()
+                        {
+                            stopButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                            await WaitModeAsync(() => !FieldValue<bool>(window, "operationBusy") && !modePlayer.IsPlaying);
                         }
                         async Task StartModeTrack(int index)
-                            => await (Task)playModeTrack.Invoke(window, new object[] { (AudioTrack)list.Items[index] })!;
+                        {
+                            // Use the normal play shortcut with the selected file on a fresh playlist.
+                            if (modePlayer.IsLoaded && !ReferenceEquals(Field<AudioTrack>(window, "loadedTrack"), list.Items[index]))
+                                await window.LoadFolderAsync(modeFolder);
+                            list.SelectedIndex = index;
+                            await window.HandleShortcutAsync(Key.Space);
+                        }
                         bool LoadedModeTrack(int index) => ReferenceEquals(Field<AudioTrack>(window, "loadedTrack"), list.Items[index]);
                         await StartModeTrack(0);
                         await WaitModeAsync(() => !modePlayer.IsPlaying && modePlayer.GetCurrentTime() == modePlayer.GetDuration());
@@ -611,7 +622,7 @@ internal static class UiChecks
                         await StartModeTrack(0);
                         await WaitModeAsync(() => Volatile.Read(ref completions) >= 1 && modePlayer.IsPlaying && modePlayer.GetCurrentTime() < modePlayer.GetDuration());
                         Assert(LoadedModeTrack(0), "Repeat One restarts same file");
-                        await modePlayer.StopAsync();
+                        await ClickModeStop();
                         await Task.Delay(300);
                         Assert(!modePlayer.IsPlaying, "Manual Stop does not repeat");
                         modePlayer.NaturalPlaybackEnded -= countCompletion;
@@ -624,10 +635,68 @@ internal static class UiChecks
                         await StartModeTrack(1);
                         await WaitModeAsync(() => LoadedModeTrack(0) && modePlayer.IsPlaying);
                         Assert(LoadedModeTrack(0), "Repeat All wraps to first file");
-                        await modePlayer.SeekAsync(modePlayer.GetDuration());
+                        await window.HandleShortcutAsync(Key.Right, ModifierKeys.Control);
                         await Task.Delay(300);
-                        Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying, "Manual seek to end does not advance");
+                        Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying, "Manual timed seek to end does not advance");
+
+                        // Simulate the shared modal guard, then exercise actual Stop/seek routing.
+                        modalField.SetValue(window, true);
+                        try
+                        {
+                            await modePlayer.PlayAsync();
+                            await WaitModeAsync(() => modePlayer.NaturalCompletion is not null);
+                            Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying,
+                                "Natural completion is deferred during a modal dialog");
+                        }
+                        finally { modalField.SetValue(window, false); }
+                        await ClickModeStop();
+                        await Task.Delay(300);
+                        Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying && modePlayer.NaturalCompletion is null,
+                            "Stop supersedes deferred natural completion");
+
+                        modalField.SetValue(window, true);
+                        try
+                        {
+                            await modePlayer.PlayAsync();
+                            await WaitModeAsync(() => modePlayer.NaturalCompletion is not null);
+                        }
+                        finally { modalField.SetValue(window, false); }
+                        await window.HandleShortcutAsync(Key.Left, ModifierKeys.Control);
+                        await Task.Delay(300);
+                        Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying && modePlayer.NaturalCompletion is null
+                            && modePlayer.GetCurrentTime() < modePlayer.GetDuration(),
+                            "Backward seek supersedes deferred natural completion");
+
+                        // In Repeat All, an unreadable next track must stop instead of cycling.
+                        string brokenModePath = Path.Combine(modeFolder, "03.wav");
+                        File.WriteAllText(brokenModePath, "not audio");
+                        await window.LoadFolderAsync(modeFolder);
+                        await StartModeTrack(1);
+                        await WaitModeAsync(() => !modePlayer.IsLoaded && !FieldValue<bool>(window, "operationBusy"));
+                        Assert(!modePlayer.IsPlaying && modePlayer.NaturalCompletion is null,
+                            "Unreadable automatic next file stops playback");
+
+                        File.Delete(brokenModePath);
+                        string emptyModePath = Path.Combine(modeFolder, "03.wav");
+                        using (var emptyWriter = new WaveFileWriter(emptyModePath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1))) { }
+                        await window.LoadFolderAsync(modeFolder);
+                        await StartModeTrack(1);
+                        await WaitModeAsync(() => !modePlayer.IsLoaded && !FieldValue<bool>(window, "operationBusy"));
+                        Assert(!modePlayer.IsPlaying && modePlayer.NaturalCompletion is null,
+                            "Zero-duration automatic next file stops playback");
+                        File.Delete(emptyModePath);
+
                         modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        string shortModePath = Path.Combine(modeFolder, "03.wav");
+                        using (var shortWriter = new WaveFileWriter(shortModePath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                            shortWriter.WriteSamples(new float[44], 0, 44);
+                        await window.LoadFolderAsync(modeFolder);
+                        for (int attempt = 0; attempt < 4; attempt++)
+                        {
+                            await StartModeTrack(2);
+                            await WaitModeAsync(() => !modePlayer.IsPlaying && modePlayer.GetCurrentTime() == modePlayer.GetDuration());
+                            Assert(LoadedModeTrack(2), "Very short audio completes without stale Playing state");
+                        }
                     }
                     finally
                     {

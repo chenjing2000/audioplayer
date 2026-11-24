@@ -80,9 +80,10 @@ public partial class SilenceSettingsWindow : Window
         settings.NavigationToleranceMilliseconds = navigationToleranceMilliseconds;
         settings.AllowedSilenceSeconds = allowedSeconds;
 
+        HashSet<string> excludedNames;
         try
         {
-            settings.Validate();
+            excludedNames = settings.ValidateAndGetExcludedFolderNames();
         }
         catch (ArgumentOutOfRangeException ex)
         {
@@ -100,7 +101,7 @@ public partial class SilenceSettingsWindow : Window
             return ShowValueError(ex.Message.Split('\n')[0], field);
         }
 
-        settings.ExcludedFolderNames = string.Join(", ", settings.GetExcludedFolderNames());
+        settings.ExcludedFolderNames = string.Join(", ", excludedNames);
         ExcludedFolderNamesTextBox.Text = settings.ExcludedFolderNames;
         BackwardStepTextBox.Text = backward.ToString(CultureInfo.InvariantCulture);
         ForwardStepTextBox.Text = forward.ToString(CultureInfo.InvariantCulture);
