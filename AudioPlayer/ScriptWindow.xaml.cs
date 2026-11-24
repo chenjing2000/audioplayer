@@ -117,6 +117,7 @@ public partial class ScriptWindow : Window
     internal void CancelNavigation()
     {
         navigationEpoch++;
+        sentPlayback = null;
         if (ready && !ownerClosing) Post(new { type = "cancel", epoch = navigationEpoch });
     }
 
@@ -145,7 +146,7 @@ public partial class ScriptWindow : Window
             loaded = await Task.Run(() => ScriptContent.Find(path));
             result = loaded is null ? "未找到对应的原文文件" : "";
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or ArgumentException)
         {
             result = "原文加载失败：" + ex.Message;
         }
@@ -168,7 +169,7 @@ public partial class ScriptWindow : Window
         if (!ready || ownerClosing || !IsVisible || article is null) return;
         if (!immediate && sentPlayback == playback) return;
         sentPlayback = playback;
-        Post(new { type = "playback", position, playing, reset, immediate });
+        Post(new { type = "playback", epoch = navigationEpoch, position, playing, reset, immediate });
     }
 
     private void Post(object payload)

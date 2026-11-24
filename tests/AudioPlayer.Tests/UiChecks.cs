@@ -746,7 +746,45 @@ internal static class UiChecks
                     await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
                     Assert(Field<PlayerEngine>(window, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
                     if (Field<Task>(window, "analysisTask") is Task recoveredAnalysis) await recoveredAnalysis;
-                    await Field<PlayerEngine>(window, "player")!.CloseAsync();
+                    var scriptPlayer = Field<PlayerEngine>(window, "player")!;
+                    string seekPath = Path.Combine(audioFolder, "script-seek-test.wav");
+                    using (var writer = new WaveFileWriter(seekPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                        writer.WriteSamples(new float[44100 * 12], 0, 44100 * 12);
+                    await (Task)playTrack.Invoke(window, new object[] { new AudioTrack { FilePath = seekPath } })!;
+                    window.BeginScriptSeek(2);
+                    window.BeginScriptSeek(4);
+                    Assert(scriptPlayer.IsPaused && slider.Value == 4 &&
+                        Field<DispatcherTimer>(window, "scriptSeekTimer")!.Interval == TimeSpan.FromMilliseconds(150),
+                        "Wheel preview pauses audio, updates slider and retains latest target");
+                    await window.CommitScriptSeekAsync();
+                    Assert(scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime().TotalSeconds >= 3.9,
+                        "Committed wheel seek resumes playing audio at latest target");
+                    scriptPlayer.Pause();
+                    window.BeginScriptSeek(2);
+                    await window.CommitScriptSeekAsync();
+                    Assert(scriptPlayer.IsPaused && Math.Abs(scriptPlayer.GetCurrentTime().TotalSeconds - 2) < 0.1,
+                        "Committed wheel seek preserves explicit pause");
+                    await scriptPlayer.PlayAsync();
+                    window.BeginScriptSeek(6);
+                    await window.RestoreCanceledScriptSeekAsync();
+                    Assert(scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime().TotalSeconds < 5,
+                        "Cancel pending wheel navigation restores playback without seeking");
+                    window.BeginScriptSeek(6);
+                    await window.HandleShortcutAsync(Key.Space);
+                    Assert(scriptPlayer.IsPaused && !FieldValue<double?>(window, "scriptSeekTarget").HasValue,
+                        "Space cancels wheel preview and honors intended pause");
+                    window.BeginScriptSeek(6);
+                    await window.HandleShortcutAsync(Key.Space);
+                    Assert(scriptPlayer.IsPlaying, "Space from explicitly paused preview resumes playback");
+                    window.BeginScriptSeek(6);
+                    stopButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    if (Field<Task>(window, "activeOperation") is Task stoppingScript) await stoppingScript;
+                    Assert(!scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime() == TimeSpan.Zero &&
+                        !Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled,
+                        "Stop cancels pending wheel seek without restarting");
+                    if (Field<Task>(window, "analysisTask") is Task seekAnalysis) await seekAnalysis;
+                    await scriptPlayer.CloseAsync();
+                    File.Delete(seekPath);
                     if (Directory.GetFiles(audioFolder, "*.mp3").Length == 0)
                     {
                         Console.WriteLine("SKIP audio-dependent UI checks: no local MP3 available.");

@@ -167,7 +167,8 @@ public partial class MainWindow : Window
     {
         if (operationBusy || closing || modalDialogOpen) return;
         var dialog = new OpenFolderDialog { Title = "选择教材音频文件夹" };
-        CancelScriptSeek();
+        await RestoreCanceledScriptSeekAsync();
+        if (closing) return;
         modalDialogOpen = true;
         try
         {
@@ -531,7 +532,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void PlayButton_Click(object sender, RoutedEventArgs e) => await RunActionAsync(TogglePlaybackAsync);
+    private async void PlayButton_Click(object sender, RoutedEventArgs e) => await ToggleFromUserAsync();
+
+    private Task ToggleFromUserAsync() => RunActionAsync(TogglePlaybackAsync, restoreScriptPlayback: false, toggleScriptPlayback: true);
     private async void StopButton_Click(object sender, RoutedEventArgs e) => await RunActionAsync(player.StopAsync);
 
     internal static int NextPlaybackIndex(PlaybackMode mode, int index, int count)
@@ -616,7 +619,7 @@ public partial class MainWindow : Window
         }));
     }
 
-    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    private async void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
         if (operationBusy || closing || modalDialogOpen) return;
 
@@ -674,7 +677,7 @@ public partial class MainWindow : Window
     internal Task HandleShortcutAsync(Key key, ModifierKeys modifiers = ModifierKeys.None)
     {
         if (modalDialogOpen || !IsPlaybackShortcut(key, modifiers)) return Task.CompletedTask;
-        if (key == Key.Space) return RunActionAsync(TogglePlaybackAsync);
+        if (key == Key.Space) return ToggleFromUserAsync();
         bool timed = modifiers == ModifierKeys.Control;
         if (closing || dragging || !player.IsLoaded || (operationBusy && !navigating)
             || (!timed && (analyzing || !analysisReady))) return Task.CompletedTask;
@@ -706,19 +709,25 @@ public partial class MainWindow : Window
                         : SilenceDetector.FindNext(ranges, current, silenceSettings);
                     // An actual user seek supersedes any pending natural continuation.
                     if (target.HasValue) await player.SeekAsync(target.Value);
-                });
+                }, restoreScriptPlayback: true);
             }
         }
         finally { navigationKeys.Clear(); navigating = false; QueueNaturalCompletion(); }
     }
 
-    private async Task RunActionAsync(Func<Task> action)
+    private async Task RunActionAsync(Func<Task> action, bool restoreScriptPlayback = false, bool toggleScriptPlayback = false)
     {
         if (operationBusy || closing) return;
-        if (!scriptSeekCommitting) CancelScriptSeek();
+        bool resume = !scriptSeekCommitting && CancelScriptSeek();
         operationBusy = true;
         UpdateControls();
-        Task work = RunCoreAsync(action);
+        Task work = RunCoreAsync(async () =>
+        {
+            if (!(toggleScriptPlayback && resume)) await action();
+            if (restoreScriptPlayback && resume && !closing && player.IsLoaded &&
+                player.IsPaused && player.GetCurrentTime() < player.GetDuration())
+                await player.PlayAsync();
+        });
         activeOperation = work;
         try { await work; }
         finally
@@ -759,6 +768,7 @@ public partial class MainWindow : Window
     {
         bool available = !operationBusy && !closing;
         OpenButton.IsEnabled = available;
+        ScriptButton.IsEnabled = available;
         SettingsButton.IsEnabled = available;
         PlaybackModeButton.IsEnabled = available && settingsFileReady;
         RefreshButton.IsEnabled = available && !trimming && currentFolder is not null;
@@ -767,7 +777,7 @@ public partial class MainWindow : Window
         PlayButton.IsEnabled = available && (player.IsLoaded || tracks.Count > 0);
         StopButton.IsEnabled = available && player.IsLoaded;
         ProgressSlider.IsEnabled = available && player.IsLoaded;
-        bool playing = player.IsPlaying;
+        bool playing = player.IsPlaying || scriptWasPlaying;
         PlayIconImage.Source = (ImageSource)FindResource(playing ? "PauseIcon" : "PlayIcon");
         PlayButton.ToolTip = playing ? "暂停" : "播放";
         AutomationProperties.SetName(PlayButton, playing ? "暂停" : "播放");
@@ -782,8 +792,8 @@ public partial class MainWindow : Window
         }
         if (indicatedTrack is not null)
         {
-            indicatedTrack.IsPlaying = player.IsPlaying;
-            indicatedTrack.IsPaused = player.IsPaused;
+            indicatedTrack.IsPlaying = playing;
+            indicatedTrack.IsPaused = !playing && player.IsPaused;
         }
     }
 
@@ -798,7 +808,7 @@ public partial class MainWindow : Window
             scriptWindow!.SetAudio(loadedTrack?.FilePath);
             double position = player.GetCurrentTime().TotalSeconds;
             bool reset = !player.IsLoaded || (!player.IsPlaying && !player.IsPaused &&
-                (position <= 0 || position >= player.GetDuration().TotalSeconds));
+                (position <= 0 || player.NaturalCompletion is not null));
             scriptWindow.UpdatePlayback(position, player.IsPlaying, reset);
         }
         if (dragging) return;
@@ -824,7 +834,9 @@ public partial class MainWindow : Window
     {
         if (e.ChangedButton != MouseButton.Left) return;
         if (operationBusy || closing || !player.IsLoaded) return;
-        CancelScriptSeek();
+        // Keep the pending temporary pause until the slider commits its seek.
+        scriptSeekTimer.Stop();
+        scriptWindow?.CancelNavigation();
         dragging = true;
         DependencyObject? source = e.OriginalSource as DependencyObject;
         while (source is not null && !ReferenceEquals(source, ProgressSlider))
@@ -847,23 +859,23 @@ public partial class MainWindow : Window
         TimeSpan target = TimeSpan.FromSeconds(ProgressSlider.Value);
         dragging = false;
         if (ReferenceEquals(Mouse.Captured, ProgressSlider)) ProgressSlider.ReleaseMouseCapture();
-        await RunActionAsync(() => player.SeekAsync(target));
+        await RunActionAsync(() => player.SeekAsync(target), restoreScriptPlayback: true);
     }
 
     private void ScriptButton_Click(object sender, RoutedEventArgs e)
     {
-        if (closing || modalDialogOpen) return;
+        if (closing || modalDialogOpen || operationBusy) return;
         if (scriptWindow is null)
         {
             scriptWindow = new ScriptWindow { Owner = this, Height = Math.Max(300, ActualHeight) };
             scriptWindow.SetAppearance(silenceSettings.ScriptAppearance);
             scriptWindow.NavigationPreview += PreviewScriptSeek;
-            scriptWindow.NavigationCanceled += () => CancelScriptSeek();
+            scriptWindow.NavigationCanceled += async () => await RestoreCanceledScriptSeekAsync();
             scriptWindow.Shortcut += async (key, modifiers) => await HandleShortcutAsync(key, modifiers);
-            scriptWindow.IsVisibleChanged += (_, _) =>
+            scriptWindow.IsVisibleChanged += async (_, _) =>
             {
                 string label = scriptWindow?.IsVisible == true ? "隐藏原文" : "显示原文";
-                if (scriptWindow?.IsVisible != true) CancelScriptSeek();
+                if (scriptWindow?.IsVisible != true) await RestoreCanceledScriptSeekAsync();
                 ScriptButton.ToolTip = label;
                 AutomationProperties.SetName(ScriptButton, label);
             };
@@ -881,14 +893,21 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PreviewScriptSeek(double seconds)
+    internal void PreviewScriptSeek(double seconds)
     {
         if (closing || operationBusy || modalDialogOpen || dragging || navigating ||
-            !player.IsLoaded || scriptWindow?.IsVisible != true)
+            !player.IsLoaded || player.NaturalCompletion is not null || scriptWindow?.IsVisible != true)
         {
             scriptWindow?.CancelNavigation();
             return;
         }
+        BeginScriptSeek(seconds);
+    }
+
+    // The reader has already validated the navigation message and its epoch.
+    internal void BeginScriptSeek(double seconds)
+    {
+        if (!double.IsFinite(seconds) || seconds < 0 || !player.IsLoaded) return;
         double duration = player.GetDuration().TotalSeconds;
         if (!scriptSeekTarget.HasValue)
         {
@@ -902,19 +921,18 @@ public partial class MainWindow : Window
         scriptSeekTimer.Start();
     }
 
-    private async Task CommitScriptSeekAsync()
+    internal async Task CommitScriptSeekAsync()
     {
         scriptSeekTimer.Stop();
         if (scriptSeekTarget is not double target) return;
         if (closing || operationBusy || modalDialogOpen || dragging || !player.IsLoaded)
         {
-            CancelScriptSeek();
+            await RestoreCanceledScriptSeekAsync();
             return;
         }
         int generation = scriptSeekGeneration;
         bool resume = scriptWasPlaying;
         scriptSeekTarget = null;
-        scriptWasPlaying = false;
         scriptSeekCommitting = true;
         try
         {
@@ -929,33 +947,76 @@ public partial class MainWindow : Window
         finally
         {
             scriptSeekCommitting = false;
+            scriptWasPlaying = false;
             if (!closing && generation == scriptSeekGeneration)
                 scriptWindow?.CompleteNavigation(player.GetCurrentTime().TotalSeconds, player.IsPlaying);
             if (!closing) { RefreshProgress(); QueueNaturalCompletion(); }
         }
     }
 
-    private void CancelScriptSeek()
+    private bool CancelScriptSeek()
     {
-        if (!scriptSeekTarget.HasValue && !scriptSeekCommitting) return;
+        if (!scriptSeekTarget.HasValue && !scriptSeekCommitting)
+        {
+            // Reject in-flight browser previews even if the host has not received one yet.
+            scriptWindow?.CancelNavigation();
+            return false;
+        }
+        bool resume = scriptWasPlaying;
         scriptSeekGeneration++;
         scriptSeekTimer.Stop();
         scriptSeekTarget = null;
         scriptWasPlaying = false;
         scriptWindow?.CancelNavigation();
+        return resume;
+    }
+
+    internal async Task RestoreCanceledScriptSeekAsync()
+    {
+        if (scriptSeekCommitting)
+        {
+            // An issued seek cannot be undone; let its serialized restoration finish.
+            if (activeOperation is Task work) await work;
+            return;
+        }
+        bool resume = CancelScriptSeek();
+        if (resume && !closing && !operationBusy && player.IsPaused)
+            await RunActionAsync(player.PlayAsync);
+        if (!closing) RefreshProgress();
     }
 
     private void PositionScriptWindow()
     {
         if (scriptWindow is null || closing || WindowState == WindowState.Minimized) return;
-        // Keep the companion accessible if the primary work area has no space on the right.
         Rect area = SystemParameters.WorkArea;
+        var source = PresentationSource.FromVisual(this);
+        if (source?.CompositionTarget is { } target)
+        {
+            IntPtr handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            var info = new MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<MonitorInfo>() };
+            if (GetMonitorInfo(MonitorFromWindow(handle, 2), ref info))
+            {
+                var scale = target.TransformFromDevice;
+                area = new Rect(scale.Transform(new Point(info.Work.Left, info.Work.Top)),
+                    scale.Transform(new Point(info.Work.Right, info.Work.Bottom)));
+            }
+        }
         double width = scriptWindow.Width;
         double height = scriptWindow.Height;
         double right = WindowState == WindowState.Maximized ? area.Right : Left + ActualWidth;
         scriptWindow.Left = Math.Clamp(right, area.Left, Math.Max(area.Left, area.Right - width));
         scriptWindow.Top = Math.Clamp(Top, area.Top, Math.Max(area.Top, area.Bottom - height));
     }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct NativeRect { public int Left, Top, Right, Bottom; }
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct MonitorInfo { public int Size; public NativeRect Monitor, Work; public uint Flags; }
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr handle, uint flags);
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
 
     private async void Window_Closing(object? sender, CancelEventArgs e)
     {

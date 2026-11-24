@@ -71,6 +71,7 @@ function moveTo(target,immediate){
 }
 function render(data){
   cancelManual();epoch=data.epoch;geometry=[];lines=[];activeLine=null;previousPosition=null;
+  playback={position:0,playing:false,reset:true};
   title.textContent=data.article?.title??'';title.hidden=!title.textContent;
   status.textContent=data.message??'';body.replaceChildren();window.scrollTo(0,0);
   for(const [pi,paragraph] of (data.article?.paragraphs??[]).entries()){
@@ -105,10 +106,15 @@ function scheduleMeasure(){
 function measure(){
   cancelAnimation();geometry=[];lines=[];activeLine=null;
   const y=window.scrollY;
+  const byY=new Map();
   function lineFor(rect){
-    const cy=rect.top+y+rect.height/2;
-    let line=lines.find(l=>Math.abs(l.y-cy)<2);
-    if(!line){line={y:cy,first:null};lines.push(line);}
+    const cy=rect.top+y+rect.height/2,key=Math.round(cy);
+    let line;
+    for(let k=key-2;k<=key+2;k++){
+      const candidate=byY.get(k);
+      if(candidate && Math.abs(candidate.y-cy)<2){line=candidate;break;}
+    }
+    if(!line){line={y:cy,first:null};lines.push(line);byY.set(key,line);}
     return line;
   }
   for(const p of body.querySelectorAll('p')){
@@ -134,10 +140,11 @@ function measure(){
     }
   }
   lines.sort((a,b)=>a.y-b.y);
-  update(playback,true);
+  update(playback,true,manual);
 }
 function update(state,immediate=false,previewOnly=false){
   if(manual && !previewOnly)return;
+  if(!state.playing && animation)cancelAnimation();
   playback=state;
   const t=state.position;
   let current=null,latest=-Infinity;
@@ -183,7 +190,7 @@ chrome.webview.addEventListener('message',({data})=>{
     scheduleMeasure();
   }
   else if(data.type==='article')render(data);
-  else if(data.type==='playback')update(data,data.immediate===true);
+  else if(data.type==='playback' && data.epoch===epoch)update(data,data.immediate===true);
   else if(data.type==='cancel'){epoch=data.epoch;cancelManual();activeLine=null;previousPosition=null;}
   else if(data.type==='commit'){
     epoch=data.epoch;manual=false;pending=null;
