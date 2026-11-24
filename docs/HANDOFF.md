@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-24 — PR #15 merged and post-merge CI passed  
+**Updated:** 2026-11-24 — PR #16 Windows acceptance and CI passed; merge deferred  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Latest merged application-code baseline:** `7cb288e` ([PR #15](https://github.com/chenjing2000/audioplayer/pull/15), squash merged). [Post-merge Windows CI #45332633926](https://github.com/chenjing2000/audioplayer/actions/runs/45332633926) passed. The user accepted 27 manual checks across successive feature revisions and authorized the merge. Remote branch listing verified: only `main` remains. Local checkout synchronization and local branch cleanup have not been independently confirmed.
@@ -23,7 +23,7 @@ PR #11 was developed on `feature/code-and-doc-cleanup` from `main@2be037f` and [
 ## Next steps and safety
 
 1. Start with [program overview](program-overview.md), [project contract](project-contract.md), [Testing](Testing.md), and [Publishing](Publishing.md); see [documentation index](README.md).
-2. PR #15 is merged and post-merge CI passed. Start future work from synchronized `main`; no active feature branch remains remotely. Inspect both downloadable assets when a future tagged Release is created. Dedicated Windows directory-access-denial, real long-pause MP3/WAV and selected FFmpeg fault tests remain deferred.
+2. PR #15 is merged and post-merge CI passed. PR #16 is active on `feature/configurable-seek-shortcuts`; continue there until explicit merge authorization. Inspect both downloadable assets when a future tagged Release is created. Dedicated Windows directory-access-denial, real long-pause MP3/WAV and selected FFmpeg fault tests remain deferred.
 3. Preserve source audio, existing outputs, configuration and installed FFmpeg in future changes. Avoid unnecessary MVVM/DI/task-framework abstractions and broad refactoring.
 4. Discuss new requirements before implementation. Do not merge to `main` without user authorization; use English commit messages, squash merge after acceptance, and clean branches afterward.
 
@@ -46,4 +46,4 @@ PR #15 added recursive scanning and persistent playlists, filename-only display,
 
 ## Active feature — configurable seek shortcuts
 
-Branch `feature/configurable-seek-shortcuts` starts at `main@00d4928`. Settings dialog widened to 480 × 390 DIP, adds backward/forward steps (5/4 seconds by default, 0–99), and Ctrl+Left/Right timed seeking. Space remains window-wide. Automated CI and Windows manual acceptance pending; no merge authorized.
+Branch `feature/configurable-seek-shortcuts` starts at `main@00d4928`. Settings dialog widened to 480 × 390 DIP, adds backward/forward steps (5/4 seconds by default, 0–99), and Ctrl+Left/Right timed seeking. Space remains window-wide. The user explicitly confirmed all 16 Windows manual acceptance checks passed on 2026-11-24. The accepted application revision `ef17fe4` passed [Windows PR CI #45359288782](https://github.com/chenjing2000/audioplayer/actions/runs/45359288782) and [push CI #45359259023](https://github.com/chenjing2000/audioplayer/actions/runs/45359259023). Merge is explicitly deferred at the user's request. See [Testing](Testing.md#windows-acceptance--pr-16) for detailed evidence.

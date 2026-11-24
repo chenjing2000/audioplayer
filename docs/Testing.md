@@ -285,3 +285,26 @@ Together with the earlier 23 checks, this records 27 user-reported manual accept
 ### PR #15 final merge and post-merge verification
 
 After the user authorized merging, final feature head `10f2aee` passed [PR CI #45332463717](https://github.com/chenjing2000/audioplayer/actions/runs/45332463717) and [push CI #45332456815](https://github.com/chenjing2000/audioplayer/actions/runs/45332456815). [PR #15](https://github.com/chenjing2000/audioplayer/pull/15) was squash merged as `main@7cb288e` on 2026-11-24. [Post-merge Windows CI #45332633926](https://github.com/chenjing2000/audioplayer/actions/runs/45332633926) completed successfully. The remote branch listing now contains only `main`; local synchronization and local branch cleanup have not been independently confirmed. The 27 user-reported manual acceptance checks are cumulative across four revisions, not a complete manual rerun on the merge commit. Previously unverified directory-access-denial and real-media/failure-path cases remain outstanding. No tagged release was created by this merge.
+
+## Windows acceptance — PR #16
+
+The user explicitly confirmed all 16 Windows manual acceptance checks passed on 2026-11-24. The accepted application revision `ef17fe4` passed [Windows PR CI #45359288782](https://github.com/chenjing2000/audioplayer/actions/runs/45359288782) and [push CI #45359259023](https://github.com/chenjing2000/audioplayer/actions/runs/45359259023). Merge is explicitly deferred at the user's request.
+
+1. Settings window measures 480 × 390 DIP.
+2. Both parameter sections are properly aligned, without clipped text.
+3. New step parameters default to 5 and 4 seconds.
+4. Both input boxes accept only ASCII digits, with a maximum length of two.
+5. Invalid pasted values and empty confirmed values are rejected.
+6. Modified steps persist after restarting AudioPlayer.
+7. Restore Defaults and Cancel behave correctly.
+8. Ctrl + Left seeks backward by the configured step.
+9. Ctrl + Right seeks forward by the configured step.
+10. Seeking correctly handles the beginning and end of audio.
+11. Seeking preserves playing or paused status, except normal end-of-media behavior.
+12. A step of 0 produces no movement.
+13. Ctrl + Left/Right works regardless of the focused main-window control.
+14. Space toggles playback regardless of the focused main-window control.
+15. Existing Left/Right silence navigation remains functional.
+16. Changing only the step parameters does not trigger silence reanalysis.
+
+These are user-reported Windows manual results, separate from hosted automated CI. No new local automated assertion counts or previously deferred failure-path coverage are claimed.
