@@ -235,12 +235,25 @@ internal static class UiChecks
                             list.ScrollIntoView(list.Items[index]);
                             list.UpdateLayout();
                             await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-                            var row = (DataGridRow)list.ItemContainerGenerator.ContainerFromIndex(index);
-                            var header = row is null ? null : FindVisual<System.Windows.Controls.Primitives.DataGridRowHeader>(row);
-                            Assert(row is not null && row.BorderThickness == new Thickness(0)
-                                && (header is null || !header.IsVisible || header.ActualWidth < 0.01)
-                                && ColorOf(row.Background) == (index % 2 == 0 ? "#FFFFFFFF" : "#FFF0F0F0"),
-                                $"Scrolled row {index} has no visible row header or border and retains alternating color");
+                            list.UpdateLayout();
+                            var row = list.ItemContainerGenerator.ContainerFromIndex(index) as DataGridRow;
+                            Assert(row is not null, $"Scrolled row {index} is realized");
+                            var header = FindVisual<System.Windows.Controls.Primitives.DataGridRowHeader>(row!);
+                            Assert(row!.BorderThickness == new Thickness(0),
+                                $"Scrolled row {index} has no row border");
+                            Assert(header is null || !header.IsVisible || header.ActualWidth < 0.01,
+                                $"Scrolled row {index} has no visible row header");
+                            int alternation = ItemsControl.GetAlternationIndex(row);
+                            Assert(alternation is 0 or 1
+                                && ColorOf(row.Background) == (alternation == 0 ? "#FFFFFFFF" : "#FFF0F0F0"),
+                                $"Scrolled row {index} follows its WPF alternation index {alternation}");
+                            foreach (int neighbor in new[] { index - 1, index + 1 })
+                            {
+                                if (neighbor < 0 || neighbor >= list.Items.Count) continue;
+                                if (list.ItemContainerGenerator.ContainerFromIndex(neighbor) is DataGridRow adjacent)
+                                    Assert(ItemsControl.GetAlternationIndex(adjacent) != alternation,
+                                        $"Realized adjacent rows {index} and {neighbor} alternate");
+                            }
                         }
                         await window.LoadFolderAsync(audioFolder);
                     }
