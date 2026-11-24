@@ -21,7 +21,6 @@ public partial class ScriptWindow : Window
     internal event Action<System.Windows.Input.Key, System.Windows.Input.ModifierKeys>? Shortcut;
     private int navigationEpoch;
     private (double Position, bool Playing, bool Reset)? playback;
-    private (double Position, bool Playing, bool Reset)? sentPlayback;
     private string? audioPath;
     private CancellationTokenSource? scriptLoadCancellation;
     private ScriptArticle? article;
@@ -93,7 +92,7 @@ public partial class ScriptWindow : Window
                     return;
                 }
                 ready = false;
-                sentPlayback = null;
+                navigationEpoch++;
             };
             core.NewWindowRequested += (_, args) => args.Handled = true;
             core.ProcessFailed += (_, args) => ShowFailure("WebView2 进程异常：" + args.ProcessFailedKind);
@@ -165,29 +164,15 @@ public partial class ScriptWindow : Window
         catch (JsonException) { }
     }
 
-    internal void CancelNavigation()
-    {
-        navigationEpoch++;
-        sentPlayback = null;
-        if (ready && !ownerClosing) Post(new { type = "cancel", epoch = navigationEpoch });
-    }
-
-    internal void CompleteNavigation(double position, bool playing)
-    {
-        navigationEpoch++;
-        sentPlayback = null;
-        if (ready && !ownerClosing) Post(new { type = "commit", epoch = navigationEpoch, position, playing, reset = false });
-    }
-
     internal async void SetAudio(string? path)
     {
         if (ownerClosing || readerFailed || string.Equals(path, audioPath, StringComparison.OrdinalIgnoreCase)) return;
-        CancelNavigation();
+        navigationEpoch++;
+        playback = null; // Never send the previous track's time with a new article.
         audioPath = path;
         scriptLoadCancellation?.Cancel();
         scriptLoadCancellation = null;
         article = null;
-        sentPlayback = null;
         message = path is null ? "尚未加载原文" : "正在加载原文…";
         SendArticle();
         if (path is null) return;
@@ -222,13 +207,16 @@ public partial class ScriptWindow : Window
         if (ready && !ownerClosing) Post(new { type = "appearance", appearance });
     }
 
-    internal void UpdatePlayback(double position, bool playing, bool reset, bool immediate = false)
+    // One authoritative snapshot protocol. Reconciliation also invalidates
+    // queued requests from the previous navigation epoch.
+    internal void UpdatePlayback(double position, bool playing, bool reset, bool reconcile = false, double? committedTarget = null)
     {
-        playback = (position, playing, reset);
-        if (!ready || ownerClosing || !IsVisible || article is null) return;
-        if (!immediate && sentPlayback == playback) return;
-        sentPlayback = playback;
-        Post(new { type = "playback", epoch = navigationEpoch, position, playing, reset, immediate });
+        var current = (Position: position, Playing: playing, Reset: reset);
+        bool changed = playback != current;
+        playback = current;
+        if (reconcile) navigationEpoch++;
+        if (!ready || ownerClosing || !IsVisible || (!reconcile && !changed)) return;
+        Post(new { type = "playback", epoch = navigationEpoch, position, playing, reset, committedTarget });
     }
 
     private void Post(object payload)
@@ -244,9 +232,8 @@ public partial class ScriptWindow : Window
     {
         if (!ready || ownerClosing) return;
         Post(new { type = "article", article, message, epoch = navigationEpoch });
-        sentPlayback = null;
         if (playback is { } current)
-            UpdatePlayback(current.Position, current.Playing, current.Reset, immediate: true);
+            UpdatePlayback(current.Position, current.Playing, current.Reset, reconcile: true);
     }
 
     private void ShowFailure(string text)
@@ -275,7 +262,7 @@ public partial class ScriptWindow : Window
         scriptLoadCancellation?.Cancel();
         scriptLoadCancellation = null;
         if (IsVisible) Hide();
-        Reader.Dispose();
-        Close();
+        try { Reader.Dispose(); }
+        finally { Close(); }
     }
 }

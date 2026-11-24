@@ -623,7 +623,7 @@ internal static class UiChecks
                     window.BeginScriptSeek(double.NaN);
                     window.BeginScriptSeek(-1);
                     Assert(!Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled &&
-                        !FieldValue<double?>(window, "scriptSeekTarget").HasValue,
+                        Field<object>(window, "scriptSeek") is null,
                         "Invalid script navigation targets do not arm the debounce timer");
                     await window.CommitScriptSeekAsync();
                     Assert(!Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled,
@@ -684,12 +684,17 @@ internal static class UiChecks
                                       .map(t=>followOffset(t,100,1000));
                                     return followAnchors.length===3 &&
                                       offsets.every((x,i)=>x===100+25*i) &&
+                                      offsets.every((x,i)=>timeAtOffset(x,100,1000)===i*0.5) &&
+                                      timeAtOffset(126,100,1000)>0.5 &&
+                                      timeAtOffset(0,100,1000)===0 &&
+                                      timeAtOffset(900,100,1000)===4 &&
+                                      timeAtOffset(0,100,80)===null &&
                                       followOffset(10,100,220)===120 &&
                                       followOffset(10,100,80)===0;
                                   } finally {followAnchors=saved;}
                                 })()
                                 """);
-                            Assert(continuousFollow == "true", "Reader follows continuous time-position trajectory between visual lines");
+                            Assert(continuousFollow == "true", "Reader forward and inverse trajectories agree, including fine-grained scroll offsets and boundaries");
                             string followFrames = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """
                                 (() => {
@@ -751,37 +756,71 @@ internal static class UiChecks
                             string scrollBarNavigation = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """
                                 (() => {
-                                  const originalPreview=preview, savedLines=lines;
+                                  const originalPreview=preview, savedAnchors=followAnchors;
                                   const spacer=document.createElement('div');
                                   spacer.style.height='3000px';
                                   let targets=[];
                                   try {
                                     body.append(spacer);
-                                    lines=[{y:window.innerHeight/2+200,first:7},
-                                           {y:window.innerHeight/2+400,first:9}];
-                                    preview=line=>targets.push(line.first);
+                                    followAnchors=[{y:window.innerHeight/2+200,time:7},
+                                                   {y:window.innerHeight/2+400,time:9}];
+                                    preview=time=>targets.push(time);
                                     scrollProgrammatically(200);
                                     window.dispatchEvent(new Event('scroll'));
                                     if(targets.length!==0)return false;
-                                    // Native scrollbar movement changes scrollY without
-                                    // going through scrollProgrammatically.
-                                    window.scrollTo(0,400);
+                                    window.scrollTo(0,250);
                                     window.dispatchEvent(new Event('scroll'));
-                                    if(targets.length!==1 || targets[0]!==9)return false;
+                                    if(targets.length!==1 || Math.abs(targets[0]-7.5)>0.02)return false;
                                     window.dispatchEvent(new Event('scroll'));
                                     if(targets.length!==1)return false;
+                                    window.scrollTo(0,260);
+                                    window.dispatchEvent(new Event('scroll'));
+                                    if(targets.length!==2 || Math.abs(targets[1]-7.6)>0.02)return false;
                                     const sentence=body.querySelector('.sentence');
                                     sentence.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,clientY:window.innerHeight/2}));
-                                    return targets.length===1;
+                                    return targets.length===2;
                                   } finally {
                                     preview=originalPreview;
-                                    lines=savedLines;
+                                    followAnchors=savedAnchors;
                                     spacer.remove();
                                     scrollProgrammatically(0);
                                   }
                                 })()
                                 """);
-                            Assert(scrollBarNavigation == "true", "Reader native scroll previews seek, programmatic scroll and double-click do not");
+                            Assert(scrollBarNavigation == "true", "Reader external scroll previews continuous time; programmatic scroll and double-click do not");
+
+                            string reconciliation = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const savedEpoch=epoch,savedAnchors=followAnchors;
+                                  const spacer=document.createElement('div');
+                                  spacer.style.height='3000px';
+                                  try {
+                                    body.append(spacer);
+                                    followAnchors=[{y:window.innerHeight/2+200,time:1},
+                                                   {y:window.innerHeight/2+400,time:3}];
+                                    receivePlayback({epoch,position:1,playing:false,reset:false});
+                                    pending=2;cancelAnimation();paintAt(2,false);scrollProgrammatically(300);
+                                    if(playback.position!==1)return false;
+                                    receivePlayback({epoch,position:1,playing:false,reset:false});
+                                    if(pending!==2 || Math.abs(window.scrollY-300)>1)return false;
+                                    receivePlayback({epoch:epoch+1,position:1,playing:false,reset:false});
+                                    if(pending!==null || Math.abs(window.scrollY-200)>1 || paintPosition!==1)return false;
+                                    receivePlayback({epoch:epoch-1,position:3,playing:false,reset:false});
+                                    if(playback.position!==1)return false;
+                                    pending=2;paintAt(2,false);scrollProgrammatically(310);
+                                    receivePlayback({epoch:epoch+1,position:2,playing:false,reset:false,committedTarget:2});
+                                    if(pending!==null || Math.abs(window.scrollY-310)>1)return false;
+                                    pending=2.5;paintAt(2.5,false);scrollProgrammatically(350);
+                                    receivePlayback({epoch:epoch+1,position:2,playing:false,reset:false,committedTarget:2});
+                                    return pending===null && Math.abs(window.scrollY-300)<=1 && playback.position===2;
+                                  } finally {
+                                    cancelManual();epoch=savedEpoch;followAnchors=savedAnchors;
+                                    spacer.remove();update({position:0,playing:false,reset:true},true);
+                                  }
+                                })()
+                                """);
+                            Assert(reconciliation == "true", "Reader preview never replaces host clock; reconciliation rejects stale snapshots and restores canceled or superseded offsets");
 
                             // Keep the synthetic article isolated from MainWindow's playback timer
                             // until the rendering assertions finish. No real audio is loaded here.
@@ -1023,15 +1062,24 @@ internal static class UiChecks
                         await settingsClosed.Task.WaitAsync(TimeSpan.FromSeconds(10));
                     }
                     finally { closeSettingsTimer.Stop(); }
-                    Assert(scriptPlayer.IsPlaying && !FieldValue<double?>(window, "scriptSeekTarget").HasValue,
+                    Assert(scriptPlayer.IsPlaying && Field<object>(window, "scriptSeek") is null,
                         "Opening and canceling Settings restores pending wheel playback intent");
                     window.BeginScriptSeek(6);
                     await window.HandleShortcutAsync(Key.Space);
-                    Assert(scriptPlayer.IsPaused && !FieldValue<double?>(window, "scriptSeekTarget").HasValue,
+                    Assert(scriptPlayer.IsPaused && Field<object>(window, "scriptSeek") is null,
                         "Space cancels wheel preview and honors intended pause");
                     window.BeginScriptSeek(6);
                     await window.HandleShortcutAsync(Key.Space);
                     Assert(scriptPlayer.IsPlaying, "Space from explicitly paused preview resumes playback");
+                    // A consumed transaction cannot replay its old target.
+                    window.BeginScriptSeek(5);
+                    await window.CommitScriptSeekAsync();
+                    double committedPosition = scriptPlayer.GetCurrentTime().TotalSeconds;
+                    await window.CommitScriptSeekAsync();
+                    Assert(scriptPlayer.IsPlaying && committedPosition >= 4.9 &&
+                        scriptPlayer.GetCurrentTime().TotalSeconds >= committedPosition &&
+                        Field<object>(window, "scriptSeek") is null,
+                        "Completed script navigation is consumed exactly once");
                     window.BeginScriptSeek(6);
                     stopButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     if (Field<Task>(window, "activeOperation") is Task stoppingScript) await stoppingScript;

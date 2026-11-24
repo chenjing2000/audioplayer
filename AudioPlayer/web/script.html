@@ -15,31 +15,18 @@ const scrollTarget=(y,height,total)=>clamp(y-height/2,0,Math.max(0,total-height)
 // The host samples the audio clock about every 25 ms while playing.
 const MAX_CLOCK_EXTRAPOLATION_S=0.05;
 const FOLLOW_HANDOFF_MS=150;
-let geometry=[],lines=[],followAnchors=[],playback={position:0,playing:false,reset:true};
-let animation=0,measureFrame=0,lastTarget=null,previousPosition=null;
+let geometry=[],followAnchors=[],playback={position:0,playing:false,reset:true};
+let animation=0,measureFrame=0;
 let sampleAt=0,followTime=null,handoffOffset=0,handoffAt=0;
-let epoch=0,manual=false,pending=null;
+let epoch=0,pending=null;
 let knownScrollY=window.scrollY,knownScrollLimit=null;
 let started=0,paintPosition=null;
 const activeUnits=new Set();
-function cancelManual(){manual=false;pending=null;cancelAnimation();}
-function preview(line){
-  if(!line || line.first===null)return;
-  manual=true;pending=line.first;cancelAnimation();
-  update({position:pending,playing:false,reset:false},false,true);
-  chrome.webview.postMessage({type:'preview',epoch,position:pending});
-}
-function nearest(y){
-  let lo=0,hi=lines.length;
-  while(lo<hi){const mid=(lo+hi)>>>1;if(lines[mid].y<y)lo=mid+1;else hi=mid;}
-  const before=lines[lo-1],after=lines[lo];
-  return !before?after:!after?before:y-before.y<=after.y-y?before:after;
-}
-function wheelLine(){
-  const max=Math.max(0,document.documentElement.scrollHeight-window.innerHeight);
-  if(window.scrollY<0.5)return lines.find(l=>l.first!==null);
-  if(window.scrollY>=max-0.5)return lines.findLast(l=>l.first!==null);
-  return nearest(window.scrollY+window.innerHeight/2);
+function cancelManual(){pending=null;cancelAnimation();}
+function preview(time){
+  pending=time;cancelAnimation();
+  paintAt(time,false);
+  chrome.webview.postMessage({type:'preview',epoch,position:time});
 }
 // Keep the actual browser offset, not the requested fractional position:
 // Chromium may round or clamp scrollTo. Its later scroll event is not a seek.
@@ -47,18 +34,17 @@ function scrollLimit(){return Math.max(0,document.documentElement.scrollHeight-w
 function rememberScroll(){knownScrollY=window.scrollY;knownScrollLimit=scrollLimit();}
 function scrollProgrammatically(y){window.scrollTo(0,y);rememberScroll();}
 function previewScroll(){
-  const line=wheelLine();
-  if(line?.first!==null && line?.first!==undefined)preview(line);
-  else if(manual && pending!==null)chrome.webview.postMessage({type:'preview',epoch,position:pending});
+  const time=timeAtOffset(window.scrollY);
+  if(time===null)return false;
+  preview(time);
+  return true;
 }
 function detectExternalScroll(){
   const changed=Math.abs(window.scrollY-knownScrollY)>0.01;
   const layoutChanged=knownScrollLimit!==null && knownScrollLimit!==scrollLimit();
   rememberScroll();
   if(!changed || layoutChanged || measureFrame)return false;
-  cancelAnimation();
-  previewScroll();
-  return true;
+  return previewScroll();
 }
 window.addEventListener('scroll',detectExternalScroll,{passive:true});
 window.addEventListener('wheel',event=>{
@@ -79,7 +65,7 @@ window.addEventListener('auxclick',event=>{if(event.button===1)event.preventDefa
 window.addEventListener('mousedown',event=>{if(event.button===1)event.preventDefault();});
 function cancelAnimation(){
   if(animation)cancelAnimationFrame(animation);
-  animation=0;lastTarget=null;followTime=null;handoffOffset=0;
+  animation=0;followTime=null;handoffOffset=0;
 }
 // A strictly increasing time axis in document order prevents backward motion
 // from overlapping, equal or out-of-order line timestamps.
@@ -92,26 +78,42 @@ function buildFollowAnchors(visualLines){
   }
   return anchors;
 }
-function followOffset(t,height=window.innerHeight,total=document.documentElement.scrollHeight){
-  if(!followAnchors.length)return 0;
-  const first=followAnchors[0],last=followAnchors.at(-1);
-  if(t<=first.time){
-    const target=scrollTarget(first.y,height,total);
-    return first.time>0?target*clamp(t/first.time,0,1):target;
-  }
-  if(t>=last.time)return scrollTarget(last.y,height,total);
+// One monotone trajectory, evaluated in either direction. Both playback and
+// manual navigation use exactly the same measured anchors.
+function interpolate(value,input,output){
   let lo=0,hi=followAnchors.length-1;
+  if(value<=followAnchors[lo][input])return followAnchors[lo][output];
+  if(value>=followAnchors[hi][input])return followAnchors[hi][output];
   while(hi-lo>1){
     const mid=(lo+hi)>>>1;
-    if(followAnchors[mid].time<=t)lo=mid;else hi=mid;
+    if(followAnchors[mid][input]<=value)lo=mid;else hi=mid;
   }
   const a=followAnchors[lo],b=followAnchors[hi];
-  // No per-line ease-in/ease-out: the position keeps moving between anchors.
-  const u=(t-a.time)/(b.time-a.time);
-  return scrollTarget(a.y+(b.y-a.y)*u,height,total);
+  const u=(value-a[input])/(b[input]-a[input]);
+  return a[output]+(b[output]-a[output])*u;
+}
+function followOffset(t,height=window.innerHeight,total=document.documentElement.scrollHeight){
+  if(!followAnchors.length)return 0;
+  const first=followAnchors[0];
+  if(t<first.time){
+    return scrollTarget(first.y,height,total)*clamp(t/first.time,0,1);
+  }
+  return scrollTarget(interpolate(t,'time','y'),height,total);
+}
+function timeAtOffset(offset,height=window.innerHeight,total=document.documentElement.scrollHeight){
+  const limit=Math.max(0,total-height);
+  if(!followAnchors.length || limit<=0)return null;
+  const first=followAnchors[0],last=followAnchors.at(-1);
+  // At the natural scroll limits several times map to the same position;
+  // retain the first/last timed line as the unambiguous manual target.
+  if(offset<=0.5)return first.time;
+  if(offset>=limit-0.5)return last.time;
+  const firstOffset=scrollTarget(first.y,height,total);
+  if(offset<firstOffset)return first.time*offset/firstOffset;
+  return interpolate(offset+height/2,'y','time');
 }
 function followFrame(now){
-  if(manual || !playback.playing || playback.reset){cancelAnimation();return;}
+  if(pending!==null || !playback.playing || playback.reset){cancelAnimation();return;}
   if(detectExternalScroll())return;
   // Interpolate the clock between host samples, never run freely beyond a
   // short bound if updates stall. Coloring still uses confirmed audio time.
@@ -120,7 +122,7 @@ function followFrame(now){
   const bias=handoffOffset*(1-clamp((now-handoffAt)/FOLLOW_HANDOFF_MS,0,1));
   const target=clamp(followOffset(followTime)+bias,0,
     Math.max(0,document.documentElement.scrollHeight-window.innerHeight));
-  if(target!==lastTarget){scrollProgrammatically(target);lastTarget=target;}
+  if(Math.abs(target-window.scrollY)>=0.5)scrollProgrammatically(target);
   animation=requestAnimationFrame(followFrame);
 }
 function followPlayback(t,immediate){
@@ -137,7 +139,7 @@ function followPlayback(t,immediate){
   }
 }
 function render(data){
-  cancelManual();epoch=data.epoch;geometry=[];lines=[];followAnchors=[];previousPosition=null;
+  cancelManual();epoch=data.epoch;geometry=[];followAnchors=[];
   started=0;paintPosition=null;activeUnits.clear();
   playback={position:0,playing:false,reset:true};
   title.textContent=data.article?.title??'';title.hidden=!title.textContent;
@@ -172,7 +174,8 @@ function scheduleMeasure(){
   if(!measureFrame)measureFrame=requestAnimationFrame(()=>{measureFrame=0;measure();});
 }
 function measure(){
-  rememberScroll();cancelAnimation();geometry=[];lines=[];followAnchors=[];
+  rememberScroll();cancelAnimation();geometry=[];followAnchors=[];
+  const lines=[];
   started=0;paintPosition=null;activeUnits.clear();
   const y=window.scrollY;
   const byY=new Map();
@@ -183,47 +186,39 @@ function measure(){
       const candidate=byY.get(k);
       if(candidate && Math.abs(candidate.y-cy)<2){line=candidate;break;}
     }
-    if(!line){line={y:cy,first:null,followStart:null};lines.push(line);byY.set(key,line);}
+    if(!line){line={y:cy,followStart:null};lines.push(line);byY.set(key,line);}
     return line;
   }
   for(const p of body.querySelectorAll('p')){
     const paint=p.querySelector(':scope > .paint'),clip=p.querySelector('clipPath');
     clip.replaceChildren();const base=paint.getBoundingClientRect();
-    // Measure untimed text too, including lines containing no timed units.
-    for(const sentence of p.querySelectorAll(':scope > .sentence')){
-      const range=document.createRange();range.selectNodeContents(sentence);
-      for(const rect of range.getClientRects())if(rect.width>0.25&&rect.height>0.25)lineFor(rect);
-    }
     for(const span of p.querySelectorAll(':scope > .sentence .timed')){
       const start=Number(span.dataset.start),end=Number(span.dataset.end);
       const range=document.createRange();range.selectNodeContents(span);
       const rects=[...range.getClientRects()].filter(r=>r.width>0.25&&r.height>0.25).sort((a,b)=>a.top-b.top||a.left-b.left);
+      if(!rects.length)continue;
+      const total=rects.reduce((sum,r)=>sum+r.width,0);
+      let consumed=0;
       const segments=rects.map(r=>{
-        const line=lineFor(r);if(line.first===null)line.first=start;
+        const line=lineFor(r);
+        // A wrapped word contributes a proportional time to each visual line.
+        const time=start+(end-start)*consumed/total;
+        line.followStart=line.followStart===null?time:Math.min(line.followStart,time);
+        consumed+=r.width;
         const element=document.createElementNS(ns,'rect');
         element.setAttribute('x',r.left-base.left);element.setAttribute('y',r.top-base.top-1);
         element.setAttribute('width','0');element.setAttribute('height',r.height+2);clip.append(element);
-        return {element,width:r.width,line,painted:0};
+        return {element,width:r.width,painted:0};
       });
-      if(segments.length){
-        const total=segments.reduce((sum,s)=>sum+s.width,0);
-        let consumed=0;
-        for(const seg of segments){
-          // A word spanning visual lines contributes a proportional timestamp
-          // to each line, without changing the existing manual seek target.
-          const time=start+(end-start)*consumed/total;
-          seg.line.followStart=seg.line.followStart===null?time:Math.min(seg.line.followStart,time);
-          consumed+=seg.width;
-        }
-        geometry.push({start,end,segments,total,last:NaN});
-      }
+      geometry.push({start,end,segments,total,last:NaN});
     }
   }
   lines.sort((a,b)=>a.y-b.y);
   followAnchors=buildFollowAnchors(lines);
   // Stable sort preserves original document order for equal starts.
   geometry.sort((a,b)=>a.start-b.start);
-  update(playback,true,manual);
+  if(pending!==null)paintAt(pending,false);
+  else update(playback,true);
 }
 function paintUnit(unit,fraction){
   if(unit.last===fraction)return;
@@ -234,20 +229,14 @@ function paintUnit(unit,fraction){
     remaining-=seg.width;
   }
 }
-function update(state,immediate=false,previewOnly=false){
-  if(manual && !previewOnly)return;
-  const wasPlaying=playback.playing;
-  const prior=previousPosition;
-  playback=state;
-  const t=state.position;
-  if(t!==prior || !wasPlaying || immediate)sampleAt=performance.now();
-  // Forward playback visits newly started and still-active intervals only.
-  // Rewind/reset restores all painted intervals, including overlapping timestamps.
-  if(state.reset || (paintPosition!==null && t<paintPosition)){
+// Coloring is a pure projection of a requested time (preview or host clock).
+// Previewing must never overwrite the authoritative playback snapshot.
+function paintAt(t,reset){
+  if(reset || (paintPosition!==null && t<paintPosition)){
     for(let i=0;i<started;i++)paintUnit(geometry[i],0);
     started=0;activeUnits.clear();
   }
-  if(!state.reset){
+  if(!reset){
     while(started<geometry.length && geometry[started].start<=t)
       activeUnits.add(geometry[started++]);
     for(const unit of activeUnits){
@@ -255,16 +244,40 @@ function update(state,immediate=false,previewOnly=false){
       if(t>=unit.end)activeUnits.delete(unit);
     }
   }
-  paintPosition=state.reset?null:t;
-  const jumped=prior!==null && (t<prior || t-prior>0.35);
-  previousPosition=t;
-  if(previewOnly){cancelAnimation();return;}
+  paintPosition=reset?null:t;
+}
+function update(state,immediate=false,preserveOffset=false){
+  const prior=playback.position,wasPlaying=playback.playing;
+  const t=state.position;
+  playback=state;
+  if(t!==prior || !wasPlaying || immediate || preserveOffset)sampleAt=performance.now();
+  paintAt(t,state.reset);
   if(state.reset){cancelAnimation();scrollProgrammatically(0);return;}
+  const jumped=t<prior || t-prior>0.35;
+  if(preserveOffset){
+    // Successful manual seek: keep the actual offset until follow resumes,
+    // and use the existing handoff to avoid a visible snap.
+    cancelAnimation();
+    if(state.playing)followPlayback(t,false);
+    return;
+  }
   if(state.playing){followPlayback(t,immediate||jumped);return;}
-  // Pause freezes the displayed offset; seek and layout changes reposition.
   cancelAnimation();
   if(immediate||jumped||(!wasPlaying && t!==prior))
     scrollProgrammatically(followOffset(t));
+}
+function receivePlayback(data){
+  if(data.epoch<epoch)return;
+  if(data.epoch===epoch){
+    // Samples already queued before the host received the preview cannot
+    // overwrite it. Every command completion uses a newer epoch.
+    if(pending===null)update(data);
+    return;
+  }
+  const preserveOffset=pending!==null && data.committedTarget===pending && !data.reset;
+  cancelManual();
+  epoch=data.epoch;
+  update(data,!preserveOffset,preserveOffset);
 }
 chrome.webview.addEventListener('message',({data})=>{
   if(data.type==='appearance'){
@@ -277,17 +290,8 @@ chrome.webview.addEventListener('message',({data})=>{
     root.setProperty('--playback-color',a.scriptColor);
     scheduleMeasure();
   }
-  else if(data.type==='article')render(data);
-  else if(data.type==='playback' && data.epoch===epoch)update(data,data.immediate===true);
-  else if(data.type==='cancel'){
-    epoch=data.epoch;
-    if(manual){cancelManual();previousPosition=null;}
-  }
-  else if(data.type==='commit'){
-    const preserveOffset=manual;
-    epoch=data.epoch;manual=false;pending=null;
-    update(data,!preserveOffset,preserveOffset);
-  }
+  else if(data.type==='article' && data.epoch>=epoch)render(data);
+  else if(data.type==='playback')receivePlayback(data);
 });
 window.addEventListener('resize',scheduleMeasure);
 document.fonts.ready.then(scheduleMeasure);

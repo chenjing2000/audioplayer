@@ -437,10 +437,10 @@ On Windows, close running AudioPlayer, switch to the feature branch and pull fas
 | C07 | Pause/resume, forward/backward seek, Stop and natural end |
 | C08 | Resize/font changes recalculate layout without audio seek |
 | D01 | Wheel at 25% of original displacement and native scrollbar both directions directly scroll, no auto animation |
-| D02 | Rapid wheel input previews latest target on main slider |
+| D02 | Rapid wheel input previews latest continuous target on main slider; small moves within a visual line change target |
 | D03 | One committed seek after approximately 150 ms idle |
 | D04 | Playing resumes, paused/stopped behavior remains consistent |
-| D05 | Top/bottom first/last timed line; untimed line and no movement behavior |
+| D05 | Top/bottom first/last valid anchor; interpolation across untimed text, no valid anchors/no movement does not seek |
 | D06 | Double-click text does not seek; left selection/copy and middle press behavior |
 | D07 | Hide/close, Stop, Space and main slider/keyboard supersede pending seek correctly |
 | D08 | Switch track, refresh, open/settings dialogs and close app during pending navigation |
@@ -526,3 +526,9 @@ The user reported the 50% setting at `ba1f351` still moves too far and requested
 ### Reader controls and close-before-minimize (pending)
 
 User requested no reader minimize/maximize buttons (retain resize/close), native scrollbar movement to preview/seek like wheel, removal of double-click seek, and actual reader close before main minimize. Native SC_MINIMIZE closes/disposes reader synchronously before default minimize; StateChanged closes as fallback for programmatic/shell paths. Restoring owner leaves reader closed until the user opens it. Scroll events distinguish actual external movement from programmatic scrollTo (including clamping/rounding), reuse center-line preview and 150 ms debounce; automatic scroll does not seek. Wheel remains 25%. New WebView2 and native lifecycle assertions are pending CI and Windows visual acceptance, including real scrollbar drag, track clicks, ongoing playback and residual shadow. No merge authorized.
+
+### Reader state and trajectory refactor (pending Windows verification)
+
+At `6917294`, [Feature validation](https://github.com/chenjing2000/audioplayer/actions/runs/45430367570) completed successfully. This is pre-refactor evidence only; no new Windows manual log was supplied. Source review identified separate quantized manual and continuous automatic mappings, four host navigation-state fields with a separate committing path, browser preview overwriting authoritative playback, cancellation without an actual-state snapshot, and stale-window callbacks. Refactor uses one pending transaction, the existing serialized host command gate, one epoch-tagged playback snapshot protocol, separate preview coloring, matching committed target for offset preservation, and one monotone timeline used in both directions. The reader measures timed rectangles only. Existing wheel scale (0.25), 150 ms debounce, natural bounds, real word timestamps for coloring, no double-click seek and owner-minimize close remain. Manual behavior deliberately changes from line-start quantization to continuous interpolation; untimed text between valid anchors can be traversed without fabricating word timings. No timed anchors means no seek.
+
+The exact revised inline JavaScript was executed in a simulated DOM/clock environment: all 401 forward/inverse round-trip samples, empty-trajectory handling, preview isolation, equal-position cancel, stale epoch rejection, matching commit offset and superseded commit reconciliation passed. This is not WebView2/Windows execution. Updated browser assertions exercise continuous sub-line external scroll, programmatic-scroll exclusion, same-position cancellation, stale messages and committed-target matching. Audio-device integration includes consumed-transaction repeated commit. Fresh CI and local Windows full suite are required. Focus D01–D08, C01–C08, A06–A08, F01–F06; test a real scrollbar drag, rapid interaction with Space/Stop/main slider/Settings, minimize during preview/commit, reopen and track changes, long scripts, untimed text, short document and device failure where feasible. Native scrollbar attribution still uses observed scroll offsets; physical input and resize/DPI behavior must be verified locally. No merge authorized.
