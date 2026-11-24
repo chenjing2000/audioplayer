@@ -55,6 +55,11 @@ public partial class MainWindow : Window
     private bool modalDialogOpen;
     private bool completionQueued;
     private ScriptWindow? scriptWindow;
+    private readonly DispatcherTimer scriptSeekTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
+    private double? scriptSeekTarget;
+    private bool scriptWasPlaying;
+    private bool scriptSeekCommitting;
+    private int scriptSeekGeneration;
 
     public MainWindow() : this(new SettingsStore(),
         new PlaylistStore(PlaylistStore.GetFilePath(SettingsStore.GetExecutablePath())))
@@ -82,6 +87,7 @@ public partial class MainWindow : Window
         player.NaturalPlaybackEnded += Player_NaturalPlaybackEnded;
         timer.Tick += (_, _) => RefreshProgress();
         timer.Start();
+        scriptSeekTimer.Tick += async (_, _) => await CommitScriptSeekAsync();
         try
         {
             silenceSettings = settingsStore.LoadOrCreate();
@@ -161,6 +167,7 @@ public partial class MainWindow : Window
     {
         if (operationBusy || closing || modalDialogOpen) return;
         var dialog = new OpenFolderDialog { Title = "选择教材音频文件夹" };
+        CancelScriptSeek();
         modalDialogOpen = true;
         try
         {
@@ -580,7 +587,7 @@ public partial class MainWindow : Window
     }
 
     private bool CanContinuePlayback()
-        => !closing && !operationBusy && !dragging && !navigating && !modalDialogOpen;
+        => !closing && !operationBusy && !dragging && !navigating && !modalDialogOpen && scriptSeekTarget is null;
 
     private void QueueNaturalCompletion()
     {
@@ -620,6 +627,7 @@ public partial class MainWindow : Window
         }
         var dialog = new SilenceSettingsWindow(silenceSettings) { Owner = this };
         bool? confirmed;
+        CancelScriptSeek();
         modalDialogOpen = true;
         try { confirmed = dialog.ShowDialog(); }
         finally { modalDialogOpen = false; QueueNaturalCompletion(); }
@@ -706,6 +714,7 @@ public partial class MainWindow : Window
     private async Task RunActionAsync(Func<Task> action)
     {
         if (operationBusy || closing) return;
+        if (!scriptSeekCommitting) CancelScriptSeek();
         operationBusy = true;
         UpdateControls();
         Task work = RunCoreAsync(action);
@@ -779,7 +788,7 @@ public partial class MainWindow : Window
 
     private void RefreshProgress()
     {
-        if (closing) return;
+        if (closing || scriptSeekTarget.HasValue || scriptSeekCommitting) return;
         bool scriptVisible = scriptWindow?.IsVisible == true && WindowState != WindowState.Minimized;
         var interval = TimeSpan.FromMilliseconds(scriptVisible && player.IsPlaying ? 25 : 100);
         if (timer.Interval != interval) timer.Interval = interval;
@@ -814,6 +823,7 @@ public partial class MainWindow : Window
     {
         if (e.ChangedButton != MouseButton.Left) return;
         if (operationBusy || closing || !player.IsLoaded) return;
+        CancelScriptSeek();
         dragging = true;
         DependencyObject? source = e.OriginalSource as DependencyObject;
         while (source is not null && !ReferenceEquals(source, ProgressSlider))
@@ -845,9 +855,13 @@ public partial class MainWindow : Window
         if (scriptWindow is null)
         {
             scriptWindow = new ScriptWindow { Owner = this, Height = Math.Max(300, ActualHeight) };
+            scriptWindow.NavigationPreview += PreviewScriptSeek;
+            scriptWindow.NavigationCanceled += () => CancelScriptSeek();
+            scriptWindow.Shortcut += async (key, modifiers) => await HandleShortcutAsync(key, modifiers);
             scriptWindow.IsVisibleChanged += (_, _) =>
             {
                 string label = scriptWindow?.IsVisible == true ? "隐藏原文" : "显示原文";
+                if (scriptWindow?.IsVisible != true) CancelScriptSeek();
                 ScriptButton.ToolTip = label;
                 AutomationProperties.SetName(ScriptButton, label);
             };
@@ -863,6 +877,70 @@ public partial class MainWindow : Window
                 (!player.IsPlaying && !player.IsPaused && (position <= 0 ||
                 position >= player.GetDuration().TotalSeconds)), immediate: true);
         }
+    }
+
+    private void PreviewScriptSeek(double seconds)
+    {
+        if (closing || operationBusy || modalDialogOpen || dragging || navigating ||
+            !player.IsLoaded || scriptWindow?.IsVisible != true)
+        {
+            scriptWindow?.CancelNavigation();
+            return;
+        }
+        double duration = player.GetDuration().TotalSeconds;
+        if (!scriptSeekTarget.HasValue)
+        {
+            scriptWasPlaying = player.IsPlaying;
+            scriptSeekTarget = Math.Clamp(seconds, 0, duration);
+            if (scriptWasPlaying) player.Pause();
+        }
+        scriptSeekTarget = Math.Clamp(seconds, 0, duration);
+        ProgressSlider.Value = scriptSeekTarget.Value;
+        scriptSeekTimer.Stop();
+        scriptSeekTimer.Start();
+    }
+
+    private async Task CommitScriptSeekAsync()
+    {
+        scriptSeekTimer.Stop();
+        if (scriptSeekTarget is not double target) return;
+        if (closing || operationBusy || modalDialogOpen || dragging || !player.IsLoaded)
+        {
+            CancelScriptSeek();
+            return;
+        }
+        int generation = scriptSeekGeneration;
+        bool resume = scriptWasPlaying;
+        scriptSeekTarget = null;
+        scriptWasPlaying = false;
+        scriptSeekCommitting = true;
+        try
+        {
+            await RunActionAsync(async () =>
+            {
+                await player.SeekAsync(TimeSpan.FromSeconds(target));
+                if (resume && !closing && generation == scriptSeekGeneration &&
+                    player.GetCurrentTime() < player.GetDuration())
+                    await player.PlayAsync();
+            });
+        }
+        finally
+        {
+            scriptSeekCommitting = false;
+            if (!closing && generation == scriptSeekGeneration)
+                scriptWindow?.CompleteNavigation(player.GetCurrentTime().TotalSeconds, player.IsPlaying);
+            if (!closing) { RefreshProgress(); QueueNaturalCompletion(); }
+        }
+    }
+
+    private void CancelScriptSeek()
+    {
+        if (!scriptSeekTarget.HasValue && !scriptSeekCommitting) return;
+        scriptSeekGeneration++;
+        scriptSeekTimer.Stop();
+        scriptSeekTarget = null;
+        scriptWasPlaying = false;
+        scriptWindow?.CancelNavigation();
     }
 
     private void PositionScriptWindow()
@@ -883,6 +961,7 @@ public partial class MainWindow : Window
         e.Cancel = true;
         if (closing) return;
         closing = true;
+        CancelScriptSeek();
         scriptWindow?.CloseForOwner();
         scanCancellation.Cancel();
         CancelAnalysis();

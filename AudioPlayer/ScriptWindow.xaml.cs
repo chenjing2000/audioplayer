@@ -11,6 +11,10 @@ public partial class ScriptWindow : Window
     private bool ownerClosing;
     private bool initialized;
     private bool ready;
+    internal event Action<double>? NavigationPreview;
+    internal event Action? NavigationCanceled;
+    internal event Action<System.Windows.Input.Key, System.Windows.Input.ModifierKeys>? Shortcut;
+    private int navigationEpoch;
     private (double Position, bool Playing, bool Reset)? playback;
     private (double Position, bool Playing, bool Reset)? sentPlayback;
     private string? audioPath;
@@ -52,11 +56,16 @@ public partial class ScriptWindow : Window
             };
             core.WebMessageReceived += (_, args) =>
             {
-                if (ownerClosing || args.Source != "about:blank" || args.WebMessageAsJson != "\"ready\"") return;
-                ready = true;
-                Status.Visibility = Visibility.Collapsed;
-                Reader.Visibility = Visibility.Visible;
-                SendArticle();
+                if (ownerClosing || args.Source != "about:blank") return;
+                if (args.WebMessageAsJson == "\"ready\"")
+                {
+                    ready = true;
+                    Status.Visibility = Visibility.Collapsed;
+                    Reader.Visibility = Visibility.Visible;
+                    SendArticle();
+                    return;
+                }
+                ReceiveNavigation(args.WebMessageAsJson);
             };
             using var stream = typeof(ScriptWindow).Assembly.GetManifestResourceStream("AudioPlayer.web.script.html")
                 ?? throw new InvalidDataException("缺少原文阅读资源。");
@@ -69,9 +78,57 @@ public partial class ScriptWindow : Window
         }
     }
 
+    private void ReceiveNavigation(string raw)
+    {
+        if (!ready || !IsVisible || raw.Length > 2048) return;
+        try
+        {
+            using var json = JsonDocument.Parse(raw);
+            var root = json.RootElement;
+            if (root.ValueKind != JsonValueKind.Object ||
+                !root.TryGetProperty("epoch", out var epoch) || !epoch.TryGetInt32(out int id) || id != navigationEpoch ||
+                !root.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String) return;
+            if (type.GetString() == "shortcut")
+            {
+                if (!root.TryGetProperty("key", out var key) || key.ValueKind != JsonValueKind.String) return;
+                var k = key.GetString() switch
+                {
+                    " " => System.Windows.Input.Key.Space,
+                    "ArrowLeft" => System.Windows.Input.Key.Left,
+                    "ArrowRight" => System.Windows.Input.Key.Right,
+                    _ => System.Windows.Input.Key.None
+                };
+                var modifiers = root.TryGetProperty("control", out var control) && control.ValueKind == JsonValueKind.True
+                    ? System.Windows.Input.ModifierKeys.Control : System.Windows.Input.ModifierKeys.None;
+                Shortcut?.Invoke(k, modifiers);
+                return;
+            }
+            if (article is null || type.GetString() != "preview" ||
+                !root.TryGetProperty("position", out var position) || position.ValueKind != JsonValueKind.Number ||
+                !position.TryGetDouble(out double seconds) || !double.IsFinite(seconds) || seconds < 0) return;
+            NavigationPreview?.Invoke(seconds);
+        }
+        catch (JsonException) { }
+        catch (InvalidOperationException) { }
+    }
+
+    internal void CancelNavigation()
+    {
+        navigationEpoch++;
+        if (ready && !ownerClosing) Post(new { type = "cancel", epoch = navigationEpoch });
+    }
+
+    internal void CompleteNavigation(double position, bool playing)
+    {
+        navigationEpoch++;
+        sentPlayback = null;
+        if (ready && !ownerClosing) Post(new { type = "commit", epoch = navigationEpoch, position, playing, reset = false });
+    }
+
     internal async void SetAudio(string? path)
     {
         if (ownerClosing || string.Equals(path, audioPath, StringComparison.OrdinalIgnoreCase)) return;
+        CancelNavigation();
         audioPath = path;
         int request = ++generation;
         article = null;
@@ -117,7 +174,7 @@ public partial class ScriptWindow : Window
     private void SendArticle()
     {
         if (!ready || ownerClosing) return;
-        Post(new { type = "article", article, message });
+        Post(new { type = "article", article, message, epoch = navigationEpoch });
         sentPlayback = null;
         if (playback is { } current)
             UpdatePlayback(current.Position, current.Playing, current.Reset, immediate: true);
@@ -126,6 +183,7 @@ public partial class ScriptWindow : Window
     private void ShowFailure(string text)
     {
         ready = false;
+        NavigationCanceled?.Invoke();
         Reader.Visibility = Visibility.Collapsed;
         Status.Text = text;
         Status.Visibility = Visibility.Visible;
