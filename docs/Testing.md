@@ -380,3 +380,21 @@ The user explicitly confirmed all 20 playback-mode Windows manual acceptance che
 ### PR #16 review remediation
 
 Read-only review at `20b9e84` followed by user-authorized corrections: state is published before audio startup; zero-duration media stops with an error; folder selection and settings share modal protection; actual user seeks and Stop supersede pending completion; scan avoids redundant exclusion filtering and dialog validation reuses parsed names. Tests exercise real Stop and shortcut routing, shared modal deferral (simulated guard, not native folder picker), unreadable/empty next media and very short WAV completion. Settings class names retained. Documentation consolidated; previous 58 manual checks are historical, new CI and focused Windows acceptance pending.
+
+
+#### Review remediation manual acceptance
+
+The user explicitly confirmed all 12 focused WindowsAppPlaybook remediation manual acceptance checks passed on 2026-11-24 at application revision `dbc2886`. Cumulative manual acceptance is 70 checks across successive revisions (16 seek, 16 exclusions, 6 scrolling, 20 playback modes, 12 remediation), not a complete rerun of all checks at one revision. Hosted verification: [pull_request CI #45380365612](https://github.com/chenjing2000/audioplayer/actions/runs/45380365612) success; [push CI #45380356119](https://github.com/chenjing2000/audioplayer/actions/runs/45380356119) success. A new local automated test/publishing log has not been supplied for this revision; previous 55 Core and 225 UI passes at `3321875` remain historical evidence. Merge remains explicitly unauthorized.
+
+1. PASS — Very short pronunciation audio completes without incorrect playing indicator.
+2. PASS — All four playback modes continue working.
+3. PASS — Stop near natural completion prevents continuation.
+4. PASS — Backward seek near end does not advance to another file.
+5. PASS — Forward seek to end stops without continuation.
+6. PASS — Open Folder dialog defers advancement.
+7. PASS — Cancel Open Folder processes valid pending continuation.
+8. PASS — Confirm new folder cancels old playlist continuation.
+9. PASS — Natural completion during Settings is handled correctly after closing.
+10. PASS — Empty or unreadable next audio stops with error.
+11. PASS — Folder exclusions work for opening, refresh and restoration.
+12. PASS — Closing during repeated or sequential playback releases resources.
