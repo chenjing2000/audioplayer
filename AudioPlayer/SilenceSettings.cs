@@ -19,8 +19,30 @@ public sealed class SilenceSettings
     public int BackwardStepSeconds { get; set; } = DefaultBackwardStepSeconds;
     public int ForwardStepSeconds { get; set; } = DefaultForwardStepSeconds;
 
+    public string ExcludedFolderNames { get; set; } = "";
+
+    internal HashSet<string> GetExcludedFolderNames()
+    {
+        if (ExcludedFolderNames is null)
+            throw new ArgumentOutOfRangeException(nameof(ExcludedFolderNames), "需排除的文件夹不能为 null。");
+
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string name in ExcludedFolderNames.Split(new[] { ',', ';', '，', '；' },
+            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (name.Length > 255 || name.EndsWith('.') || name.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) >= 0
+                || System.Text.RegularExpressions.Regex.IsMatch(name,
+                    @"^(?:CON|PRN|AUX|NUL|COM[1-9¹²³]|LPT[1-9¹²³]) *(?:\.|$)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+                throw new ArgumentOutOfRangeException(nameof(ExcludedFolderNames), $"无效的文件夹名称：{name}");
+            names.Add(name);
+        }
+        return names;
+    }
+
     public void Validate()
     {
+        GetExcludedFolderNames();
         if (BackwardStepSeconds is < 0 or > 99)
             throw new ArgumentOutOfRangeException(nameof(BackwardStepSeconds), "后退步长必须在 0 到 99 s 之间。");
         if (ForwardStepSeconds is < 0 or > 99)

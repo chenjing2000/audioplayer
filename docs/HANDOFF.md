@@ -47,3 +47,7 @@ PR #15 added recursive scanning and persistent playlists, filename-only display,
 ## Active feature — configurable seek shortcuts
 
 Branch `feature/configurable-seek-shortcuts` starts at `main@00d4928`. Settings dialog widened to 480 × 390 DIP, adds backward/forward steps (5/4 seconds by default, 0–99), and Ctrl+Left/Right timed seeking. Space remains window-wide. The user explicitly confirmed all 16 Windows manual acceptance checks passed on 2026-11-24. The accepted application revision `ef17fe4` passed [Windows PR CI #45359288782](https://github.com/chenjing2000/audioplayer/actions/runs/45359288782) and [push CI #45359259023](https://github.com/chenjing2000/audioplayer/actions/runs/45359259023). Merge is explicitly deferred at the user's request. See [Testing](Testing.md#windows-acceptance--pr-16) for detailed evidence.
+
+### PR #16 follow-up — configurable folder exclusion
+
+Replaces the fixed `audio` exclusion with `ExcludedFolderNames` in the existing settings JSON. Default is empty, including older configurations missing the field. Exact case-insensitive matching applies to recursive scan, startup restoration and trim insertion, excluding entire subtrees but not the explicit root. Confirmation saves normalized names without automatic rescanning. Follow-up CI and manual acceptance pending; earlier 16 checks apply to `ef17fe4`. Merge remains deferred.

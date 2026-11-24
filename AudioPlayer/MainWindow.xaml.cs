@@ -114,7 +114,7 @@ public partial class MainWindow : Window
                 }
                 catch (FileNotFoundException) { return null; }
                 catch (DirectoryNotFoundException) { return null; }
-                return AudioLibrary.LoadPaths(root, snapshot.Files, cancellation, restore: true);
+                return AudioLibrary.LoadPaths(root, snapshot.Files, cancellation, restore: true, excludedNames: silenceSettings.GetExcludedFolderNames());
             }, cancellation);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -169,7 +169,8 @@ public partial class MainWindow : Window
 
         List<AudioTrack> files;
         CancellationToken cancellation = scanCancellation.Token;
-        try { files = await Task.Run(() => AudioLibrary.LoadFolder(path, cancellation), cancellation); }
+        var excludedNames = silenceSettings.GetExcludedFolderNames();
+        try { files = await Task.Run(() => AudioLibrary.LoadFolder(path, cancellation, excludedNames), cancellation); }
         catch
         {
             // An unfinished scan canceled on exit must not erase the last saved list.
@@ -477,7 +478,7 @@ public partial class MainWindow : Window
 
     internal void AddTrimmedOutput(string path)
     {
-        if (currentFolder is not string root || !AudioLibrary.IsPlaylistPath(root, path)
+        if (currentFolder is not string root || !AudioLibrary.IsPlaylistPath(root, path, silenceSettings.GetExcludedFolderNames())
             || tracks.Any(track => string.Equals(track.FilePath, path, StringComparison.OrdinalIgnoreCase)))
             return;
         var added = AudioLibrary.ReadTrack(path);

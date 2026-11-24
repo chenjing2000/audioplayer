@@ -37,6 +37,7 @@ public partial class SilenceSettingsWindow : Window
 
     private void LoadValues(SilenceSettings settings)
     {
+        ExcludedFolderNamesTextBox.Text = settings.ExcludedFolderNames;
         BackwardStepTextBox.Text = settings.BackwardStepSeconds.ToString(CultureInfo.InvariantCulture);
         ForwardStepTextBox.Text = settings.ForwardStepSeconds.ToString(CultureInfo.InvariantCulture);
         FrameMillisecondsTextBox.Text = settings.FrameMilliseconds.ToString(CultureInfo.InvariantCulture);
@@ -68,6 +69,7 @@ public partial class SilenceSettingsWindow : Window
             return ShowValueError("后退步长必须是 0 到 99 的整数。", BackwardStepTextBox);
         if (!IsStepText(ForwardStepTextBox.Text) || !int.TryParse(ForwardStepTextBox.Text, out int forward))
             return ShowValueError("前进步长必须是 0 到 99 的整数。", ForwardStepTextBox);
+        settings.ExcludedFolderNames = ExcludedFolderNamesTextBox.Text;
         settings.BackwardStepSeconds = backward;
         settings.ForwardStepSeconds = forward;
         settings.FrameMilliseconds = frameMilliseconds;
@@ -90,11 +92,14 @@ public partial class SilenceSettingsWindow : Window
                 nameof(SilenceSettings.NavigationToleranceMilliseconds) => NavigationToleranceTextBox,
                 nameof(SilenceSettings.BackwardStepSeconds) => BackwardStepTextBox,
                 nameof(SilenceSettings.ForwardStepSeconds) => ForwardStepTextBox,
+                nameof(SilenceSettings.ExcludedFolderNames) => ExcludedFolderNamesTextBox,
                 _ => AllowedSilenceTextBox
             };
             return ShowValueError(ex.Message.Split('\n')[0], field);
         }
 
+        settings.ExcludedFolderNames = string.Join(", ", settings.GetExcludedFolderNames());
+        ExcludedFolderNamesTextBox.Text = settings.ExcludedFolderNames;
         BackwardStepTextBox.Text = backward.ToString(CultureInfo.InvariantCulture);
         ForwardStepTextBox.Text = forward.ToString(CultureInfo.InvariantCulture);
         AllowedSilenceTextBox.Text = allowedSeconds.ToString("0.0", CultureInfo.InvariantCulture);
@@ -225,6 +230,11 @@ public partial class SilenceSettingsWindow : Window
 
     private bool IsFieldValid(TextBox box)
     {
+        if (ReferenceEquals(box, ExcludedFolderNamesTextBox))
+        {
+            try { new SilenceSettings { ExcludedFolderNames = box.Text }.GetExcludedFolderNames(); return true; }
+            catch (ArgumentOutOfRangeException) { return false; }
+        }
         if (ReferenceEquals(box, BackwardStepTextBox) || ReferenceEquals(box, ForwardStepTextBox))
             return box.Text.Length > 0 && IsStepText(box.Text);
         if (ReferenceEquals(box, FrameMillisecondsTextBox))

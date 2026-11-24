@@ -323,7 +323,9 @@ internal static class UiChecks
                         textBox.ApplyTemplate();
                         Assert(FindVisual<Border>(textBox)!.CornerRadius.TopLeft == 6, "Input has rounded corners");
                     }
-                    var backwardBox = (TextBox)settingsWindow.FindName("BackwardStepTextBox");
+                    var excludedBox = (TextBox)settingsWindow.FindName("ExcludedFolderNamesTextBox");
+                     Assert(excludedBox.Text == "" && excludedBox.TextAlignment == TextAlignment.Left && Grid.GetRow(excludedBox) == 6, "Exclusion field defaults empty below explanatory text");
+                     var backwardBox = (TextBox)settingsWindow.FindName("BackwardStepTextBox");
                      var forwardBox = (TextBox)settingsWindow.FindName("ForwardStepTextBox");
                      Assert(backwardBox.Text == "5" && forwardBox.Text == "4" && backwardBox.MaxLength == 2 && forwardBox.MaxLength == 2, "Step defaults and length");
                      MethodInfo stepInput = typeof(SilenceSettingsWindow).GetMethod("IsStepText", BindingFlags.Static | BindingFlags.NonPublic)!;
@@ -355,6 +357,11 @@ internal static class UiChecks
                      var allowedBox = (TextBox)settingsWindow.FindName("AllowedSilenceTextBox");
                      MethodInfo readValues = typeof(SilenceSettingsWindow).GetMethod("TryReadValues",
                          BindingFlags.Instance | BindingFlags.NonPublic)!;
+                     excludedBox.Text = " audio , video; AUDIO；中文 文件夹，";
+                     Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })! && excludedBox.Text == "audio, video, 中文 文件夹", "Folder names normalize on validation");
+                     excludedBox.Text = "audio*";
+                     Assert(!(bool)readValues.Invoke(settingsWindow, new object?[] { null })!, "Invalid folder name prevents confirmation");
+                     excludedBox.Text = "";
                      allowedBox.Text = "2.";
                      Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })!
                          && allowedBox.Text == "2.0", "Confirming 2. normalizes it to 2.0");
