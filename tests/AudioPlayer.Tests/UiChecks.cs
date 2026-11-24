@@ -304,13 +304,13 @@ internal static class UiChecks
 
                     var modeButton = (Button)window.FindName("PlaybackModeButton");
                     var modeImage = (Image)window.FindName("PlaybackModeImage");
-                    Assert(modeButton.ToolTip?.ToString() == "播放模式：单曲播放", "Playback mode defaults to Play One");
+                    Assert(modeButton.ToolTip?.ToString() == "单曲播放", "Playback mode defaults to Play One");
                     string[] modeLabels = { "单曲循环", "顺序播放", "列表循环", "单曲播放" };
                     PlaybackMode[] modeOrder = { PlaybackMode.RepeatOne, PlaybackMode.Sequential, PlaybackMode.RepeatAll, PlaybackMode.PlayOne };
                     for (int i = 0; i < modeOrder.Length; i++)
                     {
                         modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                        Assert(modeButton.ToolTip?.ToString() == "播放模式：" + modeLabels[i]
+                        Assert(modeButton.ToolTip?.ToString() == modeLabels[i]
                             && ReferenceEquals(modeImage.Source, window.FindResource(modeOrder[i] + "Icon"))
                             && settingsStore.LoadOrCreate().PlaybackMode == modeOrder[i],
                             "Mode cycles, updates icon and persists " + modeOrder[i]);

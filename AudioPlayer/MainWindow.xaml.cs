@@ -546,7 +546,7 @@ public partial class MainWindow : Window
             _ => "单曲播放"
         };
         PlaybackModeImage.Source = (ImageSource)FindResource(mode + "Icon");
-        PlaybackModeButton.ToolTip = "播放模式：" + name;
+        PlaybackModeButton.ToolTip = name;
         AutomationProperties.SetName(PlaybackModeButton, "播放模式：" + name);
     }
 
