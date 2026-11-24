@@ -348,3 +348,5 @@ Local Windows rerun at `9cdf6d1` passed 54 Core checks, 191 UI checks and 5 publ
 ### PR #16 follow-up: playback modes
 
 Core tests cover mode persistence, default and invalid enum rejection, next-index policy including empty/single-file lists. UI tests cover cycling, icons, toolbar alignment and settings preservation/reset staging. Synthetic WAV integration when a waveOut device exists covers natural completion, repeat, sequential stop, wraparound, manual Stop and seek-to-end. Hosted CI and manual playback acceptance pending; previous 38 manual checks remain historical cumulative evidence.
+
+At `34f6972`, user confirmed the four modes cycle correctly and all four playback behaviors work as expected, with toolbar screenshot. This is focused functional acceptance, not explicit confirmation of all 20 detailed checks. Local application published successfully; 5 publishing safeguards and 4 published-app checks passed. Core/UI test project compilation failed with CS0136 at UiChecks.cs:587 (duplicate local `first`). Test-only fix renames synthetic mode fixture paths. Corrected automated rerun pending; no merge authorized.

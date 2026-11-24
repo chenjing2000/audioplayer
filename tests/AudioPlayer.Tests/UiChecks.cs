@@ -584,11 +584,11 @@ internal static class UiChecks
                     Directory.CreateDirectory(modeFolder);
                     try
                     {
-                        string first = Path.Combine(modeFolder, "01.wav");
-                        string second = Path.Combine(modeFolder, "02.wav");
-                        using (var writer = new WaveFileWriter(first, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                        string firstModePath = Path.Combine(modeFolder, "01.wav");
+                        string secondModePath = Path.Combine(modeFolder, "02.wav");
+                        using (var writer = new WaveFileWriter(firstModePath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                             writer.WriteSamples(new float[44100], 0, 44100);
-                        File.Copy(first, second);
+                        File.Copy(firstModePath, secondModePath);
                         await window.LoadFolderAsync(modeFolder);
                         var modePlayer = Field<PlayerEngine>(window, "player")!;
                         var playModeTrack = typeof(MainWindow).GetMethod("PlayTrackAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
