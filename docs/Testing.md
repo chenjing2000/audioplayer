@@ -255,4 +255,16 @@ Together with the initial ten checks, sixteen user-reported manual acceptance ch
 
 ### PR #15 WindowsAppPlaybook review remediation
 
-Added targeted regression checks for locked playlist save, missing/non-file saved entries, directory junction exclusion, cancellation, preservation of playlist JSON during publishing and renamed published EXE startup restoration. Removed obsolete metadata-title checks while retaining album/duration and filename coverage. Prior sixteen manual checks apply to the earlier code revision; new CI and focused Windows acceptance are pending.
+Added targeted regression checks for locked playlist save, missing/non-file saved entries, directory junction exclusion, cancellation, preservation of playlist JSON during publishing and renamed published EXE startup restoration. Removed obsolete metadata-title checks while retaining album/duration and filename coverage. Prior sixteen manual checks apply to the earlier code revisions. Remediation revision `db9fc41` passed [PR CI #45329769913](https://github.com/chenjing2000/audioplayer/actions/runs/45329769913) and [push CI #45329762960](https://github.com/chenjing2000/audioplayer/actions/runs/45329762960).
+
+The user explicitly confirmed all seven focused Windows acceptance checks passed:
+
+1. Open and refresh a directory containing multiple levels of subdirectories.
+2. Restart and restore the saved playlist correctly.
+3. Close during a large recursive scan and preserve the previous saved playlist.
+4. Reopen the current root during nested-audio trimming; the completed output appears in the table and JSON.
+5. Switch tracks; playback and pause indicators update correctly.
+6. Tooltip appearance and readable Chinese playlist paths remain unchanged.
+7. Republish while preserving the existing playlist and settings.
+
+This records user-reported manual acceptance, not new local automated test counts. The sixteen prior checks and seven focused checks total 23 accepted checks across successive revisions, not a complete rerun on one commit. Dedicated real Windows directory-access-denial testing and previously deferred real-media/failure-path cases are not claimed by this acceptance. PR #15 remains unmerged at the user's request.

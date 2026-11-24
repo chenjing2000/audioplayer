@@ -1,9 +1,9 @@
 # AudioPlayer — development handoff
 
-**Updated:** Recursive playlist review remediation (verification pending)  
+**Updated:** Recursive playlist review remediation (Windows accepted)  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Latest merged application-code baseline:** `7c1def7` (PR #14, squash merged). [Post-merge Windows CI #45302461775](https://github.com/chenjing2000/audioplayer/actions/runs/45302461775) passed after user-confirmed Windows acceptance. Current feature branch: `feature/recursive-persistent-playlist`; All sixteen Windows manual acceptance checks passed before review remediation; new code requires verification. Merge remains deferred.
+**Latest merged application-code baseline:** `7c1def7` (PR #14, squash merged). [Post-merge Windows CI #45302461775](https://github.com/chenjing2000/audioplayer/actions/runs/45302461775) passed after user-confirmed Windows acceptance. Current feature branch: `feature/recursive-persistent-playlist`; All sixteen earlier Windows manual checks and seven focused remediation checks passed at their respective revisions. Merge remains deferred.
 
 ## Current application behavior
 
@@ -47,4 +47,4 @@ The follow-up at `e42547c` limits the row tooltip to the parent directory (plus 
 
 ## Review remediation
 
-The WindowsAppPlaybook review led to targeted changes: startup distinguishes confirmed missing paths from access errors, skips reparse points below the root, and preserves saved data on access failure; scans support cooperative cancellation; trim completion waits for an active folder operation; save failures explain stale disk state. Unused metadata title removed, executable-based store paths simplified, and playback indicators update only the affected tracks. Added focused regression and publishing coverage. No new packages or architecture. New CI/manual verification pending; prior sixteen checks remain historical evidence.
+The WindowsAppPlaybook review led to targeted changes: startup distinguishes confirmed missing paths from access errors, skips reparse points below the root, and preserves saved data on access failure; scans support cooperative cancellation; trim completion waits for an active folder operation; save failures explain stale disk state. Unused metadata title removed, executable-based store paths simplified, and playback indicators update only the affected tracks. Added focused regression and publishing coverage. No new packages or architecture. The remediation revision `db9fc41` passed [PR CI #45329769913](https://github.com/chenjing2000/audioplayer/actions/runs/45329769913) and [push CI #45329762960](https://github.com/chenjing2000/audioplayer/actions/runs/45329762960). The user confirmed all seven focused Windows manual checks passed; see [Testing](Testing.md#pr-15-windowsappplaybook-review-remediation). The sixteen earlier checks remain historical evidence, not a fresh rerun. Merge remains deferred.
