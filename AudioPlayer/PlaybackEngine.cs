@@ -12,6 +12,10 @@ public sealed class PlaybackEngine : IDisposable
     private PlaybackState state = PlaybackState.Stopped;
     private bool atEnd;
     private bool disposed;
+    private object? naturalCompletion;
+    internal object? NaturalCompletion => Volatile.Read(ref naturalCompletion);
+    internal bool ConsumeNaturalCompletion(object token)
+        => ReferenceEquals(Interlocked.CompareExchange(ref naturalCompletion, null, token), token);
 
     public bool IsLoaded => reader is not null;
     public bool IsPlaying => state == PlaybackState.Playing;
@@ -21,6 +25,7 @@ public sealed class PlaybackEngine : IDisposable
     internal PlaybackState PlaybackState => state;
     public Exception? LastError { get; private set; }
     public event EventHandler? StateChanged;
+    public event EventHandler? NaturalPlaybackEnded;
 
     public Task OpenAsync(string filePath) => RunSerializedAsync(async () =>
     {
@@ -53,6 +58,7 @@ public sealed class PlaybackEngine : IDisposable
     {
         if (reader is null || output is null) return;
         if (output.PlaybackState == PlaybackState.Playing) return;
+        Interlocked.Exchange(ref naturalCompletion, null);
         if (output.PlaybackState == PlaybackState.Stopped) await StopOutputAsync();
         if (atEnd || reader.CurrentTime >= reader.TotalTime) reader.CurrentTime = TimeSpan.Zero;
         atEnd = false;
@@ -105,6 +111,7 @@ public sealed class PlaybackEngine : IDisposable
 
     private async Task StopOutputAsync()
     {
+        Interlocked.Exchange(ref naturalCompletion, null);
         TaskCompletionSource? completion = playbackCompletion;
         if (completion is null) return;
         stopping = true;
@@ -115,7 +122,7 @@ public sealed class PlaybackEngine : IDisposable
             await completion.Task.ConfigureAwait(false);
             playbackCompletion = null;
         }
-        finally { stopping = false; }
+        finally { Interlocked.Exchange(ref naturalCompletion, null); stopping = false; }
     }
 
     private void Output_PlaybackStopped(object? sender, StoppedEventArgs e)
@@ -129,7 +136,10 @@ public sealed class PlaybackEngine : IDisposable
             {
                 state = PlaybackState.Stopped;
                 atEnd = e.Exception is null;
+                if (atEnd && completion is not null)
+                    Interlocked.Exchange(ref naturalCompletion, completion);
                 StateChanged?.Invoke(this, EventArgs.Empty);
+                if (atEnd && completion is not null) NaturalPlaybackEnded?.Invoke(this, EventArgs.Empty);
             }
         }
         finally { completion?.TrySetResult(); }

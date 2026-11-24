@@ -1,5 +1,11 @@
 namespace AudioPlayer;
 
+[System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<PlaybackMode>))]
+public enum PlaybackMode
+{
+    PlayOne, RepeatOne, Sequential, RepeatAll
+}
+
 public sealed class SilenceSettings
 {
     public const int DefaultFrameMilliseconds = 10;
@@ -20,6 +26,7 @@ public sealed class SilenceSettings
     public int ForwardStepSeconds { get; set; } = DefaultForwardStepSeconds;
 
     public string ExcludedFolderNames { get; set; } = "";
+    public PlaybackMode PlaybackMode { get; set; } = PlaybackMode.PlayOne;
 
     internal HashSet<string> GetExcludedFolderNames()
     {
@@ -43,6 +50,8 @@ public sealed class SilenceSettings
     public void Validate()
     {
         GetExcludedFolderNames();
+        if (!Enum.IsDefined(PlaybackMode))
+            throw new ArgumentOutOfRangeException(nameof(PlaybackMode), "无效的播放模式。");
         if (BackwardStepSeconds is < 0 or > 99)
             throw new ArgumentOutOfRangeException(nameof(BackwardStepSeconds), "后退步长必须在 0 到 99 s 之间。");
         if (ForwardStepSeconds is < 0 or > 99)

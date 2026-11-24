@@ -10,6 +10,7 @@ namespace AudioPlayer;
 public partial class SilenceSettingsWindow : Window
 {
     private TextBox? invalidField;
+    private PlaybackMode playbackMode;
     public SilenceSettings Settings { get; private set; }
 
     public SilenceSettingsWindow(SilenceSettings settings)
@@ -37,6 +38,7 @@ public partial class SilenceSettingsWindow : Window
 
     private void LoadValues(SilenceSettings settings)
     {
+        playbackMode = settings.PlaybackMode;
         ExcludedFolderNamesTextBox.Text = settings.ExcludedFolderNames;
         BackwardStepTextBox.Text = settings.BackwardStepSeconds.ToString(CultureInfo.InvariantCulture);
         ForwardStepTextBox.Text = settings.ForwardStepSeconds.ToString(CultureInfo.InvariantCulture);
@@ -49,7 +51,7 @@ public partial class SilenceSettingsWindow : Window
 
     private bool TryReadValues(out SilenceSettings settings)
     {
-        settings = new SilenceSettings();
+        settings = new SilenceSettings { PlaybackMode = playbackMode };
 
         if (!int.TryParse(FrameMillisecondsTextBox.Text.Trim(), out int frameMilliseconds))
             return ShowValueError("分析帧长度必须是整数。", FrameMillisecondsTextBox);

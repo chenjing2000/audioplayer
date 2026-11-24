@@ -7,3 +7,5 @@ Windows x64 需要安装 [.NET 10 Windows Desktop Runtime x64](https://dotnet.mi
 程序自动检测停顿，结果保存在音频目录下的 `results/<完整音频文件名>.silent_segments.json`。选中有可压缩静音、且检测结果有效的文件后，可用剪刀按钮输出 `<stem>.new.<ext>` 或 `<stem>.new (1).<ext>` 等不覆盖的文件。AAC/M4A 裁剪另需安装 [FFmpeg](FFmpeg-Setup.txt)；WAV/MP3 不需要。
 
 设置保存在 EXE 同目录的 `<实际 EXE 名>.settings.json`。更新程序时保留配置、播放列表和自行安装的运行时。详见 [Configuration](Configuration.md) 和 [Publishing](Publishing.md)。开发和测试命令见 [Testing](Testing.md)。
+
+播放模式按钮在刷新和设置之间。每次点击按单曲播放 → 单曲循环 → 顺序播放 → 列表循环 → 单曲播放切换；悬停显示当前模式。仅自然结束时按模式续播，手动停止或定位至末尾不会自动继续。模式自动保存，恢复默认后确认可重置。

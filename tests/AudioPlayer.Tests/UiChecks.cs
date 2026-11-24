@@ -302,6 +302,31 @@ internal static class UiChecks
                     }
                     finally { Directory.Delete(resultFolder, true); }
 
+                    var modeButton = (Button)window.FindName("PlaybackModeButton");
+                    var modeImage = (Image)window.FindName("PlaybackModeImage");
+                    Assert(modeButton.ToolTip?.ToString() == "播放模式：单曲播放", "Playback mode defaults to Play One");
+                    string[] modeLabels = { "单曲循环", "顺序播放", "列表循环", "单曲播放" };
+                    PlaybackMode[] modeOrder = { PlaybackMode.RepeatOne, PlaybackMode.Sequential, PlaybackMode.RepeatAll, PlaybackMode.PlayOne };
+                    for (int i = 0; i < modeOrder.Length; i++)
+                    {
+                        modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        Assert(modeButton.ToolTip?.ToString() == "播放模式：" + modeLabels[i]
+                            && ReferenceEquals(modeImage.Source, window.FindResource(modeOrder[i] + "Icon"))
+                            && settingsStore.LoadOrCreate().PlaybackMode == modeOrder[i],
+                            "Mode cycles, updates icon and persists " + modeOrder[i]);
+                    }
+                    modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    var modeDialog = new SilenceSettingsWindow(settingsStore.LoadOrCreate());
+                    var readModeValues = typeof(SilenceSettingsWindow).GetMethod("TryReadValues", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                    object?[] modeArgs = { null };
+                    Assert((bool)readModeValues.Invoke(modeDialog, modeArgs)! && ((SilenceSettings)modeArgs[0]!).PlaybackMode == PlaybackMode.RepeatOne,
+                        "Normal settings validation preserves playback mode");
+                    ((Button)modeDialog.FindName("RestoreDefaultsButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert((bool)readModeValues.Invoke(modeDialog, modeArgs)! && ((SilenceSettings)modeArgs[0]!).PlaybackMode == PlaybackMode.PlayOne
+                        && settingsStore.LoadOrCreate().PlaybackMode == PlaybackMode.RepeatOne,
+                        "Restore Defaults stages Play One without saving until confirmation");
+                    modeDialog.Close();
+                    for (int i = 0; i < 3; i++) modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     settingsButton.ApplyTemplate();
                     var settingsBorder = (Border)settingsButton.Template.FindName("ButtonBorder", settingsButton);
                     var settingsImage = FindVisual<Image>(settingsButton)!;
@@ -311,11 +336,11 @@ internal static class UiChecks
                     Assert(settingsBorder.BorderThickness == new Thickness(0) && ColorOf(settingsBorder.Background) == "#00FFFFFF",
                         "Settings button has no border or visible background");
                     Assert(Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 &&
-                        Grid.GetColumn(refreshButton) == 6 && Grid.GetColumn(settingsButton) == 7,
-                        "Refresh button is placed between trim and settings");
-                    Assert(new[] { playButton, stopButton, trimButton, refreshButton }
+                        Grid.GetColumn(refreshButton) == 6 && Grid.GetColumn(modeButton) == 7 && Grid.GetColumn(settingsButton) == 8,
+                        "Playback mode button is placed between refresh and settings");
+                    Assert(new[] { playButton, stopButton, trimButton, refreshButton, modeButton }
                         .All(button => Math.Abs(button.Margin.Right - 5) < 0.01),
-                        "Five right toolbar buttons use 5-unit gaps");
+                        "Six right toolbar buttons use 5-unit gaps");
                     Assert(Math.Abs(slider.Height - 36) < 0.01, "Progress slider has the same control height as the buttons");
                     window.UpdateLayout();
                     var sliderTrack = FindVisual<System.Windows.Controls.Primitives.Track>(slider);
@@ -329,7 +354,7 @@ internal static class UiChecks
                     Assert(settingsButton.ToolTip?.ToString() == "设置", "Settings gear has the updated name");
                     Assert(settingsButton.HorizontalAlignment == HorizontalAlignment.Center && settingsButton.VerticalAlignment == VerticalAlignment.Center, "Settings button is centered in the top row");
                     Assert(settingsButton.FocusVisualStyle is null, "Settings button has no focus visual");
-                    foreach (string key in new[] { "OpenFolderIcon", "PlayIcon", "PauseIcon", "StopIcon", "TrimIcon", "RefreshIcon", "SettingsIcon" })
+                    foreach (string key in new[] { "OpenFolderIcon", "PlayIcon", "PauseIcon", "StopIcon", "TrimIcon", "RefreshIcon", "SettingsIcon", "PlayOneIcon", "RepeatOneIcon", "SequentialIcon", "RepeatAllIcon" })
                     {
                         var drawing = (DrawingGroup)((DrawingImage)window.FindResource(key)).Drawing;
                         var background = (GeometryDrawing)drawing.Children[1];
@@ -500,7 +525,7 @@ internal static class UiChecks
 
                     Assert(Math.Abs(window.FontSize - 12) < 0.01 && Math.Abs(timeText.FontSize - 12) < 0.01 && Math.Abs(list.FontSize - 12) < 0.01, "UI font size is 12");
                     Assert(Grid.GetColumn(slider) == 1 && Grid.GetColumn(timeText) == 2 && Grid.GetColumn(playButton) == 3, "Time display sits between progress slider and play button");
-                    foreach (Button button in new[] { openButton, playButton, stopButton, trimButton })
+                    foreach (Button button in new[] { openButton, playButton, stopButton, trimButton, modeButton })
                     {
                         button.ApplyTemplate();
                         var border = (Border)button.Template.FindName("ButtonBorder", button);
@@ -554,6 +579,62 @@ internal static class UiChecks
                     {
                         Console.WriteLine("SKIP UI audio-device playback checks: no waveOut device is available.");
                         return;
+                    }
+                    string modeFolder = Path.Combine(audioFolder, "ui-modes-" + Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(modeFolder);
+                    try
+                    {
+                        string first = Path.Combine(modeFolder, "01.wav");
+                        string second = Path.Combine(modeFolder, "02.wav");
+                        using (var writer = new WaveFileWriter(first, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                            writer.WriteSamples(new float[44100], 0, 44100);
+                        File.Copy(first, second);
+                        await window.LoadFolderAsync(modeFolder);
+                        var modePlayer = Field<PlayerEngine>(window, "player")!;
+                        var playModeTrack = typeof(MainWindow).GetMethod("PlayTrackAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                        async Task WaitModeAsync(Func<bool> condition)
+                        {
+                            var deadline = DateTime.UtcNow.AddSeconds(8);
+                            while (!condition() && DateTime.UtcNow < deadline) await Task.Delay(25);
+                            Assert(condition(), "Playback mode transition completes");
+                        }
+                        async Task StartModeTrack(int index)
+                            => await (Task)playModeTrack.Invoke(window, new object[] { (AudioTrack)list.Items[index] })!;
+                        bool LoadedModeTrack(int index) => ReferenceEquals(Field<AudioTrack>(window, "loadedTrack"), list.Items[index]);
+                        await StartModeTrack(0);
+                        await WaitModeAsync(() => !modePlayer.IsPlaying && modePlayer.GetCurrentTime() == modePlayer.GetDuration());
+                        Assert(LoadedModeTrack(0), "Play One stops on current file");
+                        modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        int completions = 0;
+                        EventHandler countCompletion = (_, _) => Interlocked.Increment(ref completions);
+                        modePlayer.NaturalPlaybackEnded += countCompletion;
+                        await StartModeTrack(0);
+                        await WaitModeAsync(() => Volatile.Read(ref completions) >= 1 && modePlayer.IsPlaying && modePlayer.GetCurrentTime() < modePlayer.GetDuration());
+                        Assert(LoadedModeTrack(0), "Repeat One restarts same file");
+                        await modePlayer.StopAsync();
+                        await Task.Delay(300);
+                        Assert(!modePlayer.IsPlaying, "Manual Stop does not repeat");
+                        modePlayer.NaturalPlaybackEnded -= countCompletion;
+                        modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        await StartModeTrack(0);
+                        await WaitModeAsync(() => LoadedModeTrack(1) && modePlayer.IsPlaying);
+                        await WaitModeAsync(() => !modePlayer.IsPlaying && modePlayer.GetCurrentTime() == modePlayer.GetDuration());
+                        Assert(LoadedModeTrack(1), "Sequential advances and stops at last file");
+                        modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        await StartModeTrack(1);
+                        await WaitModeAsync(() => LoadedModeTrack(0) && modePlayer.IsPlaying);
+                        Assert(LoadedModeTrack(0), "Repeat All wraps to first file");
+                        await modePlayer.SeekAsync(modePlayer.GetDuration());
+                        await Task.Delay(300);
+                        Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying, "Manual seek to end does not advance");
+                        modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    }
+                    finally
+                    {
+                        await window.LoadFolderAsync(audioFolder);
+                        await Task.WhenAll(Field<List<Task>>(window, "runningAnalyses")!);
+                        await Task.WhenAll(Field<List<Task>>(window, "runningSelectionChecks")!);
+                        Directory.Delete(modeFolder, true);
                     }
                     string recoveryPath = Path.Combine(audioFolder, "recovery.wav");
                     using (var writer = new WaveFileWriter(recoveryPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))

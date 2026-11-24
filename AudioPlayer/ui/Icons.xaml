@@ -101,4 +101,56 @@
             </DrawingGroup>
         </DrawingImage.Drawing>
     </DrawingImage>
+    <DrawingImage x:Key="PlayOneIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="Transparent" Geometry="M0,0 H1024 V1024 H0 Z"/>
+                <GeometryDrawing Brush="#26798A">
+                    <GeometryDrawing.Geometry><EllipseGeometry Center="512,512" RadiusX="480" RadiusY="480"/></GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#FFFFFF" Geometry="M285,295 L600,512 L285,729 Z M660,295 H740 V729 H660 Z"/>
+                </DrawingGroup>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="RepeatOneIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="Transparent" Geometry="M0,0 H1024 V1024 H0 Z"/>
+                <GeometryDrawing Brush="#26798A">
+                    <GeometryDrawing.Geometry><EllipseGeometry Center="512,512" RadiusX="480" RadiusY="480"/></GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#FFFFFF" Geometry="M290,488 V372 Q290,315 350,315 H650 L650,245 L790,365 L650,485 V405 H380 V488 Z M734,536 V652 Q734,709 674,709 H374 V779 L234,659 L374,539 V619 H644 V536 Z M475,472 L535,432 H574 V585 H520 V490 L475,515 Z"/>
+                </DrawingGroup>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="SequentialIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="Transparent" Geometry="M0,0 H1024 V1024 H0 Z"/>
+                <GeometryDrawing Brush="#26798A">
+                    <GeometryDrawing.Geometry><EllipseGeometry Center="512,512" RadiusX="480" RadiusY="480"/></GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#FFFFFF" Geometry="M260,295 H545 V365 H260 Z M260,475 H545 V545 H260 Z M260,655 H545 V725 H260 Z M605,400 L790,530 L605,660 Z"/>
+                </DrawingGroup>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+    <DrawingImage x:Key="RepeatAllIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="Transparent" Geometry="M0,0 H1024 V1024 H0 Z"/>
+                <GeometryDrawing Brush="#26798A">
+                    <GeometryDrawing.Geometry><EllipseGeometry Center="512,512" RadiusX="480" RadiusY="480"/></GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#FFFFFF" Geometry="M290,488 V372 Q290,315 350,315 H650 L650,245 L790,365 L650,485 V405 H380 V488 Z M734,536 V652 Q734,709 674,709 H374 V779 L234,659 L374,539 V619 H644 V536 Z"/>
+                </DrawingGroup>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
 </ResourceDictionary>

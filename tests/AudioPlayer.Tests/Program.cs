@@ -37,7 +37,8 @@ Check("Settings initialize beside executable, persist and preserve invalid files
         File.WriteAllText(store.FilePath, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0}""");
         settings = store.LoadOrCreate();
         Assert(settings.BackwardStepSeconds == 5 && settings.ForwardStepSeconds == 4);
-        Assert(settings.ExcludedFolderNames == "");
+        Assert(settings.ExcludedFolderNames == "" && settings.PlaybackMode == PlaybackMode.PlayOne);
+        settings.PlaybackMode = PlaybackMode.RepeatAll;
         settings.ExcludedFolderNames = "audio, 视频";
         settings.BackwardStepSeconds = 0;
         settings.ForwardStepSeconds = 99;
@@ -49,8 +50,12 @@ Check("Settings initialize beside executable, persist and preserve invalid files
         var loaded = new SettingsStore(store.FilePath).LoadOrCreate();
         Assert(loaded.FrameMilliseconds == 20 && loaded.MinimumSilenceMilliseconds == 500
             && loaded.SilenceThresholdDb == -40 && loaded.NavigationToleranceMilliseconds == 250);
-        Assert(loaded.BackwardStepSeconds == 0 && loaded.ForwardStepSeconds == 99 && loaded.ExcludedFolderNames == "audio, 视频");
+        Assert(loaded.BackwardStepSeconds == 0 && loaded.ForwardStepSeconds == 99 && loaded.ExcludedFolderNames == "audio, 视频" && loaded.PlaybackMode == PlaybackMode.RepeatAll);
+        Assert(File.ReadAllText(store.FilePath).Contains("\"PlaybackMode\": \"RepeatAll\""));
         string previous = File.ReadAllText(store.FilePath);
+        try { store.Save(new SilenceSettings { PlaybackMode = (PlaybackMode)99 }); throw new Exception("Invalid mode accepted"); }
+        catch (ArgumentOutOfRangeException) { }
+        Assert(File.ReadAllText(store.FilePath) == previous);
         foreach (string invalidName in new[] { "audio*", "a/b", "CON", "NUL.txt", "folder.", ".." })
         {
             try { store.Save(new SilenceSettings { ExcludedFolderNames = invalidName }); throw new Exception("Invalid folder accepted"); }
@@ -103,6 +108,19 @@ Check("Settings save failure preserves original configuration", () =>
         if (File.Exists(path)) File.SetAttributes(path, FileAttributes.Normal);
         Directory.Delete(folder, true);
     }
+});
+
+Check("Playback mode completion policy", () =>
+{
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.PlayOne, 1, 3) == -1);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.RepeatOne, 1, 3) == 1);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.Sequential, 1, 3) == 2);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.Sequential, 2, 3) == -1);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.RepeatAll, 2, 3) == 0);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.Sequential, 0, 1) == -1);
+    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.RepeatAll, 0, 1) == 0);
+    foreach (var mode in Enum.GetValues<PlaybackMode>())
+        Assert(MainWindow.NextPlaybackIndex(mode, -1, 3) == -1 && MainWindow.NextPlaybackIndex(mode, 0, 0) == -1);
 });
 
 Check("Silence settings defaults", () =>
