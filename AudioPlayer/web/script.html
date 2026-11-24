@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>
 html{background:#F8F8F6;color:#283747;font:18px/1.7 Georgia,"Segoe UI",serif;scroll-behavior:auto;overflow-anchor:none}
-body{margin:16px;overflow-wrap:break-word}h1{font-size:1.2em;text-align:center}p{margin:0 0 16px;position:relative}
+body{margin:16px;overflow-wrap:break-word}h1{font-size:1.2em;text-align:center}p{margin:0 0 var(--paragraph-after,16px);text-indent:var(--indent,0em);position:relative}
 #status{color:#687783;font:14px "Segoe UI",sans-serif}
-.paint{position:absolute;inset:0;color:#B64550;pointer-events:none;user-select:none}
+.paint{position:absolute;inset:0;color:var(--playback-color,#B64550);pointer-events:none;user-select:none}
 .clips{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
 </style></head><body><div id="status"></div><h1 id="title" hidden></h1><main id="text"></main><script>
 "use strict";
@@ -172,7 +172,17 @@ function update(state,immediate=false,previewOnly=false){
   }
 }
 chrome.webview.addEventListener('message',({data})=>{
-  if(data.type==='article')render(data);
+  if(data.type==='appearance'){
+    const a=data.appearance,root=document.documentElement.style;
+    root.fontFamily=a.font+', "Segoe UI", serif';
+    root.fontSize=a.fontSize+'px';root.lineHeight=String(a.lineHeight);
+    root.color=a.color;root.backgroundColor=a.background;
+    root.setProperty('--paragraph-after',a.paragraphAfter+'px');
+    root.setProperty('--indent',a.firstLineIndent+'em');
+    root.setProperty('--playback-color',a.scriptColor);
+    scheduleMeasure();
+  }
+  else if(data.type==='article')render(data);
   else if(data.type==='playback')update(data,data.immediate===true);
   else if(data.type==='cancel'){epoch=data.epoch;cancelManual();activeLine=null;previousPosition=null;}
   else if(data.type==='commit'){

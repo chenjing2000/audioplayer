@@ -643,6 +643,7 @@ public partial class MainWindow : Window
             || silenceSettings.MinimumSilenceMilliseconds != dialog.Settings.MinimumSilenceMilliseconds
             || silenceSettings.SilenceThresholdDb != dialog.Settings.SilenceThresholdDb;
         silenceSettings = dialog.Settings;
+        scriptWindow?.SetAppearance(silenceSettings.ScriptAppearance);
         UpdatePlaybackModeButton();
         if (detectionChanged && loadedTrack is not null)
         {
@@ -855,6 +856,7 @@ public partial class MainWindow : Window
         if (scriptWindow is null)
         {
             scriptWindow = new ScriptWindow { Owner = this, Height = Math.Max(300, ActualHeight) };
+            scriptWindow.SetAppearance(silenceSettings.ScriptAppearance);
             scriptWindow.NavigationPreview += PreviewScriptSeek;
             scriptWindow.NavigationCanceled += () => CancelScriptSeek();
             scriptWindow.Shortcut += async (key, modifiers) => await HandleShortcutAsync(key, modifiers);

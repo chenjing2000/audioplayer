@@ -28,7 +28,11 @@
         </Style>
     </Window.Resources>
     <Grid>
-      <Grid Margin="24">
+      <Grid Margin="16,10,16,16">
+        <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <TabControl x:Name="SettingsTabs" Background="Transparent">
+          <TabItem Header="音频设置">
+      <Grid Margin="8,12,8,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -36,7 +40,6 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*" MinHeight="24"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
@@ -87,7 +90,44 @@
                  TextAlignment="Left" VerticalContentAlignment="Center" AllowDrop="False"
                  ToolTip="多个文件夹名称用逗号或分号分隔，不区分大小写。"/>
 
-        <Grid Grid.Row="7" Grid.ColumnSpan="5" Margin="0,12,0,0">
+      </Grid>
+          </TabItem>
+          <TabItem Header="原文设置">
+            <Grid Margin="8,10,8,0">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+              </Grid.RowDefinitions>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <TextBlock Grid.Row="0" Grid.Column="0" Text="字体" VerticalAlignment="Center" Margin="0,0,4,6"/>
+              <ComboBox x:Name="FontBox" Grid.Row="0" Grid.Column="1" Margin="0,0,8,6" SelectionChanged="Appearance_Changed"/>
+              <TextBlock Grid.Row="0" Grid.Column="2" Text="字号（DIP）" VerticalAlignment="Center" Margin="0,0,4,6"/>
+              <ComboBox x:Name="FontSizeBox" Grid.Row="0" Grid.Column="3" Margin="0,0,8,6" SelectionChanged="Appearance_Changed"/>
+              <TextBlock Grid.Row="1" Grid.Column="0" Text="行高" VerticalAlignment="Center" Margin="0,0,4,6"/>
+              <ComboBox x:Name="LineHeightBox" Grid.Row="1" Grid.Column="1" Margin="0,0,8,6" SelectionChanged="Appearance_Changed"/>
+              <TextBlock Grid.Row="1" Grid.Column="2" Text="段后间距（DIP）" VerticalAlignment="Center" Margin="0,0,4,6"/>
+              <ComboBox x:Name="ParagraphAfterBox" Grid.Row="1" Grid.Column="3" Margin="0,0,8,6" SelectionChanged="Appearance_Changed"/>
+              <TextBlock Grid.Row="2" Grid.Column="0" Text="首行缩进（em）" VerticalAlignment="Center" Margin="0,0,4,6"/>
+              <ComboBox x:Name="IndentBox" Grid.Row="2" Grid.Column="1" Margin="0,0,8,6" SelectionChanged="Appearance_Changed"/>
+              <TextBlock Grid.Row="2" Grid.Column="2" Text="正文颜色" VerticalAlignment="Center" Margin="0,0,4,6"/>
+              <ComboBox x:Name="TextColorBox" Grid.Row="2" Grid.Column="3" Margin="0,0,8,6" SelectionChanged="Appearance_Changed"/>
+              <TextBlock Grid.Row="3" Grid.Column="0" Text="播放颜色" VerticalAlignment="Center" Margin="0,0,4,6"/>
+              <ComboBox x:Name="PlaybackColorBox" Grid.Row="3" Grid.Column="1" Margin="0,0,8,6" SelectionChanged="Appearance_Changed"/>
+              <TextBlock Grid.Row="3" Grid.Column="2" Text="背景颜色" VerticalAlignment="Center" Margin="0,0,4,6"/>
+              <ComboBox x:Name="BackgroundColorBox" Grid.Row="3" Grid.Column="3" Margin="0,0,8,6" SelectionChanged="Appearance_Changed"/>
+              <Border x:Name="AppearancePreview" Grid.Row="4" Grid.ColumnSpan="4" Padding="10" CornerRadius="6" ClipToBounds="True" Margin="0,4,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                  <StackPanel>
+                    <TextBlock x:Name="PreviewFirst" TextWrapping="Wrap"><Run x:Name="PreviewPlayed" Text="Learning changes "/><Run Text="the way we think."/></TextBlock>
+                    <TextBlock x:Name="PreviewSecond" TextWrapping="Wrap" Text="Each experience shapes our understanding."/>
+                  </StackPanel>
+                </ScrollViewer>
+              </Border>
+            </Grid>
+          </TabItem>
+        </TabControl>
+        <Grid Grid.Row="1" Margin="8,10,8,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -98,7 +138,6 @@
             <Button x:Name="CancelButton" Grid.Column="2" Width="54" Height="32" Padding="4,2" Margin="0,0,10,0" Content="取消" IsCancel="True"/>
             <Button x:Name="OkButton" Grid.Column="3" Width="54" Height="32" Padding="4,2" Content="确定" Click="OkButton_Click"/>
         </Grid>
-      </Grid>
       <local:ToastHost x:Name="ToastMessages" MaxWidth="280" Margin="14,0,14,12"
                        VerticalAlignment="Bottom" HorizontalAlignment="Center" Panel.ZIndex="10"/>
     </Grid>

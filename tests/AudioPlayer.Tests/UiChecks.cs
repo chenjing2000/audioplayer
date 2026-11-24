@@ -405,6 +405,8 @@ internal static class UiChecks
                         "Stop square is centered and exactly 35% of circle height");
 
                     var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
+                    Assert(((TabControl)settingsWindow.FindName("SettingsTabs")).Items.Count == 2, "Settings has audio and script tabs");
+                    Assert((int)((ComboBox)settingsWindow.FindName("FontSizeBox")).SelectedItem == 18, "Script font defaults to 18 DIP");
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 480) < 0.01, "Settings window width is 480");
                     Assert(Math.Abs(settingsWindow.Height - 420) < 0.01, "Settings window height is 420");
@@ -426,8 +428,7 @@ internal static class UiChecks
                      settingsWindow.Top = -20000;
                      settingsWindow.Show();
                      settingsWindow.UpdateLayout();
-                     var layoutRoot = (Grid)excludedBox.Parent;
-                     Rect Bounds(FrameworkElement element) => element.TransformToAncestor(layoutRoot)
+                     Rect Bounds(FrameworkElement element) => element.TransformToAncestor(settingsWindow)
                          .TransformBounds(new Rect(new Point(), element.RenderSize));
                      Rect helpBounds = Bounds(help);
                      Rect exclusionBounds = Bounds(excludedBox);
@@ -437,7 +438,7 @@ internal static class UiChecks
                          && helpBounds.Bottom <= Math.Min(exclusionBounds.Top, labelBounds.Top)
                          && labelBounds.Right <= exclusionBounds.Left
                          && Math.Max(exclusionBounds.Bottom, labelBounds.Bottom) <= buttonsBounds.Top
-                         && buttonsBounds.Bottom <= layoutRoot.ActualHeight + 0.5,
+                         && buttonsBounds.Bottom <= settingsWindow.ActualHeight + 0.5,
                          "Settings help, exclusion controls and buttons do not overlap or overflow");
                      settingsWindow.Hide();
                      var backwardBox = (TextBox)settingsWindow.FindName("BackwardStepTextBox");

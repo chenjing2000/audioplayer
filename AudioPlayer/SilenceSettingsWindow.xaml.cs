@@ -17,6 +17,14 @@ public partial class SilenceSettingsWindow : Window
     {
         InitializeComponent();
         Settings = settings;
+        FontBox.ItemsSource = ScriptAppearance.Fonts;
+        FontSizeBox.ItemsSource = ScriptAppearance.Sizes;
+        LineHeightBox.ItemsSource = ScriptAppearance.Heights;
+        ParagraphAfterBox.ItemsSource = ScriptAppearance.Spacings;
+        IndentBox.ItemsSource = ScriptAppearance.Indents;
+        TextColorBox.ItemsSource = ScriptAppearance.Colors;
+        PlaybackColorBox.ItemsSource = ScriptAppearance.PlaybackColors;
+        BackgroundColorBox.ItemsSource = ScriptAppearance.Backgrounds;
         LoadValues(settings);
 
     }
@@ -38,6 +46,15 @@ public partial class SilenceSettingsWindow : Window
 
     private void LoadValues(SilenceSettings settings)
     {
+        var appearance = settings.ScriptAppearance;
+        FontBox.SelectedItem = appearance.Font;
+        FontSizeBox.SelectedItem = appearance.FontSize;
+        LineHeightBox.SelectedItem = appearance.LineHeight;
+        ParagraphAfterBox.SelectedItem = appearance.ParagraphAfter;
+        IndentBox.SelectedItem = appearance.FirstLineIndent;
+        TextColorBox.SelectedItem = appearance.Color;
+        PlaybackColorBox.SelectedItem = appearance.ScriptColor;
+        BackgroundColorBox.SelectedItem = appearance.Background;
         playbackMode = settings.PlaybackMode;
         ExcludedFolderNamesTextBox.Text = settings.ExcludedFolderNames;
         BackwardStepTextBox.Text = settings.BackwardStepSeconds.ToString(CultureInfo.InvariantCulture);
@@ -51,7 +68,7 @@ public partial class SilenceSettingsWindow : Window
 
     private bool TryReadValues(out SilenceSettings settings)
     {
-        settings = new SilenceSettings { PlaybackMode = playbackMode };
+        settings = new SilenceSettings { PlaybackMode = playbackMode, ScriptAppearance = ReadAppearance() };
 
         if (!int.TryParse(FrameMillisecondsTextBox.Text.Trim(), out int frameMilliseconds))
             return ShowValueError("分析帧长度必须是整数。", FrameMillisecondsTextBox);
@@ -108,6 +125,39 @@ public partial class SilenceSettingsWindow : Window
         AllowedSilenceTextBox.Text = allowedSeconds.ToString("0.0", CultureInfo.InvariantCulture);
         ClearValueError();
         return true;
+    }
+
+    private ScriptAppearance ReadAppearance() => new()
+    {
+        Font = (string?)FontBox?.SelectedItem ?? "Georgia",
+        FontSize = (int?)FontSizeBox?.SelectedItem ?? 18,
+        LineHeight = (double?)LineHeightBox?.SelectedItem ?? 1.7,
+        ParagraphAfter = (int?)ParagraphAfterBox?.SelectedItem ?? 16,
+        FirstLineIndent = (int?)IndentBox?.SelectedItem ?? 0,
+        Color = (string?)TextColorBox?.SelectedItem ?? "#283747",
+        ScriptColor = (string?)PlaybackColorBox?.SelectedItem ?? "#B64550",
+        Background = (string?)BackgroundColorBox?.SelectedItem ?? "#F8F8F6"
+    };
+
+    private void Appearance_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (PreviewSecond is null || PreviewPlayed is null) return;
+        var a = ReadAppearance();
+        Brush BrushFor(string color) => (Brush)new BrushConverter().ConvertFromString(color)!;
+        AppearancePreview.Background = BrushFor(a.Background);
+        foreach (var block in new[] { PreviewFirst, PreviewSecond })
+        {
+            block.FontFamily = new FontFamily(a.Font + ", Segoe UI");
+            block.FontSize = a.FontSize;
+            block.LineHeight = a.FontSize * a.LineHeight;
+            block.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+            block.Foreground = BrushFor(a.Color);
+
+        }
+        PreviewPlayed.Text = new string('\u2003', a.FirstLineIndent) + "Learning changes ";
+        PreviewSecond.Text = new string('\u2003', a.FirstLineIndent) + "Each experience shapes our understanding.";
+        PreviewFirst.Margin = new Thickness(0, 0, 0, a.ParagraphAfter);
+        PreviewPlayed.Foreground = BrushFor(a.ScriptColor);
     }
 
     private static bool IsStepText(string text) => text.Length <= 2 && text.All(c => c is >= '0' and <= '9');

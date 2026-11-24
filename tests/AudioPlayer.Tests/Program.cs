@@ -58,6 +58,28 @@ Check("Script parser rejects invalid intervals and accepts empty timed units", (
     Assert(ScriptContent.Parse(valid.RootElement).Paragraphs[0].Sentences[0].TimedUnits.Count == 0);
 });
 
+Check("Script appearance defaults, persistence and validation", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "appearance-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        var store = new SettingsStore(Path.Combine(folder, "player.settings.json"));
+        File.WriteAllText(store.FilePath, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0}""");
+        var settings = store.LoadOrCreate();
+        Assert(settings.ScriptAppearance == new ScriptAppearance());
+        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 22, LineHeight = 1.8, ParagraphAfter = 24, FirstLineIndent = 2, Background = "#FFFFFF", ScriptColor = "#26798A" };
+        store.Save(settings);
+        Assert(store.LoadOrCreate().ScriptAppearance == settings.ScriptAppearance);
+        string original = File.ReadAllText(store.FilePath);
+        settings.ScriptAppearance = settings.ScriptAppearance with { FontSize = 99 };
+        try { store.Save(settings); throw new Exception("Invalid appearance accepted"); }
+        catch (ArgumentOutOfRangeException) { }
+        Assert(File.ReadAllText(store.FilePath) == original);
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
 Check("Settings initialize beside executable, persist and preserve invalid files", () =>
 {
     string folder = Path.Combine(AppContext.BaseDirectory, "settings-" + Guid.NewGuid().ToString("N"));

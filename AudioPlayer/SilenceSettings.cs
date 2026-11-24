@@ -27,6 +27,7 @@ public sealed class SilenceSettings
 
     public string ExcludedFolderNames { get; set; } = "";
     public PlaybackMode PlaybackMode { get; set; } = PlaybackMode.PlayOne;
+    public ScriptAppearance ScriptAppearance { get; set; } = new();
 
     internal HashSet<string> GetExcludedFolderNames()
     {
@@ -51,6 +52,8 @@ public sealed class SilenceSettings
 
     internal HashSet<string> ValidateAndGetExcludedFolderNames()
     {
+        if (ScriptAppearance is null) throw new ArgumentOutOfRangeException(nameof(ScriptAppearance));
+        ScriptAppearance.Validate();
         var excludedNames = GetExcludedFolderNames();
         if (!Enum.IsDefined(PlaybackMode))
             throw new ArgumentOutOfRangeException(nameof(PlaybackMode), "无效的播放模式。");
@@ -71,5 +74,34 @@ public sealed class SilenceSettings
             throw new ArgumentOutOfRangeException(nameof(AllowedSilenceSeconds),
                 $"允许静音时长不得低于 {Math.Ceiling(MinimumSilenceMilliseconds / 100m) / 10m:0.0} 秒，且最多一位小数。");
         return excludedNames;
+    }
+}
+
+public sealed record ScriptAppearance
+{
+    internal static readonly string[] Fonts = ["Georgia", "Segoe UI", "Microsoft YaHei UI", "Nunito", "Times New Roman", "Arial"];
+    internal static readonly int[] Sizes = [14, 15, 16, 17, 18, 20, 22, 24, 26, 28];
+    internal static readonly double[] Heights = [1.4, 1.5, 1.6, 1.7, 1.8, 2.0];
+    internal static readonly int[] Spacings = [0, 8, 12, 14, 16, 18, 20, 24];
+    internal static readonly int[] Indents = [0, 1, 2, 3];
+    internal static readonly string[] Colors = ["#283747", "#344054", "#3F4750", "#315247", "#513D4D"];
+    internal static readonly string[] PlaybackColors = ["#B64550", "#A33D30", "#A45A2C", "#856300", "#53713C", "#26798A"];
+    internal static readonly string[] Backgrounds = ["#F8F8F6", "#F0F3F7", "#F7F1E6", "#EFF5F0", "#F1F0F7", "#FFFFFF"];
+
+    public string Font { get; init; } = "Georgia";
+    public int FontSize { get; init; } = 18;
+    public double LineHeight { get; init; } = 1.7;
+    public int ParagraphAfter { get; init; } = 16;
+    public int FirstLineIndent { get; init; }
+    public string Color { get; init; } = "#283747";
+    public string ScriptColor { get; init; } = "#B64550";
+    public string Background { get; init; } = "#F8F8F6";
+
+    internal void Validate()
+    {
+        if (!Fonts.Contains(Font) || !Sizes.Contains(FontSize) || !Heights.Contains(LineHeight) ||
+            !Spacings.Contains(ParagraphAfter) || !Indents.Contains(FirstLineIndent) ||
+            !Colors.Contains(Color) || !PlaybackColors.Contains(ScriptColor) || !Backgrounds.Contains(Background))
+            throw new ArgumentOutOfRangeException(nameof(ScriptAppearance), "无效的原文显示参数。");
     }
 }

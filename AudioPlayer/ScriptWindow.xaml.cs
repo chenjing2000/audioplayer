@@ -9,6 +9,7 @@ namespace AudioPlayer;
 public partial class ScriptWindow : Window
 {
     private bool ownerClosing;
+    private ScriptAppearance appearance = new();
     private bool initialized;
     private bool ready;
     internal event Action<double>? NavigationPreview;
@@ -62,6 +63,7 @@ public partial class ScriptWindow : Window
                     ready = true;
                     Status.Visibility = Visibility.Collapsed;
                     Reader.Visibility = Visibility.Visible;
+                    Post(new { type = "appearance", appearance });
                     SendArticle();
                     return;
                 }
@@ -151,6 +153,13 @@ public partial class ScriptWindow : Window
         article = loaded;
         message = result;
         SendArticle();
+    }
+
+    internal void SetAppearance(ScriptAppearance value)
+    {
+        if (appearance == value) return;
+        appearance = value;
+        if (ready && !ownerClosing) Post(new { type = "appearance", appearance });
     }
 
     internal void UpdatePlayback(double position, bool playing, bool reset, bool immediate = false)
