@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     private bool settingsFileReady;
     private List<SilenceRange> ranges = new();
     private AudioTrack? loadedTrack;
+    private AudioTrack? indicatedTrack;
+    private readonly CancellationTokenSource scanCancellation = new();
     private bool operationBusy;
     private bool analyzing;
     private bool trimming;
@@ -51,16 +53,17 @@ public partial class MainWindow : Window
     private Task navigationTask = Task.CompletedTask;
     private Exception? displayedPlaybackError;
 
-    public MainWindow() : this(new SettingsStore())
+    public MainWindow() : this(new SettingsStore(),
+        new PlaylistStore(PlaylistStore.GetFilePath(SettingsStore.GetExecutablePath())))
     {
     }
 
     internal MainWindow(SettingsStore settingsStore, PlaylistStore? playlistStore = null)
     {
         this.settingsStore = settingsStore;
-        // Both stores follow the actual executable stem; test settings paths stay isolated.
+        // Test settings paths keep their playlists isolated from the real executable.
         this.playlistStore = playlistStore ?? new PlaylistStore(
-            PlaylistStore.GetFilePath(Path.ChangeExtension(Path.ChangeExtension(settingsStore.FilePath, null), ".exe")));
+            settingsStore.FilePath[..^".settings.json".Length] + ".playlist.json");
         InitializeComponent();
         Rect workArea = SystemParameters.WorkArea;
         double desiredWidth = Math.Round(workArea.Width * 0.5);
@@ -95,18 +98,37 @@ public partial class MainWindow : Window
 
     private async Task RestorePlaylistAsync()
     {
-        PlaylistSnapshot? snapshot = await Task.Run(playlistStore.Load);
+        CancellationToken cancellation = scanCancellation.Token;
+        PlaylistSnapshot? snapshot = await Task.Run(playlistStore.Load, cancellation);
         if (snapshot is null || closing || snapshot.RootFolder is null) return;
         string root = Path.GetFullPath(snapshot.RootFolder);
-        if (!Directory.Exists(root))
+        List<AudioTrack>? files;
+        try
         {
-            SavePlaylist();
-            ToastMessages.Show("上次的音频文件夹不可用，已清空播放列表。", ToastLevel.Error);
+            files = await Task.Run(() =>
+            {
+                cancellation.ThrowIfCancellationRequested();
+                try
+                {
+                    if ((File.GetAttributes(root) & FileAttributes.Directory) == 0) return null;
+                }
+                catch (FileNotFoundException) { return null; }
+                catch (DirectoryNotFoundException) { return null; }
+                return AudioLibrary.LoadPaths(root, snapshot.Files, cancellation, restore: true);
+            }, cancellation);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (!closing) ToastMessages.Show("恢复播放列表失败，已保留磁盘上的列表。请检查目录访问权限后重启：" + ex.Message, ToastLevel.Error);
             return;
         }
-
-        var files = await Task.Run(() => AudioLibrary.LoadPaths(root, snapshot.Files.Where(File.Exists)));
         if (closing) return;
+        if (files is null)
+        {
+            SavePlaylist();
+            ToastMessages.Show("上次的音频文件夹不存在，已清空播放列表。", ToastLevel.Error);
+            return;
+        }
         currentFolder = root;
         foreach (var file in files) tracks.Add(file);
         if (!snapshot.Files.SequenceEqual(files.Select(file => file.FilePath), StringComparer.Ordinal))
@@ -119,7 +141,7 @@ public partial class MainWindow : Window
         try { playlistStore.Save(currentFolder, tracks.Select(track => track.FilePath)); }
         catch (Exception ex) when (IsSettingsFileError(ex))
         {
-            if (!closing) ToastMessages.Show("播放列表保存失败：" + ex.Message, ToastLevel.Error);
+            if (!closing) ToastMessages.Show("播放列表保存失败，磁盘上可能仍是旧列表。请刷新或重新打开文件夹重试：" + ex.Message, ToastLevel.Error);
         }
     }
 
@@ -146,10 +168,12 @@ public partial class MainWindow : Window
         UpdateControls();
 
         List<AudioTrack> files;
-        try { files = await Task.Run(() => AudioLibrary.LoadFolder(path)); }
+        CancellationToken cancellation = scanCancellation.Token;
+        try { files = await Task.Run(() => AudioLibrary.LoadFolder(path, cancellation), cancellation); }
         catch
         {
-            SavePlaylist();
+            // An unfinished scan canceled on exit must not erase the last saved list.
+            if (!closing) SavePlaylist();
             throw;
         }
         if (closing) return;
@@ -405,6 +429,8 @@ public partial class MainWindow : Window
         try
         {
             SilenceTrimResult result = await work;
+            // A folder switch can overlap trimming; wait for its committed root.
+            if (activeOperation is Task operation) await operation;
             if (closing) return;
             AddTrimmedOutput(result.OutputPath);
             if (!result.OutputSilenceSaved)
@@ -615,11 +641,19 @@ public partial class MainWindow : Window
         PlayIconImage.Source = (ImageSource)FindResource(playing ? "PauseIcon" : "PlayIcon");
         PlayButton.ToolTip = playing ? "暂停" : "播放";
         AutomationProperties.SetName(PlayButton, playing ? "暂停" : "播放");
-        foreach (var track in tracks)
+        if (!ReferenceEquals(indicatedTrack, loadedTrack))
         {
-            bool loaded = ReferenceEquals(track, loadedTrack);
-            track.IsPlaying = loaded && player.IsPlaying;
-            track.IsPaused = loaded && player.IsPaused;
+            if (indicatedTrack is not null)
+            {
+                indicatedTrack.IsPlaying = false;
+                indicatedTrack.IsPaused = false;
+            }
+            indicatedTrack = loadedTrack;
+        }
+        if (indicatedTrack is not null)
+        {
+            indicatedTrack.IsPlaying = player.IsPlaying;
+            indicatedTrack.IsPaused = player.IsPaused;
         }
     }
 
@@ -679,6 +713,7 @@ public partial class MainWindow : Window
         e.Cancel = true;
         if (closing) return;
         closing = true;
+        scanCancellation.Cancel();
         CancelAnalysis();
         CancelSelectionCheck();
         trimCancellation?.Cancel();
@@ -704,6 +739,7 @@ public partial class MainWindow : Window
         {
             player.StateChanged -= Player_StateChanged;
             player.Dispose();
+            scanCancellation.Dispose();
             allowClose = true;
             Close();
         }

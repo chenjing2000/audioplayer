@@ -454,7 +454,7 @@ try
         }));
         Assert(tracks.All(t => t.DisplayName == Path.GetFileNameWithoutExtension(t.FilePath)));
         Assert(tracks.All(t => t.RowToolTip.StartsWith(Path.GetDirectoryName(t.FilePath)!))); 
-        var tooltipTrack = new AudioTrack { FilePath = Path.Combine(fixture, "媒体文件.mp3"), Title = "Tag title" };
+        var tooltipTrack = new AudioTrack { FilePath = Path.Combine(fixture, "媒体文件.mp3") };
         Assert(tooltipTrack.RowToolTip == fixture);
     });
 
@@ -516,7 +516,7 @@ try
     Check("Broken file retained with error and unknown duration", () =>
     {
         var track = AudioLibrary.LoadFolder(fixture).Single(t => Path.GetFileName(t.FilePath) == "3.mp3");
-        Assert(track.LoadError is not null && track.Duration is null && track.Title == "3" && track.DurationText == "未知");
+        Assert(track.LoadError is not null && track.Duration is null && track.DisplayName == "3" && track.DurationText == "未知");
     });
 
     Check("Metadata readers release broken files", () =>
@@ -538,10 +538,10 @@ try
             tags.Save();
         }
 
-        Check("Title and album metadata", () =>
+        Check("Album and duration metadata; name uses filename", () =>
         {
             var track = AudioLibrary.LoadFolder(fixture).Single(t => Path.GetFileName(t.FilePath) == "sample.mp3");
-            Assert(track.Title == "Test title" && track.Album == "Test album" && track.Duration > TimeSpan.Zero);
+            Assert(track.DisplayName == "sample" && track.Album == "Test album" && track.Duration > TimeSpan.Zero);
         });
 
         using (var tags = TagLib.File.Create(valid))
@@ -554,7 +554,7 @@ try
         Check("Missing metadata falls back", () =>
         {
             var track = AudioLibrary.LoadFolder(fixture).Single(t => Path.GetFileName(t.FilePath) == "sample.mp3");
-            Assert(track.Title == "sample" && track.Album == "");
+            Assert(track.DisplayName == "sample" && track.Album == "");
         });
     }
     else
@@ -603,7 +603,7 @@ else if (args.Contains("--report"))
         + "区间仅经自动数值检查，尚未经人工试听确认。\n\n");
     foreach (var track in AudioLibrary.LoadFolder(audioFolder))
     {
-        Check("Real MP3: " + track.Title, () =>
+        Check("Real audio: " + track.DisplayName, () =>
         {
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var found = SilenceDetector.Detect(track.FilePath);
@@ -614,7 +614,7 @@ else if (args.Contains("--report"))
                 Assert(found.Count > 0);
             }
             using (var file = new FileStream(track.FilePath, FileMode.Open, FileAccess.Read, FileShare.None)) Assert(file.Length > 0);
-            report.AppendLine($"## {Path.GetFileName(track.FilePath)}\n\nTitle：{track.Title}；Album：{track.Album}；标签时长：{track.Duration}；分析耗时：{watch.Elapsed.TotalMilliseconds:F1} ms；有效停顿：{found.Count}。\n");
+            report.AppendLine($"## {Path.GetFileName(track.FilePath)}\n\nAlbum：{track.Album}；标签时长：{track.Duration}；分析耗时：{watch.Elapsed.TotalMilliseconds:F1} ms；有效停顿：{found.Count}。\n");
             report.AppendLine("| 起点（秒） | 终点（秒） | 中点（秒） |\n|---:|---:|---:|");
             foreach (var r in found) report.AppendLine($"| {r.Start.TotalSeconds:F3} | {r.End.TotalSeconds:F3} | {r.Middle.TotalSeconds:F3} |");
             report.AppendLine();

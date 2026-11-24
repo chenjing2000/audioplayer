@@ -4,7 +4,7 @@ namespace AudioPlayer;
 
 public static class AudioLibrary
 {
-    public static List<AudioTrack> LoadFolder(string folderPath)
+    public static List<AudioTrack> LoadFolder(string folderPath, CancellationToken cancellation = default)
     {
         string root = Path.GetFullPath(folderPath);
         var options = new EnumerationOptions
@@ -13,17 +13,55 @@ public static class AudioLibrary
             IgnoreInaccessible = false,
             AttributesToSkip = FileAttributes.ReparsePoint
         };
-        return LoadPaths(root, Directory.EnumerateFiles(root, "*", options));
+        cancellation.ThrowIfCancellationRequested();
+        return LoadPaths(root, Directory.EnumerateFiles(root, "*", options), cancellation);
     }
 
-    internal static List<AudioTrack> LoadPaths(string root, IEnumerable<string> paths)
+    internal static List<AudioTrack> LoadPaths(string root, IEnumerable<string> paths,
+        CancellationToken cancellation = default, bool restore = false)
     {
-        var files = paths.Select(Path.GetFullPath)
-            .Where(path => IsWithinFolder(root, path) && IsSupportedFile(path) && !IsTrimTemporaryFile(path))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        Array.Sort(files, (left, right) => ComparePaths(root, left, right));
-        return files.Select(ReadTrack).ToList();
+        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string candidate in paths)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            string path = Path.GetFullPath(candidate);
+            if (IsWithinFolder(root, path) && IsSupportedFile(path) && !IsTrimTemporaryFile(path)
+                && (!restore || IsRestorablePath(root, path, cancellation)))
+                files.Add(path);
+        }
+        cancellation.ThrowIfCancellationRequested();
+        var sorted = files.ToArray();
+        Array.Sort(sorted, (left, right) => ComparePaths(root, left, right));
+        var tracks = new List<AudioTrack>(sorted.Length);
+        foreach (string path in sorted)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            tracks.Add(ReadTrack(path));
+        }
+        cancellation.ThrowIfCancellationRequested();
+        return tracks;
+    }
+
+    // Attribute reads distinguish missing paths from access and IO errors.
+    private static bool IsRestorablePath(string root, string path, CancellationToken cancellation)
+    {
+        string current = root;
+        string[] parts = Path.GetRelativePath(root, path).Split(Path.DirectorySeparatorChar);
+        try
+        {
+            for (int i = 0; i < parts.Length; i++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                current = Path.Combine(current, parts[i]);
+                FileAttributes attributes = File.GetAttributes(current);
+                bool directory = (attributes & FileAttributes.Directory) != 0;
+                if ((attributes & FileAttributes.ReparsePoint) != 0 || directory != (i < parts.Length - 1))
+                    return false;
+            }
+            return true;
+        }
+        catch (FileNotFoundException) { return false; }
+        catch (DirectoryNotFoundException) { return false; }
     }
 
     internal static bool IsSupportedFile(string path)
@@ -50,21 +88,19 @@ public static class AudioLibrary
 
     internal static AudioTrack ReadTrack(string path)
     {
-        string fallback = Path.GetFileNameWithoutExtension(path);
         try
         {
             using var file = TagLib.File.Create(path);
             return new AudioTrack
             {
                 FilePath = Path.GetFullPath(path),
-                Title = string.IsNullOrWhiteSpace(file.Tag.Title) ? fallback : file.Tag.Title,
                 Album = file.Tag.Album ?? "",
                 Duration = file.Properties.Duration
             };
         }
         catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is TagLib.CorruptFileException || ex is TagLib.UnsupportedFormatException)
         {
-            return new AudioTrack { FilePath = Path.GetFullPath(path), Title = fallback, LoadError = ex.Message };
+            return new AudioTrack { FilePath = Path.GetFullPath(path), LoadError = ex.Message };
         }
     }
 

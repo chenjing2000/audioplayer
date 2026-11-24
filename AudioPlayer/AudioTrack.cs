@@ -6,7 +6,6 @@ namespace AudioPlayer;
 public sealed class AudioTrack : INotifyPropertyChanged
 {
     public string FilePath { get; init; } = "";
-    public string Title { get; init; } = "";
     public TimeSpan? Duration { get; init; }
     public string Album { get; init; } = "";
     public string? LoadError { get; init; }

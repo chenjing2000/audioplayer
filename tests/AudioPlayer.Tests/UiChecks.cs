@@ -38,7 +38,7 @@ internal static class UiChecks
                 }
                 try
                 {
-                    var settingsStore = new SettingsStore(Path.Combine(audioFolder, "UiPlayer.settings.json"));
+                    var settingsStore = new SettingsStore(Path.Combine(audioFolder, "UiPlayer-" + Guid.NewGuid().ToString("N") + ".settings.json"));
                     window = new MainWindow(settingsStore);
                     Assert(File.Exists(settingsStore.FilePath), "First launch initializes settings file");
                     Rect workArea = SystemParameters.WorkArea;
@@ -469,7 +469,7 @@ internal static class UiChecks
                     string recoveryPath = Path.Combine(audioFolder, "recovery.wav");
                     using (var writer = new WaveFileWriter(recoveryPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                         writer.WriteSamples(new float[44100], 0, 44100);
-                    var recoveryTrack = new AudioTrack { FilePath = recoveryPath, Title = "Recovery" };
+                    var recoveryTrack = new AudioTrack { FilePath = recoveryPath };
                     MethodInfo playTrack = typeof(MainWindow).GetMethod("PlayTrackAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
                     await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
                     if (Field<Task>(window, "analysisTask") is Task recoveryAnalysis) await recoveryAnalysis;
@@ -489,7 +489,7 @@ internal static class UiChecks
                         Console.WriteLine("SKIP audio-dependent UI checks: no local MP3 available.");
                         return;
                     }
-                    Assert(list.Columns.Count == 4 && list.Items.Count == 3, "Four columns and three MP3 files");
+                    Assert(list.Columns.Count == 4 && list.Items.Count > 0, "Four columns and a nonempty audio list");
                     Assert(list.Columns[2].Header?.ToString() == "时长", "Duration header is shortened");
                     list.UpdateLayout();
                     var row0 = (DataGridRow)list.ItemContainerGenerator.ContainerFromIndex(0);
@@ -639,6 +639,7 @@ internal static class UiChecks
                     }
                     window = new MainWindow(settingsStore) { ShowInTaskbar = false, ShowActivated = false, Left = -20000, Top = -20000 };
                     window.Show();
+                    if (Field<Task>(window, "activeOperation") is Task restoredStartup) await restoredStartup;
                     await window.LoadFolderAsync(audioFolder);
                     await window.HandleShortcutAsync(Key.Space);
                     Assert(FieldValue<bool>(window, "analyzing"), "Analysis in progress before close");

@@ -15,7 +15,7 @@ internal sealed class SettingsStore
 
     public SettingsStore(string filePath) => FilePath = filePath;
 
-    private static string GetExecutablePath()
+    internal static string GetExecutablePath()
     {
         string? executablePath = Environment.ProcessPath;
         if (executablePath is null || Path.GetFileNameWithoutExtension(executablePath).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
