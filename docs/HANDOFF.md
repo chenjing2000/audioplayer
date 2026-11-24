@@ -1,10 +1,10 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-24 — PR #17 feature branch, core Windows acceptance passed; remaining edge cases pending  
+**Updated:** 2026-11-25 — PR #17 refactor, focused Windows regression and CI passed; awaiting merge authorization  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Merged main baseline:** `52bb0b8` (application from PR #16, `af27658`).  
-**Feature branch:** `feature/script-companion-window`; latest verified feature revision `6789ffd`; [draft PR #17](https://github.com/chenjing2000/audioplayer/pull/17). Do not merge without separate explicit user authorization. Local checkout not independently verified.
+**Feature branch:** `feature/script-companion-window`; latest verified application revision `b662cba`; [draft PR #17](https://github.com/chenjing2000/audioplayer/pull/17). Do not merge without separate explicit user authorization. User-provided Windows log verifies local HEAD and origin at that revision; local checkout not independently inspected.
 
 ## Current feature branch
 
@@ -12,7 +12,7 @@ All five implementation stages and source-review remediation are committed: mode
 
 ## Verification and next action
 
-Feature revision `6789ffd` passed [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45402314948) and [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45402326844): 58 Core, 223 UI, 5 publishing safeguards and 4 published EXE checks. User's local Windows run passed 58 Core, 262 UI, 5 publishing safeguards and 4 published checks (329 total), including WebView2 and all seven wheel assertion lines. The prior published reader initialization defect is resolved on the user's computer. All 10 focused manual reader checks passed; remaining full-matrix edge cases are not yet confirmed. Optional MP3-specific cases skipped; a temporary test WebView2 cache remained in use during cleanup. See [Testing](Testing.md) for exact scope and limitations. No release tag or merge authorized.
+Feature revision `b662cba` passed [Feature validation CI](https://github.com/chenjing2000/audioplayer/actions/runs/45434378532) and the user-provided Windows full suite: 58 Core, 276 UI, 5 publishing safeguards and 4 published EXE checks (343 total, zero failures). All 22 focused manual regression checks passed, including scrollbar navigation, operation competition, fine-grained wheel seeking, and close-before-minimize without residual shadow. Local publish succeeded. Optional MP3 checks skipped; isolated temporary WebView2 cache cleanup reported a nonfatal in-use warning. Earlier full-matrix edge cases not separately confirmed remain unverified. See [Testing](Testing.md). Preserve the accepted application code; await explicit merge authorization. No release tag authorized.
 
 ```powershell
 cd C:\Projects\AudioPlayer
@@ -21,7 +21,7 @@ git fetch origin --prune
 git switch feature/script-companion-window
 git pull --ff-only origin feature/script-companion-window
 git log -1 --oneline
-.\tools\Test.ps1 -Suite UI
+.\tools\Test.ps1 -Suite Full
 .\tools\Publish.ps1
 .\tools\Test-PublishedApp.ps1
 ```
@@ -56,14 +56,14 @@ The user clarified that subtitles should continuously move during playback, not 
 
 At the user's request, the original wheel displacement is multiplied by 0.5 after pixel/line/page normalization. Center-line seek, debounce (150 ms), direct wheel motion and continuous automatic scrolling are unchanged; elapsed-time navigation is approximate due to discrete lines and speech timing. A browser assertion checks both directions and wheel modes. New CI and Windows wheel acceptance remain pending. No merge authorized.
 
-## Further wheel sensitivity reduction (pending verification)
+## Further wheel sensitivity reduction (historical; accepted on refactored revision)
 
 The user found the 50% wheel displacement at `ba1f351` still too large. The normalized wheel multiplier is now 0.25 (another 50% reduction); automatic follow, line selection and 150 ms debounce are unchanged. The existing wheel regression assertion now checks quarter displacement. New CI and Windows acceptance are pending; no merge authorized.
 
-## Reader controls and owner minimize (pending verification)
+## Reader controls and owner minimize (historical; accepted on refactored revision)
 
 Reader native minimize/maximize caption buttons removed without changing resizable border. Native scrollbar changes now use the same center-line preview/150 ms debounced seek as the wheel; automatic programmatic scroll events are excluded, and double-click seek is removed. Owner SC_MINIMIZE closes/disposes reader before default minimize, with StateChanged fallback; no auto-reopen on restore. New browser/native lifecycle assertions replace hide/restore assertions. Fresh CI and manual Windows confirmation (including shadow) pending. No merge authorized.
 
-## Reader state and trajectory refactor (pending Windows verification)
+## Reader state and trajectory refactor (focused Windows acceptance passed)
 
-Pre-refactor `6917294` feature validation passed; this does not establish local visual acceptance. Replaced four main-window navigation flags/target with one pending transaction and consumed it through the existing operation gate. Removed cancel/commit browser messages in favor of one authoritative epoch-tagged playback snapshot; preview coloring cannot overwrite the host clock, and only a matching confirmed target preserves the user offset. Removed duplicate sent snapshot, previous position and manual boolean; consolidated reader disposal and stale-instance event guards. The scroll-to-time inverse now shares the same continuous trajectory as time-to-scroll; no per-line quantization, no invented word timestamps, no seek when no anchors. Wheel 25%, 150 ms debounce, continuous follow, window behavior and media engine unchanged. Exact revised JS passed isolated simulated checks; new CI and Windows regression remain pending (see Testing). No merge authorized.
+Pre-refactor `6917294` feature validation passed; this does not establish local visual acceptance. Replaced four main-window navigation flags/target with one pending transaction and consumed it through the existing operation gate. Removed cancel/commit browser messages in favor of one authoritative epoch-tagged playback snapshot; preview coloring cannot overwrite the host clock, and only a matching confirmed target preserves the user offset. Removed duplicate sent snapshot, previous position and manual boolean; consolidated reader disposal and stale-instance event guards. The scroll-to-time inverse now shares the same continuous trajectory as time-to-scroll; no per-line quantization, no invented word timestamps, no seek when no anchors. Wheel 25%, 150 ms debounce, continuous follow, window behavior and media engine unchanged. Exact revised JS passed isolated simulated checks. At b662cba, CI and local Windows full suite passed; all 22 focused manual checks passed, including the residual-shadow correction (see Testing). No merge authorized.

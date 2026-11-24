@@ -527,8 +527,51 @@ The user reported the 50% setting at `ba1f351` still moves too far and requested
 
 User requested no reader minimize/maximize buttons (retain resize/close), native scrollbar movement to preview/seek like wheel, removal of double-click seek, and actual reader close before main minimize. Native SC_MINIMIZE closes/disposes reader synchronously before default minimize; StateChanged closes as fallback for programmatic/shell paths. Restoring owner leaves reader closed until the user opens it. Scroll events distinguish actual external movement from programmatic scrollTo (including clamping/rounding), reuse center-line preview and 150 ms debounce; automatic scroll does not seek. Wheel remains 25%. New WebView2 and native lifecycle assertions are pending CI and Windows visual acceptance, including real scrollbar drag, track clicks, ongoing playback and residual shadow. No merge authorized.
 
-### Reader state and trajectory refactor (pending Windows verification)
+### Reader state and trajectory refactor (implementation and pre-acceptance evidence)
 
 At `6917294`, [Feature validation](https://github.com/chenjing2000/audioplayer/actions/runs/45430367570) completed successfully. This is pre-refactor evidence only; no new Windows manual log was supplied. Source review identified separate quantized manual and continuous automatic mappings, four host navigation-state fields with a separate committing path, browser preview overwriting authoritative playback, cancellation without an actual-state snapshot, and stale-window callbacks. Refactor uses one pending transaction, the existing serialized host command gate, one epoch-tagged playback snapshot protocol, separate preview coloring, matching committed target for offset preservation, and one monotone timeline used in both directions. The reader measures timed rectangles only. Existing wheel scale (0.25), 150 ms debounce, natural bounds, real word timestamps for coloring, no double-click seek and owner-minimize close remain. Manual behavior deliberately changes from line-start quantization to continuous interpolation; untimed text between valid anchors can be traversed without fabricating word timings. No timed anchors means no seek.
 
 The exact revised inline JavaScript was executed in a simulated DOM/clock environment: all 401 forward/inverse round-trip samples, empty-trajectory handling, preview isolation, equal-position cancel, stale epoch rejection, matching commit offset and superseded commit reconciliation passed. This is not WebView2/Windows execution. Updated browser assertions exercise continuous sub-line external scroll, programmatic-scroll exclusion, same-position cancellation, stale messages and committed-target matching. Audio-device integration includes consumed-transaction repeated commit. Fresh CI and local Windows full suite are required. Focus D01–D08, C01–C08, A06–A08, F01–F06; test a real scrollbar drag, rapid interaction with Space/Stop/main slider/Settings, minimize during preview/commit, reopen and track changes, long scripts, untimed text, short document and device failure where feasible. Native scrollbar attribution still uses observed scroll offsets; physical input and resize/DPI behavior must be verified locally. No merge authorized.
+
+### Refactored reader Windows acceptance (2026-11-25)
+
+Verified application revision: `b662cba` (user-provided PowerShell log confirms local HEAD and origin/feature/script-companion-window matched after a fast-forward from `2a22de9`; working tree was clean before pull). [Feature validation CI #45434378532](https://github.com/chenjing2000/audioplayer/actions/runs/45434378532) completed successfully; verify job passed.
+
+User-provided local Windows PowerShell 5.1 results:
+
+| Check | Passed | Failed |
+| --- | ---: | ---: |
+| Core | 58 | 0 |
+| UI (including real WebView2 and WAV navigation) | 276 | 0 |
+| Publishing safeguards | 5 | 0 |
+| Published EXE checks | 4 | 0 |
+| Total | 343 | 0 |
+
+`Test.ps1 -Suite Full` passed (3 top-level groups, 0 failed, 1 skipped). PowerShell source/syntax checks passed. `Publish.ps1` successfully built and published the win-x64 .NET 10 executable to dist; `Test-PublishedApp.ps1` passed 4/4. Optional real MP3 playback, valid-MP3 metadata and MP3-dependent UI checks were skipped because the requisite local MP3 fixture was unavailable. The isolated temporary WebView2 test cache remained in use during cleanup (nonfatal; no claim that cleanup succeeded).
+
+User explicitly confirmed all 22 focused manual regression checks at this revision:
+
+- [x] Continuous smooth scrolling without obvious dwell.
+- [x] Progressive word coloring synchronized to audio.
+- [x] Long IELTS listening material plays smoothly.
+- [x] Pause/resume behaves correctly.
+- [x] Window resizing and font changes do not trigger unintended seeks.
+- [x] Fine-grained wheel navigation.
+- [x] Rapid repeated wheel navigation stays synchronized.
+- [x] Right scrollbar dragging updates playback progress.
+- [x] Clicking the scrollbar track updates playback progress.
+- [x] Manual scrolling pauses and restores prior playback state.
+- [x] Double-click text does not seek.
+- [x] Space during scrolling.
+- [x] Stop during scrolling.
+- [x] Arrow shortcuts during scrolling.
+- [x] Main slider immediately after scrolling.
+- [x] Open and cancel Settings immediately after scrolling.
+- [x] Switch audio immediately after scrolling.
+- [x] Reader cannot minimize/maximize but remains resizable.
+- [x] Minimize owner during playback closes reader with no desktop shadow.
+- [x] Minimize owner during manual navigation.
+- [x] Restore owner and reopen reader with correct synchronization.
+- [x] Repeated reader open/close without errors or stale text.
+
+The previously reported residual reader shadow is resolved in the user's tested Windows environment. The focused regression is accepted; this does not establish every earlier full-matrix case (e.g. mixed-DPI/multiple monitors, missing runtime, actual device failure, and optional MP3 checks). No application source changes, merge, release tag or release authorization in this documentation update.
