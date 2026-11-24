@@ -607,6 +607,46 @@ internal static class UiChecks
                     await window.CommitScriptSeekAsync();
                     Assert(!Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled,
                         "Commit without a pending script target is a no-op");
+                    // Real WebView2 integration runs independently of audio hardware.
+                    string? runtimeVersion = null;
+                    try { runtimeVersion = Microsoft.Web.WebView2.Core.CoreWebView2Environment.GetAvailableBrowserVersionString(); }
+                    catch (Microsoft.Web.WebView2.Core.WebView2RuntimeNotFoundException) { }
+                    if (string.IsNullOrWhiteSpace(runtimeVersion))
+                        Console.WriteLine("SKIP UI script reader integration: WebView2 Runtime unavailable.");
+                    else
+                    {
+                        string readerFolder = Path.Combine(Path.GetTempPath(), "script-reader-" + Guid.NewGuid().ToString("N"));
+                        Directory.CreateDirectory(readerFolder);
+                        var readerWindow = new ScriptWindow(Path.Combine(readerFolder, "cache"))
+                            { Owner = window, Height = 400, ShowActivated = false, Left = -10000, Top = -10000 };
+                        try
+                        {
+                            File.WriteAllText(Path.Combine(readerFolder, "arbitrary.script.json"),
+                                """{"filetype":"script","title":"Reader test","paragraphs":[[{"text":"Hello, world.","timed_units":[["Hello",0,1],["world",1,2]]}]]}""");
+                            readerWindow.SetAudio(Path.Combine(readerFolder, "sample.wav"));
+                            readerWindow.Show();
+                            var deadline = DateTime.UtcNow.AddSeconds(25);
+                            while (!readerWindow.ReaderReady && readerWindow.ReaderFailure is null && DateTime.UtcNow < deadline)
+                                await Task.Delay(100);
+                            Assert(readerWindow.ReaderReady, "Embedded WebView2 reader completes ready handshake: " + readerWindow.ReaderFailure);
+                            var reader = (Microsoft.Web.WebView2.Wpf.WebView2)readerWindow.FindName("Reader");
+                            string content = "";
+                            while (DateTime.UtcNow < deadline)
+                            {
+                                content = await reader.CoreWebView2.ExecuteScriptAsync("document.querySelector('#text').textContent");
+                                if (content.Contains("Hello, world.")) break;
+                                await Task.Delay(100);
+                            }
+                            Assert(content.Contains("Hello, world."), "Embedded WebView2 reader renders discovered Script JSON");
+                        }
+                        finally
+                        {
+                            readerWindow.CloseForOwner();
+                            try { Directory.Delete(readerFolder, true); }
+                            catch (IOException) { Console.WriteLine("Temporary WebView2 cache still in use: " + readerFolder); }
+                            catch (UnauthorizedAccessException) { Console.WriteLine("Temporary WebView2 cache still in use: " + readerFolder); }
+                        }
+                    }
                     if (WaveOut.DeviceCount == 0)
                     {
                         Console.WriteLine("SKIP UI script wheel playback checks (6 assertions): no waveOut device is available.");

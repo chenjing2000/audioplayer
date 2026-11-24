@@ -31,3 +31,7 @@ git log -1 --oneline
 PR #16 was squash merged at `af27658`; [post-merge CI](https://github.com/chenjing2000/audioplayer/actions/runs/45382847185) passed. The user confirmed 70 cumulative manual checks across successive revisions. Local `3321875` passed 55 Core, 225 UI and 5 publishing safeguards, including synthetic WAV playback; optional MP3 skipped. Real long-pause MP3/WAV listening, directory access denial, selected FFmpeg failure paths and tagged release assets remain deferred. Historical evidence is in [Testing](Testing.md).
 
 Follow root AGENTS.md and WindowsAppPlaybook; discuss new requirements before coding; protect user data, use English commit messages and avoid unnecessary abstractions. Keep main unchanged until explicit merge authorization.
+
+## Local acceptance update (2026-11-24)
+
+At `0ada0d9`, user logs confirmed 58 Core, 260 UI, 5 publishing safeguards and 4 published checks passed, including all actual WAV wheel assertions. Optional MP3 checks skipped. Manual published reader failed with “原文页面加载失败。”; do not mark reader accepted. The follow-up fixes local document navigation using the ReadArticles embedded-resource approach, reports diagnostic failures and adds actual reader integration coverage. Re-run UI, publish and manual reader checks before resuming the checklist. No merge authorization.

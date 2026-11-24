@@ -462,3 +462,7 @@ On Windows, close running AudioPlayer, switch to the feature branch and pull fas
 | F08 | Existing playback, silence navigation, scan and trim regression smoke |
 
 No item above is marked passed until user reports actual Windows results. Timing estimates based on observation are qualitative unless instrumented. Real device failure scenarios or mixed-DPI hardware unavailable locally must be marked skipped, not passed.
+
+### Local Windows result at 0ada0d9 (2026-11-24)
+
+User-supplied PowerShell log: 58 Core, 260 UI, 5 publishing safeguards, 4 published EXE checks passed; optional MP3 skipped. All seven wheel-related assertion lines passed (the prior skip label counted six grouped scenarios). Manual launch of the published EXE displayed the companion but reported “原文页面加载失败。”; reader acceptance failed and further manual checks are pending. The navigation implementation is corrected to serve the embedded reader through a fixed local HTTPS resource response, as in ReadArticles, with exact navigation/message source checks and diagnostic errors. A real WebView2 ready/render smoke test now runs before the audio-device gate when the runtime is available. This correction still requires CI and local re-verification.

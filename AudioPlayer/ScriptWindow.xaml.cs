@@ -8,7 +8,11 @@ namespace AudioPlayer;
 
 public partial class ScriptWindow : Window
 {
+    private const string ReaderOrigin = "https://audioplayer.invalid";
+    private const string ReaderDocument = ReaderOrigin + "/script.html";
+    private readonly string? testCacheDirectory;
     private bool ownerClosing;
+    private bool readerFailed;
     private ScriptAppearance appearance = new();
     private bool initialized;
     private bool ready;
@@ -24,11 +28,17 @@ public partial class ScriptWindow : Window
     private string message = "尚未加载原文";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public ScriptWindow()
+    public ScriptWindow() : this(null) { }
+
+    internal ScriptWindow(string? cacheDirectory)
     {
+        testCacheDirectory = cacheDirectory;
         InitializeComponent();
         Loaded += InitializeReader;
     }
+
+    internal bool ReaderReady => ready;
+    internal string? ReaderFailure => readerFailed ? Status.Text : null;
 
     private async void InitializeReader(object sender, RoutedEventArgs e)
     {
@@ -36,7 +46,7 @@ public partial class ScriptWindow : Window
         initialized = true;
         try
         {
-            string folder = Path.Combine(Path.GetDirectoryName(SettingsStore.GetExecutablePath())!, "cache", "webview2");
+            string folder = testCacheDirectory ?? Path.Combine(Path.GetDirectoryName(SettingsStore.GetExecutablePath())!, "cache", "webview2");
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: folder);
             if (ownerClosing) return;
             await Reader.EnsureCoreWebView2Async(environment);
@@ -45,21 +55,40 @@ public partial class ScriptWindow : Window
             core.Settings.AreHostObjectsAllowed = false;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
+            core.AddWebResourceRequestedFilter(ReaderOrigin + "/*", CoreWebView2WebResourceContext.All);
+            core.WebResourceRequested += (_, args) =>
+            {
+                Stream? stream = string.Equals(args.Request.Uri, ReaderDocument, StringComparison.OrdinalIgnoreCase)
+                    ? typeof(ScriptWindow).Assembly.GetManifestResourceStream("AudioPlayer.web.script.html") : null;
+                int code = stream is null ? 404 : 200;
+                stream ??= new MemoryStream(System.Text.Encoding.UTF8.GetBytes("Not found"));
+                args.Response = environment.CreateWebResourceResponse(stream, code,
+                    code == 200 ? "OK" : "Not Found",
+                    "Content-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff");
+            };
             core.NavigationStarting += (_, args) =>
             {
-                if (args.Uri != "about:blank") args.Cancel = true;
+                if (!string.Equals(args.Uri, ReaderDocument, StringComparison.OrdinalIgnoreCase))
+                {
+                    args.Cancel = true;
+                    return;
+                }
+                ready = false;
+                sentPlayback = null;
             };
             core.NewWindowRequested += (_, args) => args.Handled = true;
-            core.ProcessFailed += (_, _) => ShowFailure("WebView2 进程异常，请重新启动程序。");
+            core.ProcessFailed += (_, args) => ShowFailure("WebView2 进程异常：" + args.ProcessFailedKind);
             core.NavigationCompleted += (_, args) =>
             {
-                if (!args.IsSuccess) ShowFailure("原文页面加载失败。");
+                if (!args.IsSuccess && args.WebErrorStatus != CoreWebView2WebErrorStatus.OperationCanceled)
+                    ShowFailure("原文页面加载失败：" + args.WebErrorStatus);
             };
             core.WebMessageReceived += (_, args) =>
             {
-                if (ownerClosing || args.Source != "about:blank") return;
+                if (ownerClosing || readerFailed || !string.Equals(args.Source, ReaderDocument, StringComparison.OrdinalIgnoreCase)) return;
                 if (args.WebMessageAsJson == "\"ready\"")
                 {
+                    if (ready) return;
                     ready = true;
                     Status.Visibility = Visibility.Collapsed;
                     Reader.Visibility = Visibility.Visible;
@@ -69,10 +98,14 @@ public partial class ScriptWindow : Window
                 }
                 ReceiveNavigation(args.WebMessageAsJson);
             };
-            using var stream = typeof(ScriptWindow).Assembly.GetManifestResourceStream("AudioPlayer.web.script.html")
-                ?? throw new InvalidDataException("缺少原文阅读资源。");
-            using var reader = new StreamReader(stream);
-            core.NavigateToString(reader.ReadToEnd());
+            // Match ReadArticles: serve the embedded document at a fixed local HTTPS origin.
+            // No extracted files or remote network resources are required.
+            using (var resource = typeof(ScriptWindow).Assembly.GetManifestResourceStream("AudioPlayer.web.script.html"))
+                if (resource is null) throw new InvalidDataException("缺少原文阅读资源。");
+            core.Navigate(ReaderDocument);
+            await Task.Delay(TimeSpan.FromSeconds(15));
+            if (!ownerClosing && !ready && !readerFailed)
+                ShowFailure("原文阅读器初始化超时：未收到页面 ready 消息。");
         }
         catch (Exception ex)
         {
@@ -191,6 +224,8 @@ public partial class ScriptWindow : Window
 
     private void ShowFailure(string text)
     {
+        if (ownerClosing || readerFailed) return;
+        readerFailed = true;
         ready = false;
         NavigationCanceled?.Invoke();
         Reader.Visibility = Visibility.Collapsed;
