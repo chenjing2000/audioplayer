@@ -238,7 +238,7 @@ The user explicitly confirmed all ten Windows manual acceptance checks passed fo
 9. Missing root on Refresh clears the playlist and saved root path.
 10. Existing playback, silence navigation and settings continue working.
 
-User-reported manual acceptance is distinct from hosted automated verification. The accepted implementation at `9479bca` passed [Windows PR CI #45305530107](https://github.com/chenjing2000/audioplayer/actions/runs/45305530107) and [push CI #45305513723](https://github.com/chenjing2000/audioplayer/actions/runs/45305513723). The earlier local log was from the pre-feature version after a failed Git fetch, so its counts are not attributed to this feature. No new local automated counts or previously deferred real-media/failure-path coverage are claimed. Merge into main awaits separate authorization.
+User-reported manual acceptance is distinct from hosted automated verification. The accepted implementation at `9479bca` passed [Windows PR CI #45305530107](https://github.com/chenjing2000/audioplayer/actions/runs/45305530107) and [push CI #45305513723](https://github.com/chenjing2000/audioplayer/actions/runs/45305513723). The earlier local log was from the pre-feature version after a failed Git fetch, so its counts are not attributed to this feature. No new local automated counts or previously deferred real-media/failure-path coverage are claimed. At this stage merge authorization was still pending; the final merge is recorded below.
 
 ### PR #15 follow-up: tooltip and readable playlist JSON
 
@@ -251,7 +251,7 @@ After the initial ten manual checks passed, the user requested parent-directory-
 5. Chinese characters are directly readable in playlist JSON.
 6. Previously saved Unicode-escaped playlists still load normally.
 
-Together with the initial ten checks, sixteen user-reported manual acceptance checks have passed. No new local automated test counts are claimed. Merge remains deferred at the user's request.
+Together with the initial ten checks, sixteen user-reported manual acceptance checks have passed. No new local automated test counts are claimed. At this stage merge was deferred at the user's request.
 
 ### PR #15 WindowsAppPlaybook review remediation
 
@@ -267,7 +267,7 @@ The user explicitly confirmed all seven focused Windows acceptance checks passed
 6. Tooltip appearance and readable Chinese playlist paths remain unchanged.
 7. Republish while preserving the existing playlist and settings.
 
-This records user-reported manual acceptance, not new local automated test counts. The sixteen prior checks and seven focused checks total 23 accepted checks across successive revisions, not a complete rerun on one commit. Dedicated real Windows directory-access-denial testing and previously deferred real-media/failure-path cases are not claimed by this acceptance. PR #15 remains unmerged at the user's request.
+This records user-reported manual acceptance, not new local automated test counts. The sixteen prior checks and seven focused checks total 23 accepted checks across successive revisions, not a complete rerun on one commit. Dedicated real Windows directory-access-denial testing and previously deferred real-media/failure-path cases are not claimed by this acceptance. At this stage PR #15 remained unmerged at the user's request.
 
 ### PR #15 pronunciation directory exclusion
 
@@ -280,4 +280,8 @@ The user explicitly confirmed all four focused Windows manual acceptance checks 
 3. Previously saved vocabulary pronunciation files disappear from the playlist after restarting.
 4. Refresh does not reintroduce excluded pronunciation files.
 
-Together with the earlier 23 checks, this records 27 user-reported manual acceptance checks across successive revisions, not a full rerun on the latest commit. No new local automated test counts are claimed. Previously unverified access-denial and real-media failure scenarios remain unchanged. PR #15 remains unmerged.
+Together with the earlier 23 checks, this records 27 user-reported manual acceptance checks across successive revisions, not a full rerun on the latest commit. No new local automated test counts are claimed. Previously unverified access-denial and real-media failure scenarios remain unchanged. At this stage PR #15 remained unmerged.
+
+### PR #15 final merge and post-merge verification
+
+After the user authorized merging, final feature head `10f2aee` passed [PR CI #45332463717](https://github.com/chenjing2000/audioplayer/actions/runs/45332463717) and [push CI #45332456815](https://github.com/chenjing2000/audioplayer/actions/runs/45332456815). [PR #15](https://github.com/chenjing2000/audioplayer/pull/15) was squash merged as `main@7cb288e` on 2026-11-24. [Post-merge Windows CI #45332633926](https://github.com/chenjing2000/audioplayer/actions/runs/45332633926) completed successfully. The remote branch listing now contains only `main`; local synchronization and local branch cleanup have not been independently confirmed. The 27 user-reported manual acceptance checks are cumulative across four revisions, not a complete manual rerun on the merge commit. Previously unverified directory-access-denial and real-media/failure-path cases remain outstanding. No tagged release was created by this merge.
