@@ -335,12 +335,35 @@ internal static class UiChecks
                     Assert(Math.Abs(settingsImage.Width - 28) < 0.01 && Math.Abs(settingsImage.Height - 28) < 0.01, "Settings icon is 28x28");
                     Assert(settingsBorder.BorderThickness == new Thickness(0) && ColorOf(settingsBorder.Background) == "#00FFFFFF",
                         "Settings button has no border or visible background");
-                    Assert(Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 &&
-                        Grid.GetColumn(refreshButton) == 6 && Grid.GetColumn(modeButton) == 7 && Grid.GetColumn(settingsButton) == 8,
-                        "Playback mode button is placed between refresh and settings");
-                    Assert(new[] { playButton, stopButton, trimButton, refreshButton, modeButton }
-                        .All(button => Math.Abs(button.Margin.Right - 5) < 0.01),
-                        "Six right toolbar buttons use 5-unit gaps");
+                    var scriptButton = (Button)window.FindName("ScriptButton");
+                    Assert(Grid.GetColumn(playButton) == 3 && Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 &&
+                        Grid.GetColumn(refreshButton) == 6 && Grid.GetColumn(modeButton) == 7 &&
+                        Grid.GetColumn(scriptButton) == 8 && Grid.GetColumn(settingsButton) == 9 &&
+                        ((Grid)scriptButton.Parent).ColumnDefinitions.Count == 10,
+                        "Toolbar order is play, stop, trim, refresh, mode, script, settings");
+                    Assert(new[] { playButton, stopButton, trimButton, refreshButton, modeButton, scriptButton }
+                        .All(button => Math.Abs(button.Margin.Right - 5) < 0.01) && settingsButton.Margin.Right == 0,
+                        "Seven right toolbar buttons use 5-DIP gaps");
+                    scriptButton.ApplyTemplate();
+                    var scriptBorder = (Border)scriptButton.Template.FindName("ButtonBorder", scriptButton);
+                    var scriptImage = FindVisual<Image>(scriptButton)!;
+                    Assert(scriptButton.Width == 36 && scriptButton.Height == 36 &&
+                        scriptBorder.CornerRadius.TopLeft == 18 && scriptBorder.BorderThickness == new Thickness(0),
+                        "Script button uses existing circular toolbar style");
+                    Assert(scriptImage.Width == 28 && scriptImage.Height == 28 &&
+                        ReferenceEquals(scriptImage.Source, window.FindResource("ScriptIcon")),
+                        "Script button uses its 28-DIP vector icon");
+                    Assert(scriptButton.ToolTip?.ToString() == "显示原文" &&
+                        System.Windows.Automation.AutomationProperties.GetName(scriptButton) == "显示原文",
+                        "Script button initially offers to show the hidden companion");
+                    var scriptDrawing = (DrawingGroup)((DrawingImage)window.FindResource("ScriptIcon")).Drawing;
+                    var scriptBackground = (GeometryDrawing)scriptDrawing.Children[1];
+                    Assert(scriptBackground.Geometry is EllipseGeometry && ColorOf(scriptBackground.Brush) == "#FF26798A",
+                        "Script icon uses the existing teal circle");
+                    Assert(scriptDrawing.Children.Skip(2).OfType<GeometryDrawing>().Count() == 2 &&
+                        scriptDrawing.Children.Skip(2).OfType<GeometryDrawing>()
+                            .All(part => part.Pen is not null && ColorOf(part.Pen.Brush) == "#FFFFFFFF"),
+                        "Script icon uses white document outline and text lines");
                     Assert(Math.Abs(slider.Height - 36) < 0.01, "Progress slider has the same control height as the buttons");
                     window.UpdateLayout();
                     var sliderTrack = FindVisual<System.Windows.Controls.Primitives.Track>(slider);
