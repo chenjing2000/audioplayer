@@ -350,3 +350,29 @@ Local Windows rerun at `9cdf6d1` passed 54 Core checks, 191 UI checks and 5 publ
 Core tests cover mode persistence, default and invalid enum rejection, next-index policy including empty/single-file lists. UI tests cover cycling, icons, toolbar alignment and settings preservation/reset staging. Synthetic WAV integration when a waveOut device exists covers natural completion, repeat, sequential stop, wraparound, manual Stop and seek-to-end. Hosted CI and manual playback acceptance pending; previous 38 manual checks remain historical cumulative evidence.
 
 At `34f6972`, user confirmed the four modes cycle correctly and all four playback behaviors work as expected, with toolbar screenshot. This is focused functional acceptance, not explicit confirmation of all 20 detailed checks. Local application published successfully; 5 publishing safeguards and 4 published-app checks passed. Core/UI test project compilation failed with CS0136 at UiChecks.cs:587 (duplicate local `first`). Test-only fix renames synthetic mode fixture paths. Corrected automated rerun pending; no merge authorized.
+
+
+#### Playback mode final acceptance
+
+The user explicitly confirmed all 20 playback-mode Windows manual acceptance checks passed on 2026-11-24. Local Windows rerun at `3321875` passed 55 Core checks, 225 UI checks and 5 publishing safeguards, zero failures. The actual waveOut synthetic WAV playback integration ran and passed (Play One, Repeat One, Sequential, Repeat All, manual Stop and seek-to-end). Optional valid-MP3 metadata and MP3-dependent UI checks were skipped. Application revision remains `34f6972`; earlier publishing and published-app checks passed at that revision. [pull_request CI #45379441565](https://github.com/chenjing2000/audioplayer/actions/runs/45379441565) success; [push CI #45379433218](https://github.com/chenjing2000/audioplayer/actions/runs/45379433218) in_progress. Cumulative manual acceptance is 58 checks (16 seek + 16 exclusion + 6 scrolling + 20 playback modes), across successive revisions, not one complete manual rerun. Merge remains explicitly unauthorized.
+
+1. PASS — Button placement between Refresh and Settings.
+2. PASS — Four icons clear and visually consistent.
+3. PASS — Cycle A → B → C → D → A.
+4. PASS — Tooltip identifies each mode.
+5. PASS — Play One stops at completion.
+6. PASS — Repeat One restarts current file.
+7. PASS — Sequential advances to next file.
+8. PASS — Sequential stops at last file.
+9. PASS — Repeat All advances and wraps.
+10. PASS — Single-file Repeat One and Repeat All.
+11. PASS — Changing mode during playback does not interrupt.
+12. PASS — Manual Stop prevents continuation.
+13. PASS — Pause and Resume in all modes.
+14. PASS — Manual seek to end does not continue.
+15. PASS — Automatic next row scrolls into view.
+16. PASS — Refresh stops playback and retains mode.
+17. PASS — Mode persists on restart without autoplay.
+18. PASS — Ordinary settings retain mode; confirmed defaults reset it.
+19. PASS — Existing shortcuts, exclusions and scrolling still work.
+20. PASS — Unreadable next file stops and reports error.
