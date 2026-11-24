@@ -20,9 +20,12 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(100) };
     private SilenceSettings silenceSettings = new();
     private readonly SettingsStore settingsStore;
+    private readonly PlaylistStore playlistStore;
     private bool settingsFileReady;
     private List<SilenceRange> ranges = new();
     private AudioTrack? loadedTrack;
+    private AudioTrack? indicatedTrack;
+    private readonly CancellationTokenSource scanCancellation = new();
     private bool operationBusy;
     private bool analyzing;
     private bool trimming;
@@ -50,13 +53,17 @@ public partial class MainWindow : Window
     private Task navigationTask = Task.CompletedTask;
     private Exception? displayedPlaybackError;
 
-    public MainWindow() : this(new SettingsStore())
+    public MainWindow() : this(new SettingsStore(),
+        new PlaylistStore(PlaylistStore.GetFilePath(SettingsStore.GetExecutablePath())))
     {
     }
 
-    internal MainWindow(SettingsStore settingsStore)
+    internal MainWindow(SettingsStore settingsStore, PlaylistStore? playlistStore = null)
     {
         this.settingsStore = settingsStore;
+        // Test settings paths keep their playlists isolated from the real executable.
+        this.playlistStore = playlistStore ?? new PlaylistStore(
+            settingsStore.FilePath[..^".settings.json".Length] + ".playlist.json");
         InitializeComponent();
         Rect workArea = SystemParameters.WorkArea;
         double desiredWidth = Math.Round(workArea.Width * 0.5);
@@ -79,6 +86,62 @@ public partial class MainWindow : Window
         catch (Exception ex) when (IsSettingsFileError(ex))
         {
             ToastMessages.Show($"配置读取或初始化失败，暂用默认参数：{ex.Message}", ToastLevel.Error);
+        }
+        Loaded += RestorePlaylistOnLoad;
+    }
+
+    private async void RestorePlaylistOnLoad(object sender, RoutedEventArgs e)
+    {
+        Loaded -= RestorePlaylistOnLoad;
+        await RunActionAsync(RestorePlaylistAsync);
+    }
+
+    private async Task RestorePlaylistAsync()
+    {
+        CancellationToken cancellation = scanCancellation.Token;
+        PlaylistSnapshot? snapshot = await Task.Run(playlistStore.Load, cancellation);
+        if (snapshot is null || closing || snapshot.RootFolder is null) return;
+        string root = Path.GetFullPath(snapshot.RootFolder);
+        List<AudioTrack>? files;
+        try
+        {
+            files = await Task.Run(() =>
+            {
+                cancellation.ThrowIfCancellationRequested();
+                try
+                {
+                    if ((File.GetAttributes(root) & FileAttributes.Directory) == 0) return null;
+                }
+                catch (FileNotFoundException) { return null; }
+                catch (DirectoryNotFoundException) { return null; }
+                return AudioLibrary.LoadPaths(root, snapshot.Files, cancellation, restore: true);
+            }, cancellation);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            if (!closing) ToastMessages.Show("恢复播放列表失败，已保留磁盘上的列表。请检查目录访问权限后重启：" + ex.Message, ToastLevel.Error);
+            return;
+        }
+        if (closing) return;
+        if (files is null)
+        {
+            SavePlaylist();
+            ToastMessages.Show("上次的音频文件夹不存在，已清空播放列表。", ToastLevel.Error);
+            return;
+        }
+        currentFolder = root;
+        foreach (var file in files) tracks.Add(file);
+        if (!snapshot.Files.SequenceEqual(files.Select(file => file.FilePath), StringComparer.Ordinal))
+            SavePlaylist();
+        ReportFolderLoad(files);
+    }
+
+    private void SavePlaylist()
+    {
+        try { playlistStore.Save(currentFolder, tracks.Select(track => track.FilePath)); }
+        catch (Exception ex) when (IsSettingsFileError(ex))
+        {
+            if (!closing) ToastMessages.Show("播放列表保存失败，磁盘上可能仍是旧列表。请刷新或重新打开文件夹重试：" + ex.Message, ToastLevel.Error);
         }
     }
 
@@ -104,10 +167,24 @@ public partial class MainWindow : Window
         RefreshProgress();
         UpdateControls();
 
-        var files = await Task.Run(() => AudioLibrary.LoadFolder(path));
+        List<AudioTrack> files;
+        CancellationToken cancellation = scanCancellation.Token;
+        try { files = await Task.Run(() => AudioLibrary.LoadFolder(path, cancellation), cancellation); }
+        catch
+        {
+            // An unfinished scan canceled on exit must not erase the last saved list.
+            if (!closing) SavePlaylist();
+            throw;
+        }
         if (closing) return;
         currentFolder = Path.GetFullPath(path);
         foreach (var file in files) tracks.Add(file);
+        SavePlaylist();
+        ReportFolderLoad(files);
+    }
+
+    private void ReportFolderLoad(List<AudioTrack> files)
+    {
         int errors = files.Count(file => file.LoadError is not null);
         if (errors > 0) ToastMessages.Show($"{errors} 个文件的标签读取失败，悬停对应行可查看原因。", ToastLevel.Warning);
         else if (files.Count == 0) ToastMessages.Show("此文件夹中没有 WAV、MP3 或 M4A 音频文件。", ToastLevel.Warning);
@@ -130,6 +207,12 @@ public partial class MainWindow : Window
             source = VisualTreeHelper.GetParent(source);
         if (source is DataGridRow row && row.Item is AudioTrack track)
             await RunActionAsync(() => PlayTrackAsync(track));
+    }
+
+    private void TrackRow_ToolTipOpening(object sender, ToolTipEventArgs e)
+    {
+        if (sender is DataGridRow { ToolTip: ToolTip tooltip })
+            tooltip.MaxWidth = Math.Max(1, ActualWidth - 48);
     }
 
     private async void TrackRow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -346,18 +429,10 @@ public partial class MainWindow : Window
         try
         {
             SilenceTrimResult result = await work;
+            // A folder switch can overlap trimming; wait for its committed root.
+            if (activeOperation is Task operation) await operation;
             if (closing) return;
-            if (currentFolder is not null &&
-                string.Equals(currentFolder, Path.GetDirectoryName(result.OutputPath), StringComparison.OrdinalIgnoreCase))
-            {
-                var added = AudioLibrary.ReadTrack(result.OutputPath);
-                int index = 0;
-                while (index < tracks.Count &&
-                    AudioLibrary.CompareNames(Path.GetFileName(tracks[index].FilePath),
-                        Path.GetFileName(result.OutputPath)) < 0)
-                    index++;
-                tracks.Insert(index, added);
-            }
+            AddTrimmedOutput(result.OutputPath);
             if (!result.OutputSilenceSaved)
                 ToastMessages.CompleteTask(trimToast!, "音频已保存，但停顿信息更新失败：" + result.OutputPath,
                     ToastLevel.Warning, TimeSpan.FromSeconds(15));
@@ -398,6 +473,19 @@ public partial class MainWindow : Window
                 UpdateControls();
             }
         }
+    }
+
+    internal void AddTrimmedOutput(string path)
+    {
+        if (currentFolder is not string root || !AudioLibrary.IsPlaylistPath(root, path)
+            || tracks.Any(track => string.Equals(track.FilePath, path, StringComparison.OrdinalIgnoreCase)))
+            return;
+        var added = AudioLibrary.ReadTrack(path);
+        int index = 0;
+        while (index < tracks.Count && AudioLibrary.ComparePaths(root, tracks[index].FilePath, path) < 0)
+            index++;
+        tracks.Insert(index, added);
+        SavePlaylist();
     }
 
     private async Task TogglePlaybackAsync()
@@ -553,11 +641,19 @@ public partial class MainWindow : Window
         PlayIconImage.Source = (ImageSource)FindResource(playing ? "PauseIcon" : "PlayIcon");
         PlayButton.ToolTip = playing ? "暂停" : "播放";
         AutomationProperties.SetName(PlayButton, playing ? "暂停" : "播放");
-        foreach (var track in tracks)
+        if (!ReferenceEquals(indicatedTrack, loadedTrack))
         {
-            bool loaded = ReferenceEquals(track, loadedTrack);
-            track.IsPlaying = loaded && player.IsPlaying;
-            track.IsPaused = loaded && player.IsPaused;
+            if (indicatedTrack is not null)
+            {
+                indicatedTrack.IsPlaying = false;
+                indicatedTrack.IsPaused = false;
+            }
+            indicatedTrack = loadedTrack;
+        }
+        if (indicatedTrack is not null)
+        {
+            indicatedTrack.IsPlaying = player.IsPlaying;
+            indicatedTrack.IsPaused = player.IsPaused;
         }
     }
 
@@ -617,6 +713,7 @@ public partial class MainWindow : Window
         e.Cancel = true;
         if (closing) return;
         closing = true;
+        scanCancellation.Cancel();
         CancelAnalysis();
         CancelSelectionCheck();
         trimCancellation?.Cancel();
@@ -642,6 +739,7 @@ public partial class MainWindow : Window
         {
             player.StateChanged -= Player_StateChanged;
             player.Dispose();
+            scanCancellation.Dispose();
             allowClose = true;
             Close();
         }

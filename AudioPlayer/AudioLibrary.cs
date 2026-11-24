@@ -4,17 +4,110 @@ namespace AudioPlayer;
 
 public static class AudioLibrary
 {
-    public static List<AudioTrack> LoadFolder(string folderPath)
+    public static List<AudioTrack> LoadFolder(string folderPath, CancellationToken cancellation = default)
     {
-        string[] files = Directory.GetFiles(folderPath).Where(path =>
-            new[] { ".mp3", ".m4a", ".wav" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)
-            && !IsTrimTemporaryFile(path)).ToArray();
-        Array.Sort(files, (left, right) => CompareNames(Path.GetFileName(left), Path.GetFileName(right)));
-        var tracks = new List<AudioTrack>();
-        foreach (string path in files)
+        string root = Path.GetFullPath(folderPath);
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = false,
+            IgnoreInaccessible = false,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        };
+        cancellation.ThrowIfCancellationRequested();
+        return LoadPaths(root, EnumerateMediaPaths(root, options, cancellation), cancellation);
+    }
+
+    private static IEnumerable<string> EnumerateMediaPaths(string root, EnumerationOptions options,
+        CancellationToken cancellation)
+    {
+        var pending = new Stack<string>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            string folder = pending.Pop();
+            foreach (string child in Directory.EnumerateDirectories(folder, "*", options))
+            {
+                cancellation.ThrowIfCancellationRequested();
+                if (!IsExcludedDirectoryName(Path.GetFileName(child))) pending.Push(child);
+            }
+            foreach (string file in Directory.EnumerateFiles(folder, "*", options))
+            {
+                cancellation.ThrowIfCancellationRequested();
+                yield return file;
+            }
+        }
+    }
+
+    private static bool IsExcludedDirectoryName(string name)
+        => string.Equals(name, "audio", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool IsPlaylistPath(string root, string path)
+    {
+        if (!IsWithinFolder(root, path) || !IsSupportedFile(path) || IsTrimTemporaryFile(path))
+            return false;
+        string[] parts = Path.GetRelativePath(root, path).Split(Path.DirectorySeparatorChar);
+        return !parts.Take(parts.Length - 1).Any(IsExcludedDirectoryName);
+    }
+
+    internal static List<AudioTrack> LoadPaths(string root, IEnumerable<string> paths,
+        CancellationToken cancellation = default, bool restore = false)
+    {
+        var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string candidate in paths)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            string path = Path.GetFullPath(candidate);
+            if (IsPlaylistPath(root, path) && (!restore || IsRestorablePath(root, path, cancellation)))
+                files.Add(path);
+        }
+        cancellation.ThrowIfCancellationRequested();
+        var sorted = files.ToArray();
+        Array.Sort(sorted, (left, right) => ComparePaths(root, left, right));
+        var tracks = new List<AudioTrack>(sorted.Length);
+        foreach (string path in sorted)
+        {
+            cancellation.ThrowIfCancellationRequested();
             tracks.Add(ReadTrack(path));
+        }
+        cancellation.ThrowIfCancellationRequested();
         return tracks;
     }
+
+    // Attribute reads distinguish missing paths from access and IO errors.
+    private static bool IsRestorablePath(string root, string path, CancellationToken cancellation)
+    {
+        string current = root;
+        string[] parts = Path.GetRelativePath(root, path).Split(Path.DirectorySeparatorChar);
+        try
+        {
+            for (int i = 0; i < parts.Length; i++)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                current = Path.Combine(current, parts[i]);
+                FileAttributes attributes = File.GetAttributes(current);
+                bool directory = (attributes & FileAttributes.Directory) != 0;
+                if ((attributes & FileAttributes.ReparsePoint) != 0 || directory != (i < parts.Length - 1))
+                    return false;
+            }
+            return true;
+        }
+        catch (FileNotFoundException) { return false; }
+        catch (DirectoryNotFoundException) { return false; }
+    }
+
+    internal static bool IsSupportedFile(string path)
+        => Path.GetExtension(path).ToLowerInvariant() is ".wav" or ".mp3" or ".m4a";
+
+    internal static bool IsWithinFolder(string root, string path)
+    {
+        string relative = Path.GetRelativePath(root, path);
+        return !Path.IsPathRooted(relative) && relative != "." && relative != ".."
+            && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+    }
+
+    internal static int ComparePaths(string root, string left, string right)
+        => CompareNames(Path.GetRelativePath(root, left), Path.GetRelativePath(root, right));
 
     // Only hide our own in-progress trim output; keep other dot-prefixed audio visible.
     internal static bool IsTrimTemporaryFile(string path)
@@ -27,21 +120,19 @@ public static class AudioLibrary
 
     internal static AudioTrack ReadTrack(string path)
     {
-        string fallback = Path.GetFileNameWithoutExtension(path);
         try
         {
             using var file = TagLib.File.Create(path);
             return new AudioTrack
             {
                 FilePath = Path.GetFullPath(path),
-                Title = string.IsNullOrWhiteSpace(file.Tag.Title) ? fallback : file.Tag.Title,
                 Album = file.Tag.Album ?? "",
                 Duration = file.Properties.Duration
             };
         }
         catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is TagLib.CorruptFileException || ex is TagLib.UnsupportedFormatException)
         {
-            return new AudioTrack { FilePath = Path.GetFullPath(path), Title = fallback, LoadError = ex.Message };
+            return new AudioTrack { FilePath = Path.GetFullPath(path), LoadError = ex.Message };
         }
     }
 

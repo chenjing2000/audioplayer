@@ -1,14 +1,18 @@
 using System.ComponentModel;
+using System.IO;
 
 namespace AudioPlayer;
 
 public sealed class AudioTrack : INotifyPropertyChanged
 {
     public string FilePath { get; init; } = "";
-    public string Title { get; init; } = "";
     public TimeSpan? Duration { get; init; }
     public string Album { get; init; } = "";
     public string? LoadError { get; init; }
+    public string DisplayName => Path.GetFileNameWithoutExtension(FilePath);
+    public string RowToolTip => string.Join(Environment.NewLine,
+        new[] { Path.GetDirectoryName(FilePath), LoadError }
+            .Where(value => !string.IsNullOrWhiteSpace(value)));
     public string DurationText => Duration.HasValue ? FormatTime(Duration.Value) : "未知";
 
     private bool isPlaying;

@@ -222,3 +222,62 @@ User-supplied Windows PowerShell 5.1 results for `feature/code-and-doc-cleanup`,
 The new `Folder scans ignore only in-progress trim audio` Core regression explicitly passed. The optional valid-MP3 metadata test and MP3-dependent UI checks printed **SKIP** because no MP3 test input was supplied; that is distinct from the test wrapper's zero skipped *groups*. The user did not report executing `-Suite Full -AudioFile` in this run. Real MP3/WAV long-pause listening and selected FFmpeg incomplete-DLL/cancellation/source-mutation failure cases remain deferred. A future tagged GitHub Release must still be inspected to verify that both downloadable assets actually appear, despite the local TXT publishing test passing.
 
 Revision `e392114` passed [Windows PR CI #45187026289](https://github.com/chenjing2000/audioplayer/actions/runs/45187026289). The final pre-merge revision `3cce00d` passed [Windows PR CI #45189289382](https://github.com/chenjing2000/audioplayer/actions/runs/45189289382); one simultaneous push check initially failed a Toast UI queueing assertion and [passed on retry](https://github.com/chenjing2000/audioplayer/actions/runs/45189280854). [PR #11](https://github.com/chenjing2000/audioplayer/pull/11) was squash merged into `main@c90afec`. [Post-merge Windows CI #45190102017](https://github.com/chenjing2000/audioplayer/actions/runs/45190102017) succeeded. The user verified their local `main` matches `origin/main`, the working tree is clean, and both local and remote feature branches have been removed. No new real-media or failure-path testing is claimed by this documentation update.
+
+## Windows acceptance — PR #15
+
+The user explicitly confirmed all ten Windows manual acceptance checks passed for the recursive persistent playlist feature:
+
+1. Recursive discovery of supported audio files in nested directories.
+2. Filename extensions hidden; complete path available in row tooltip.
+3. Natural relative-path sorting.
+4. Playlist JSON created beside the executable.
+5. Restart restores saved playlist without automatically playing audio.
+6. New files added while closed appear after Refresh, not merely startup restoration.
+7. Deleted saved files are removed after restarting.
+8. Trimmed audio in a subdirectory appears in the table and saved JSON.
+9. Missing root on Refresh clears the playlist and saved root path.
+10. Existing playback, silence navigation and settings continue working.
+
+User-reported manual acceptance is distinct from hosted automated verification. The accepted implementation at `9479bca` passed [Windows PR CI #45305530107](https://github.com/chenjing2000/audioplayer/actions/runs/45305530107) and [push CI #45305513723](https://github.com/chenjing2000/audioplayer/actions/runs/45305513723). The earlier local log was from the pre-feature version after a failed Git fetch, so its counts are not attributed to this feature. No new local automated counts or previously deferred real-media/failure-path coverage are claimed. Merge into main awaits separate authorization.
+
+### PR #15 follow-up: tooltip and readable playlist JSON
+
+After the initial ten manual checks passed, the user requested parent-directory-only tooltips (wrapped, maximum main-window width minus 48 DIP, 8 DIP rounded corners) and literal Chinese characters in UTF-8 playlist JSON. Existing escaped JSON remains readable. Core regression assertions cover the revised tooltip text and JSON round-trip. Both [PR CI #45328234578](https://github.com/chenjing2000/audioplayer/actions/runs/45328234578) and [push CI #45328228807](https://github.com/chenjing2000/audioplayer/actions/runs/45328228807) passed at `e42547c`. The user supplied a checked screenshot confirming all six follow-up Windows manual checks:
+
+1. Parent directory displayed without media filename.
+2. Long directory paths wrap across multiple lines.
+3. Tooltip has rounded corners.
+4. Maximum tooltip width adjusts after main-window resizing.
+5. Chinese characters are directly readable in playlist JSON.
+6. Previously saved Unicode-escaped playlists still load normally.
+
+Together with the initial ten checks, sixteen user-reported manual acceptance checks have passed. No new local automated test counts are claimed. Merge remains deferred at the user's request.
+
+### PR #15 WindowsAppPlaybook review remediation
+
+Added targeted regression checks for locked playlist save, missing/non-file saved entries, directory junction exclusion, cancellation, preservation of playlist JSON during publishing and renamed published EXE startup restoration. Removed obsolete metadata-title checks while retaining album/duration and filename coverage. Prior sixteen manual checks apply to the earlier code revisions. Remediation revision `db9fc41` passed [PR CI #45329769913](https://github.com/chenjing2000/audioplayer/actions/runs/45329769913) and [push CI #45329762960](https://github.com/chenjing2000/audioplayer/actions/runs/45329762960).
+
+The user explicitly confirmed all seven focused Windows acceptance checks passed:
+
+1. Open and refresh a directory containing multiple levels of subdirectories.
+2. Restart and restore the saved playlist correctly.
+3. Close during a large recursive scan and preserve the previous saved playlist.
+4. Reopen the current root during nested-audio trimming; the completed output appears in the table and JSON.
+5. Switch tracks; playback and pause indicators update correctly.
+6. Tooltip appearance and readable Chinese playlist paths remain unchanged.
+7. Republish while preserving the existing playlist and settings.
+
+This records user-reported manual acceptance, not new local automated test counts. The sixteen prior checks and seven focused checks total 23 accepted checks across successive revisions, not a complete rerun on one commit. Dedicated real Windows directory-access-denial testing and previously deferred real-media/failure-path cases are not claimed by this acceptance. PR #15 remains unmerged at the user's request.
+
+### PR #15 pronunciation directory exclusion
+
+Added a Core regression for nested exact-name `audio` exclusions, case-insensitive matching, similarly named directories, ordinary `audio.mp3` files, saved-path filtering, and explicit root selection. Revision `18e6fe0` passed [PR CI #45332081052](https://github.com/chenjing2000/audioplayer/actions/runs/45332081052) and [push CI #45332074251](https://github.com/chenjing2000/audioplayer/actions/runs/45332074251).
+
+The user explicitly confirmed all four focused Windows manual acceptance checks passed:
+
+1. Directories named exactly `audio` are excluded at every subdirectory level.
+2. Similarly named directories remain included.
+3. Previously saved vocabulary pronunciation files disappear from the playlist after restarting.
+4. Refresh does not reintroduce excluded pronunciation files.
+
+Together with the earlier 23 checks, this records 27 user-reported manual acceptance checks across successive revisions, not a full rerun on the latest commit. No new local automated test counts are claimed. Previously unverified access-denial and real-media failure scenarios remain unchanged. PR #15 remains unmerged.

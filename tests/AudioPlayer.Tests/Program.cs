@@ -437,17 +437,154 @@ try
     Directory.CreateDirectory(Path.Combine(fixture, "nested"));
     File.WriteAllText(Path.Combine(fixture, "nested", "4.mp3"), "not an mp3");
 
-    Check("Natural order, extension and non-recursive scan", () =>
+    Directory.CreateDirectory(Path.Combine(fixture, "Book 9"));
+    Directory.CreateDirectory(Path.Combine(fixture, "Book 10", "deep"));
+    File.WriteAllText(Path.Combine(fixture, "Book 9", "2.wav"), "broken WAV fixture");
+    File.WriteAllText(Path.Combine(fixture, "Book 10", "deep", "2.m4a"), "broken M4A fixture");
+    File.WriteAllText(Path.Combine(fixture, "nested", "ignore.txt"), "not audio");
+
+    Check("Recursive scan, supported extensions and natural relative-path order", () =>
     {
         var tracks = AudioLibrary.LoadFolder(fixture);
-        Assert(string.Join(",", tracks.Select(t => Path.GetFileName(t.FilePath))) == "01.mp3,2.MP3,3.mp3,10.mp3");
+        Assert(tracks.Select(t => Path.GetRelativePath(fixture, t.FilePath)).SequenceEqual(new[]
+        {
+            "01.mp3", "2.MP3", "3.mp3", "10.mp3",
+            Path.Combine("Book 9", "2.wav"), Path.Combine("Book 10", "deep", "2.m4a"),
+            Path.Combine("nested", "4.mp3")
+        }));
+        Assert(tracks.All(t => t.DisplayName == Path.GetFileNameWithoutExtension(t.FilePath)));
+        Assert(tracks.All(t => t.RowToolTip.StartsWith(Path.GetDirectoryName(t.FilePath)!))); 
+        var tooltipTrack = new AudioTrack { FilePath = Path.Combine(fixture, "媒体文件.mp3") };
+        Assert(tooltipTrack.RowToolTip == fixture);
+    });
+
+    Check("Recursive scan and restore skip exact audio subdirectories", () =>
+    {
+        string root = Path.Combine(fixture, "exclusion");
+        string[] excluded = { Path.Combine(root, "audio", "word.mp3"),
+            Path.Combine(root, "Book", "Audio", "deep", "word.m4a") };
+        string[] included = { Path.Combine(root, "audio.mp3"),
+            Path.Combine(root, "AudioBooks", "book.wav"),
+            Path.Combine(root, "Book", "audio-files", "lesson.mp3") };
+        try
+        {
+            foreach (string path in excluded.Concat(included))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.WriteAllText(path, "metadata fixture");
+            }
+            var expected = included.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            Assert(AudioLibrary.LoadFolder(root).Select(t => t.FilePath).ToHashSet().SetEquals(expected));
+            Assert(AudioLibrary.LoadPaths(root, excluded.Concat(included), restore: true)
+                .Select(t => t.FilePath).ToHashSet().SetEquals(expected));
+            Assert(excluded.All(path => !AudioLibrary.IsPlaylistPath(root, path)));
+            Assert(AudioLibrary.LoadFolder(Path.Combine(root, "audio")).Count == 1);
+        }
+        finally { Directory.Delete(root, true); }
+    });
+
+    Check("Playlist JSON uses executable stem, preserves full paths and replaces safely", () =>
+    {
+        string path = PlaylistStore.GetFilePath(Path.Combine(fixture, "Renamed Player.exe"));
+        var store = new PlaylistStore(path);
+        Assert(Path.GetFileName(path) == "Renamed Player.playlist.json" && store.Load() is null);
+        var files = AudioLibrary.LoadFolder(fixture).Select(t => t.FilePath).ToArray();
+        store.Save(fixture, files);
+        var saved = store.Load()!;
+        Assert(saved.RootFolder == fixture && saved.Files.SequenceEqual(files));
+        using (var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path)))
+            Assert(json.RootElement.GetProperty("rootFolder").GetString() == fixture
+                && json.RootElement.GetProperty("files").GetArrayLength() == files.Length);
+        var restored = AudioLibrary.LoadPaths(fixture, files.Concat(new[] { files[0], Path.Combine(fixture, "..", "outside.wav") }));
+        Assert(restored.Count == files.Length);
+        store.Save(null, Array.Empty<string>());
+        Assert(store.Load() is { RootFolder: null, Files.Length: 0 });
+        Assert(!Directory.EnumerateFiles(fixture, "*.tmp").Any());
+        foreach (string invalid in new[] { "{broken", "null", "{}", "{\"rootFolder\":null,\"files\":[\"relative.mp3\"]}" })
+        {
+            File.WriteAllText(path, invalid);
+            bool rejected = false;
+            try { store.Load(); }
+            catch (System.Text.Json.JsonException) { rejected = true; }
+            Assert(rejected && File.ReadAllText(path) == invalid);
+        }
+        string chineseRoot = Path.Combine(fixture, "英语学习");
+        string chineseFile = Path.Combine(chineseRoot, "剑桥雅思.mp3");
+        store.Save(chineseRoot, new[] { chineseFile });
+        string readableJson = File.ReadAllText(path);
+        Assert(readableJson.Contains("英语学习") && readableJson.Contains("剑桥雅思") &&
+            store.Load()!.Files.SequenceEqual(new[] { chineseFile }));
+        File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(
+            new { rootFolder = chineseRoot, files = new[] { chineseFile } }));
+        Assert(store.Load()!.Files.SequenceEqual(new[] { chineseFile }));
+        File.Delete(path);
+    });
+
+    Check("Playlist save failure preserves prior JSON", () =>
+    {
+        string path = Path.Combine(fixture, "locked.playlist.json");
+        var store = new PlaylistStore(path);
+        store.Save(fixture, new[] { Path.Combine(fixture, "01.mp3") });
+        string old = File.ReadAllText(path);
+        using (var locked = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            bool rejected = false;
+            try { store.Save(null, Array.Empty<string>()); }
+            catch (IOException) { rejected = true; }
+            Assert(rejected);
+        }
+        Assert(File.ReadAllText(path) == old && !Directory.EnumerateFiles(fixture, "*.tmp").Any());
+        File.Delete(path);
+    });
+
+    Check("Restore skips missing files and directories posing as audio", () =>
+    {
+        string fake = Path.Combine(fixture, "folder.wav");
+        Directory.CreateDirectory(fake);
+        try
+        {
+            var restored = AudioLibrary.LoadPaths(fixture, new[]
+            {
+                Path.Combine(fixture, "absent.mp3"), fake, Path.Combine(fixture, "01.mp3")
+            }, restore: true);
+            Assert(restored.Count == 1 && restored[0].DisplayName == "01");
+        }
+        finally { Directory.Delete(fake); }
+    });
+
+    Check("Recursive scan and restore exclude directory junctions", () =>
+    {
+        string junction = Path.Combine(fixture, "junction");
+        string target = Path.Combine(fixture, "nested");
+        using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("cmd.exe",
+            $"/c mklink /J \"{junction}\" \"{target}\"") { UseShellExecute = false, CreateNoWindow = true })!;
+        process.WaitForExit();
+        Assert(process.ExitCode == 0, "Could not create junction fixture");
+        try
+        {
+            Assert(!AudioLibrary.LoadFolder(fixture).Any(t => t.FilePath.StartsWith(junction + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)));
+            Assert(AudioLibrary.LoadPaths(fixture, new[] { Path.Combine(junction, "4.mp3") }, restore: true).Count == 0);
+        }
+        finally { Directory.Delete(junction); }
+    });
+
+    Check("Recursive scan and restore honor cancellation", () =>
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        bool scanCanceled = false, restoreCanceled = false;
+        try { AudioLibrary.LoadFolder(fixture, cancellation.Token); }
+        catch (OperationCanceledException) { scanCanceled = true; }
+        try { AudioLibrary.LoadPaths(fixture, new[] { Path.Combine(fixture, "01.mp3") }, cancellation.Token, restore: true); }
+        catch (OperationCanceledException) { restoreCanceled = true; }
+        Assert(scanCanceled && restoreCanceled);
     });
 
     Check("Folder scans ignore only in-progress trim audio", () =>
     {
         string id = Guid.NewGuid().ToString("N");
         foreach (string extension in new[] { ".wav", ".mp3", ".m4a" })
-            File.WriteAllText(Path.Combine(fixture, ".lesson.new." + id + extension), "unfinished");
+            File.WriteAllText(Path.Combine(fixture, "nested", ".lesson.new." + id + extension), "unfinished");
         string ordinary = "lesson.new." + id + ".wav";
         string unusual = ".lesson.new.not-a-guid.wav";
         File.WriteAllText(Path.Combine(fixture, ordinary), "ordinary audio name");
@@ -464,7 +601,7 @@ try
     Check("Broken file retained with error and unknown duration", () =>
     {
         var track = AudioLibrary.LoadFolder(fixture).Single(t => Path.GetFileName(t.FilePath) == "3.mp3");
-        Assert(track.LoadError is not null && track.Duration is null && track.Title == "3" && track.DurationText == "未知");
+        Assert(track.LoadError is not null && track.Duration is null && track.DisplayName == "3" && track.DurationText == "未知");
     });
 
     Check("Metadata readers release broken files", () =>
@@ -486,10 +623,10 @@ try
             tags.Save();
         }
 
-        Check("Title and album metadata", () =>
+        Check("Album and duration metadata; name uses filename", () =>
         {
             var track = AudioLibrary.LoadFolder(fixture).Single(t => Path.GetFileName(t.FilePath) == "sample.mp3");
-            Assert(track.Title == "Test title" && track.Album == "Test album" && track.Duration > TimeSpan.Zero);
+            Assert(track.DisplayName == "sample" && track.Album == "Test album" && track.Duration > TimeSpan.Zero);
         });
 
         using (var tags = TagLib.File.Create(valid))
@@ -502,7 +639,7 @@ try
         Check("Missing metadata falls back", () =>
         {
             var track = AudioLibrary.LoadFolder(fixture).Single(t => Path.GetFileName(t.FilePath) == "sample.mp3");
-            Assert(track.Title == "sample" && track.Album == "");
+            Assert(track.DisplayName == "sample" && track.Album == "");
         });
     }
     else
@@ -551,7 +688,7 @@ else if (args.Contains("--report"))
         + "区间仅经自动数值检查，尚未经人工试听确认。\n\n");
     foreach (var track in AudioLibrary.LoadFolder(audioFolder))
     {
-        Check("Real MP3: " + track.Title, () =>
+        Check("Real audio: " + track.DisplayName, () =>
         {
             var watch = System.Diagnostics.Stopwatch.StartNew();
             var found = SilenceDetector.Detect(track.FilePath);
@@ -562,7 +699,7 @@ else if (args.Contains("--report"))
                 Assert(found.Count > 0);
             }
             using (var file = new FileStream(track.FilePath, FileMode.Open, FileAccess.Read, FileShare.None)) Assert(file.Length > 0);
-            report.AppendLine($"## {Path.GetFileName(track.FilePath)}\n\nTitle：{track.Title}；Album：{track.Album}；标签时长：{track.Duration}；分析耗时：{watch.Elapsed.TotalMilliseconds:F1} ms；有效停顿：{found.Count}。\n");
+            report.AppendLine($"## {Path.GetFileName(track.FilePath)}\n\nAlbum：{track.Album}；标签时长：{track.Duration}；分析耗时：{watch.Elapsed.TotalMilliseconds:F1} ms；有效停顿：{found.Count}。\n");
             report.AppendLine("| 起点（秒） | 终点（秒） | 中点（秒） |\n|---:|---:|---:|");
             foreach (var r in found) report.AppendLine($"| {r.Start.TotalSeconds:F3} | {r.End.TotalSeconds:F3} | {r.Middle.TotalSeconds:F3} |");
             report.AppendLine();
