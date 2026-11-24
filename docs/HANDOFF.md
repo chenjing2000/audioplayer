@@ -1,33 +1,45 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-24 — PR #16 review remediation manual acceptance completed  
+**Updated:** 2026-11-24 — PR #16 merged; post-merge CI passed  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Main:** `00d4928` (application baseline `7cb288e`, PR #15 squash merged).  
-**Active branch:** `feature/configurable-seek-shortcuts`, [PR #16](https://github.com/chenjing2000/audioplayer/pull/16), not merged.
+**Latest merged application baseline:** `af27658` ([PR #16](https://github.com/chenjing2000/audioplayer/pull/16), squash merged).  
+**Remote branches:** Only `main` remained when checked; local checkout synchronization and branch cleanup have not been independently confirmed.
 
 ## Current application
 
-C# / WPF / .NET 10, NAudio 2.2.1, TagLibSharp 2.3.0. Portable framework-dependent executable `dist/AudioPlayer.exe`. Current behavior and data ownership are defined by [program overview](program-overview.md), [project contract](project-contract.md) and [configuration](Configuration.md); publishing is described in [Publishing](Publishing.md).
+C# / WPF / .NET 10, NAudio 2.2.1, TagLibSharp 2.3.0. Portable framework-dependent Windows x64 executable `dist/AudioPlayer.exe`. Current behavior and data ownership are defined by [program overview](program-overview.md), [project contract](project-contract.md) and [configuration](Configuration.md); publishing is described in [Publishing](Publishing.md).
 
-PR #16 adds configurable Ctrl+Left/Right seeking, configurable exact-name folder exclusions (empty by default), 480 × 420 DIP settings dialog, virtualized playlist row-header correction and four persistent playback modes. Startup restoration never autoplays. Source media and existing outputs remain protected.
+PR #16 adds:
+- Configurable Ctrl+Left/Right timed seek (default 5/4 seconds, 0–99), preserving Space and plain Left/Right silence navigation.
+- Configurable exact-name, case-insensitive folder exclusions (empty by default; explicit root exempt), consistent across scans, restoration and trimmed-output insertion.
+- Fixed 480 × 420 DIP settings dialog and virtualized playlist row-header/border correction.
+- Four persistent playback modes (单曲播放 → 单曲循环 → 顺序播放 → 列表循环), one button between Refresh and Settings, concise mode-only tooltips.
+- Playback lifecycle remediation: startup state ordering, empty-media rejection, shared modal deferral, explicit-command priority and stale-completion protection; simplified exclusion processing and strengthened regression coverage.
 
-## Current verification status
+Startup restores saved playlists without autoplay. Source audio and existing outputs remain protected. Settings and playlist JSON stay beside the actual EXE.
 
-The user accepted 58 manual checks across successive revisions (16 seek, 16 exclusions, 6 scrolling, 20 modes). Local `3321875` passed 55 Core and 225 UI checks plus publishing safeguards, including synthetic WAV playback; optional MP3 checks skipped. Historical evidence, CI links and earlier PR #11/#15 results are in [Testing](Testing.md).
+## Verification and remaining limits
 
-Review remediation after `20b9e84` establishes playback state before starting output, rejects empty media, shares modal protection, retains explicit-command priority, refines real-entry-point tests and simplifies exclusion processing. Settings class names intentionally retained. The user explicitly confirmed all 12 focused WindowsAppPlaybook remediation manual acceptance checks passed on 2026-11-24 at application revision `dbc2886`. Cumulative manual acceptance is 70 checks across successive revisions (16 seek, 16 exclusions, 6 scrolling, 20 playback modes, 12 remediation), not a complete rerun of all checks at one revision. Hosted verification: [pull_request CI #45380365612](https://github.com/chenjing2000/audioplayer/actions/runs/45380365612) success; [push CI #45380356119](https://github.com/chenjing2000/audioplayer/actions/runs/45380356119) success. A new local automated test/publishing log has not been supplied for this revision; previous 55 Core and 225 UI passes at `3321875` remain historical evidence. Merge remains explicitly unauthorized.
+Final feature head `c3a4c21` passed both [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45382457033) and [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45382467366). Merged application baseline `af27658` passed [post-merge Windows CI](https://github.com/chenjing2000/audioplayer/actions/runs/45382847185). The user authorized merging on 2026-11-24.
 
-## Next steps
+The user confirmed 70 cumulative manual checks across successive feature revisions (16 seek, 16 exclusions, 6 scrolling, 20 modes, 12 remediation). Local `3321875` passed 55 Core and 225 UI checks plus 5 publishing safeguards, including actual synthetic WAV playback; optional MP3 checks skipped. A new local automated log for remediation or a separate manual result for the final tooltip refinement was not supplied. Historical evidence and limitations are maintained in [Testing](Testing.md).
 
-- Complete any outstanding automated verification of the remediation with the commands below; focused Windows manual acceptance is complete. Real long-pause MP3/WAV listening, directory access denial, selected FFmpeg failure cases and tagged release assets remain deferred; see Testing.
-- Preserve source audio, output files, settings, playlists and installed FFmpeg. Avoid unnecessary frameworks or broad refactoring.
-- Discuss new requirements first; do not merge without explicit authorization. Use English commit messages.
+Real long-pause MP3/WAV listening, dedicated directory-access-denial checks, selected FFmpeg fault scenarios and actual tagged Release assets remain deferred. No new release tag was created.
+
+## Next development round
+
+- Read this handoff, [program overview](program-overview.md), [project contract](project-contract.md) and root AGENTS.md; verify current main and source before changes.
+- Discuss new requirements first, then use a new feature branch. Follow [WindowsAppPlaybook](https://github.com/chenjing2000/windowsappplaybook): first principles, minimum necessary design, remove redundancy before adding entities, no unnecessary frameworks or broad refactoring.
+- Protect source audio, outputs, settings, playlists and installed FFmpeg. Use English commit messages, hosted CI and focused Windows acceptance. Do not merge without separate explicit authorization.
 
 ```powershell
 cd C:\Projects\AudioPlayer
-git switch feature/configurable-seek-shortcuts
-git pull --ff-only origin feature/configurable-seek-shortcuts
+git switch main
+git pull --ff-only origin main
+git fetch --prune
+git status
+git log -1 --oneline
 .\tools\Test.ps1 -Suite Core
 .\tools\Test.ps1 -Suite UI
 .\tools\Publish.ps1

@@ -398,3 +398,8 @@ The user explicitly confirmed all 12 focused WindowsAppPlaybook remediation manu
 10. PASS — Empty or unreadable next audio stops with error.
 11. PASS — Folder exclusions work for opening, refresh and restoration.
 12. PASS — Closing during repeated or sequential playback releases resources.
+
+
+### PR #16 final merge and post-merge verification
+
+Final tooltip revision `c3a4c21` removes the visible `播放模式：` prefix while preserving accessible names and updates UI assertions. Both [push CI #45382457033](https://github.com/chenjing2000/audioplayer/actions/runs/45382457033) and [PR CI #45382467366](https://github.com/chenjing2000/audioplayer/actions/runs/45382467366) passed. No separate manual tooltip result was supplied. The user explicitly authorized merging on 2026-11-24; [PR #16](https://github.com/chenjing2000/audioplayer/pull/16) was squash merged into `main@af27658`. [Post-merge Windows CI #45382847185](https://github.com/chenjing2000/audioplayer/actions/runs/45382847185) passed. Remote branch listing verified only `main` remains. Local branch cleanup/synchronization and a new local automated/publishing log for the remediation revision have not been independently confirmed. The 70 user-reported manual checks are cumulative, not a full rerun on the merge commit. Earlier pending/deferred merge statements above describe historical stages. Optional MP3 and previously deferred real-media/failure-path checks remain unverified; no release tag was created.

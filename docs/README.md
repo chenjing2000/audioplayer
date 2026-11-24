@@ -8,7 +8,7 @@
 | [Program overview](program-overview.md) | 当前功能、模块和运行逻辑 |
 | [Project contract](project-contract.md) | 技术、数据安全与项目约束 |
 | [Getting Started](Getting-Started.md) | 最简运行说明 |
-| [Configuration](Configuration.md) | 当前五项配置及安全保存 |
+| [Configuration](Configuration.md) | 当前配置参数及安全保存 |
 | [Testing](Testing.md) | 测试命令、历史结果和未完成验收 |
 | [Publishing](Publishing.md) | 便携发布、EXE/安装说明交付 |
 | [FFmpeg setup](FFmpeg-Setup.txt) | 运行时可选依赖的安装说明 |
