@@ -36,7 +36,7 @@ public partial class ScriptWindow : Window
         initialized = true;
         try
         {
-            string folder = Path.Combine(AppContext.BaseDirectory, "cache", "webview2");
+            string folder = Path.Combine(Path.GetDirectoryName(SettingsStore.GetExecutablePath())!, "cache", "webview2");
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: folder);
             if (ownerClosing) return;
             await Reader.EnsureCoreWebView2Async(environment);
@@ -88,7 +88,7 @@ public partial class ScriptWindow : Window
             using var json = JsonDocument.Parse(raw);
             var root = json.RootElement;
             if (root.ValueKind != JsonValueKind.Object ||
-                !root.TryGetProperty("epoch", out var epoch) || !epoch.TryGetInt32(out int id) || id != navigationEpoch ||
+                !root.TryGetProperty("epoch", out var epoch) || epoch.ValueKind != JsonValueKind.Number || !epoch.TryGetInt32(out int id) || id != navigationEpoch ||
                 !root.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String) return;
             if (type.GetString() == "shortcut")
             {
@@ -111,7 +111,6 @@ public partial class ScriptWindow : Window
             NavigationPreview?.Invoke(seconds);
         }
         catch (JsonException) { }
-        catch (InvalidOperationException) { }
     }
 
     internal void CancelNavigation()

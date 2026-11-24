@@ -44,6 +44,7 @@ window.addEventListener('wheel',event=>{
   else if(manual && pending!==null)chrome.webview.postMessage({type:'preview',epoch,position:pending});
 },{passive:false});
 body.addEventListener('dblclick',event=>{
+  if(!event.target.closest('.sentence'))return;
   const line=nearest(event.clientY+window.scrollY);
   if(line && line.first!==null)preview(line);
 });
@@ -144,7 +145,8 @@ function measure(){
 }
 function update(state,immediate=false,previewOnly=false){
   if(manual && !previewOnly)return;
-  if(!state.playing && animation)cancelAnimation();
+  const wasAnimating=!!animation;
+  if(!state.playing && wasAnimating)cancelAnimation();
   playback=state;
   const t=state.position;
   let current=null,latest=-Infinity;
@@ -173,7 +175,7 @@ function update(state,immediate=false,previewOnly=false){
   if(previewOnly){activeLine=current;return;}
   if(state.reset){activeLine=null;moveTo(0,true);return;}
   if(!current)return;
-  if(current!==activeLine || immediate || jumped){
+  if(current!==activeLine || immediate || jumped || (!state.playing && wasAnimating)){
     activeLine=current;
     moveTo(scrollTarget(current.y,window.innerHeight,document.documentElement.scrollHeight),immediate||jumped||!state.playing);
   }

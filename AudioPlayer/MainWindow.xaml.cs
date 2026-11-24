@@ -805,10 +805,10 @@ public partial class MainWindow : Window
         if (timer.Interval != interval) timer.Interval = interval;
         if (scriptVisible)
         {
-            scriptWindow!.SetAudio(loadedTrack?.FilePath);
+            scriptWindow!.SetAudio(player.IsLoaded ? loadedTrack?.FilePath : null);
             double position = player.GetCurrentTime().TotalSeconds;
             bool reset = !player.IsLoaded || (!player.IsPlaying && !player.IsPaused &&
-                (position <= 0 || player.NaturalCompletion is not null));
+                (position <= 0 || position >= player.GetDuration().TotalSeconds));
             scriptWindow.UpdatePlayback(position, player.IsPlaying, reset);
         }
         if (dragging) return;
@@ -875,9 +875,9 @@ public partial class MainWindow : Window
             scriptWindow.IsVisibleChanged += async (_, _) =>
             {
                 string label = scriptWindow?.IsVisible == true ? "隐藏原文" : "显示原文";
-                if (scriptWindow?.IsVisible != true) await RestoreCanceledScriptSeekAsync();
                 ScriptButton.ToolTip = label;
                 AutomationProperties.SetName(ScriptButton, label);
+                if (scriptWindow?.IsVisible != true) await RestoreCanceledScriptSeekAsync();
             };
         }
         if (scriptWindow.IsVisible) scriptWindow.Hide();
@@ -950,7 +950,7 @@ public partial class MainWindow : Window
             scriptWasPlaying = false;
             if (!closing && generation == scriptSeekGeneration)
                 scriptWindow?.CompleteNavigation(player.GetCurrentTime().TotalSeconds, player.IsPlaying);
-            if (!closing) { RefreshProgress(); QueueNaturalCompletion(); }
+            if (!closing) { UpdateControls(); RefreshProgress(); QueueNaturalCompletion(); }
         }
     }
 
@@ -973,6 +973,7 @@ public partial class MainWindow : Window
 
     internal async Task RestoreCanceledScriptSeekAsync()
     {
+        if (closing) return;
         if (scriptSeekCommitting)
         {
             // An issued seek cannot be undone; let its serialized restoration finish.

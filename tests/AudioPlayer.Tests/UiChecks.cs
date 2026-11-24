@@ -599,8 +599,17 @@ internal static class UiChecks
                         "Invalid configuration is preserved and reported inline");
                     invalidWindow.Close();
                     settingsStore.Save(saved);
+                    window.BeginScriptSeek(double.NaN);
+                    window.BeginScriptSeek(-1);
+                    Assert(!Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled &&
+                        !FieldValue<double?>(window, "scriptSeekTarget").HasValue,
+                        "Invalid script navigation targets do not arm the debounce timer");
+                    await window.CommitScriptSeekAsync();
+                    Assert(!Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled,
+                        "Commit without a pending script target is a no-op");
                     if (WaveOut.DeviceCount == 0)
                     {
+                        Console.WriteLine("SKIP UI script wheel playback checks (6 assertions): no waveOut device is available.");
                         Console.WriteLine("SKIP UI audio-device playback checks: no waveOut device is available.");
                         return;
                     }
