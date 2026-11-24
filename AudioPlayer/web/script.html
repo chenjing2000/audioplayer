@@ -12,10 +12,12 @@ const ns='http://www.w3.org/2000/svg';
 const clamp=(n,lo,hi)=>Math.max(lo,Math.min(hi,n));
 const progress=(t,start,end)=>clamp((t-start)/(end-start),0,1);
 const scrollTarget=(y,height,total)=>clamp(y-height/2,0,Math.max(0,total-height));
-const cosine=u=>(1-Math.cos(Math.PI*clamp(u,0,1)))/2;
-const LINE_TRANSITION_MS=180;
-let geometry=[],lines=[],playback={position:0,playing:false,reset:true},activeLine=null;
+// The host samples the audio clock about every 25 ms while playing.
+const MAX_CLOCK_EXTRAPOLATION_S=0.05;
+const FOLLOW_HANDOFF_MS=150;
+let geometry=[],lines=[],followAnchors=[],playback={position:0,playing:false,reset:true};
 let animation=0,measureFrame=0,lastTarget=null,previousPosition=null;
+let sampleAt=0,followTime=null,handoffOffset=0,handoffAt=0;
 let epoch=0,manual=false,pending=null;
 let started=0,paintPosition=null;
 const activeUnits=new Set();
@@ -62,22 +64,66 @@ window.addEventListener('keydown',event=>{
 });
 window.addEventListener('auxclick',event=>{if(event.button===1)event.preventDefault();});
 window.addEventListener('mousedown',event=>{if(event.button===1)event.preventDefault();});
-function cancelAnimation(){if(animation)cancelAnimationFrame(animation);animation=0;lastTarget=null;}
-function moveTo(target,immediate){
-  if(immediate){cancelAnimation();window.scrollTo(0,target);return;}
-  if(lastTarget===target && animation)return;
-  if(Math.abs(window.scrollY-target)<0.5){cancelAnimation();return;}
-  cancelAnimation();lastTarget=target;
-  const from=window.scrollY,begin=performance.now();
-  function step(now){
-    const u=clamp((now-begin)/LINE_TRANSITION_MS,0,1);
-    window.scrollTo(0,from+(target-from)*cosine(u));
-    if(u<1)animation=requestAnimationFrame(step);else{animation=0;lastTarget=null;}
+function cancelAnimation(){
+  if(animation)cancelAnimationFrame(animation);
+  animation=0;lastTarget=null;followTime=null;handoffOffset=0;
+}
+// A strictly increasing time axis in document order prevents backward motion
+// from overlapping, equal or out-of-order line timestamps.
+function buildFollowAnchors(visualLines){
+  const anchors=[];
+  for(const line of visualLines){
+    const time=line.followStart;
+    if(Number.isFinite(time) && (!anchors.length || time>anchors.at(-1).time))
+      anchors.push({time,y:line.y});
   }
-  animation=requestAnimationFrame(step);
+  return anchors;
+}
+function followOffset(t,height=window.innerHeight,total=document.documentElement.scrollHeight){
+  if(!followAnchors.length)return 0;
+  const first=followAnchors[0],last=followAnchors.at(-1);
+  if(t<=first.time){
+    const target=scrollTarget(first.y,height,total);
+    return first.time>0?target*clamp(t/first.time,0,1):target;
+  }
+  if(t>=last.time)return scrollTarget(last.y,height,total);
+  let lo=0,hi=followAnchors.length-1;
+  while(hi-lo>1){
+    const mid=(lo+hi)>>>1;
+    if(followAnchors[mid].time<=t)lo=mid;else hi=mid;
+  }
+  const a=followAnchors[lo],b=followAnchors[hi];
+  // No per-line ease-in/ease-out: the position keeps moving between anchors.
+  const u=(t-a.time)/(b.time-a.time);
+  return scrollTarget(a.y+(b.y-a.y)*u,height,total);
+}
+function followFrame(now){
+  if(manual || !playback.playing || playback.reset){cancelAnimation();return;}
+  // Interpolate the clock between host samples, never run freely beyond a
+  // short bound if updates stall. Coloring still uses confirmed audio time.
+  const estimate=playback.position+clamp((now-sampleAt)/1000,0,MAX_CLOCK_EXTRAPOLATION_S);
+  followTime=Math.max(followTime??playback.position,estimate);
+  const bias=handoffOffset*(1-clamp((now-handoffAt)/FOLLOW_HANDOFF_MS,0,1));
+  const target=clamp(followOffset(followTime)+bias,0,
+    Math.max(0,document.documentElement.scrollHeight-window.innerHeight));
+  if(target!==lastTarget){window.scrollTo(0,target);lastTarget=target;}
+  animation=requestAnimationFrame(followFrame);
+}
+function followPlayback(t,immediate){
+  if(immediate){
+    cancelAnimation();
+    window.scrollTo(0,followOffset(t));
+  }
+  if(!followAnchors.length)return;
+  if(!animation){
+    followTime=t;
+    handoffAt=sampleAt;
+    handoffOffset=immediate?0:window.scrollY-followOffset(t);
+    animation=requestAnimationFrame(followFrame);
+  }
 }
 function render(data){
-  cancelManual();epoch=data.epoch;geometry=[];lines=[];activeLine=null;previousPosition=null;
+  cancelManual();epoch=data.epoch;geometry=[];lines=[];followAnchors=[];previousPosition=null;
   started=0;paintPosition=null;activeUnits.clear();
   playback={position:0,playing:false,reset:true};
   title.textContent=data.article?.title??'';title.hidden=!title.textContent;
@@ -112,7 +158,7 @@ function scheduleMeasure(){
   if(!measureFrame)measureFrame=requestAnimationFrame(()=>{measureFrame=0;measure();});
 }
 function measure(){
-  cancelAnimation();geometry=[];lines=[];activeLine=null;
+  cancelAnimation();geometry=[];lines=[];followAnchors=[];
   started=0;paintPosition=null;activeUnits.clear();
   const y=window.scrollY;
   const byY=new Map();
@@ -123,7 +169,7 @@ function measure(){
       const candidate=byY.get(k);
       if(candidate && Math.abs(candidate.y-cy)<2){line=candidate;break;}
     }
-    if(!line){line={y:cy,first:null};lines.push(line);byY.set(key,line);}
+    if(!line){line={y:cy,first:null,followStart:null};lines.push(line);byY.set(key,line);}
     return line;
   }
   for(const p of body.querySelectorAll('p')){
@@ -145,10 +191,22 @@ function measure(){
         element.setAttribute('width','0');element.setAttribute('height',r.height+2);clip.append(element);
         return {element,width:r.width,line,painted:0};
       });
-      if(segments.length)geometry.push({start,end,segments,total:segments.reduce((sum,s)=>sum+s.width,0),last:NaN});
+      if(segments.length){
+        const total=segments.reduce((sum,s)=>sum+s.width,0);
+        let consumed=0;
+        for(const seg of segments){
+          // A word spanning visual lines contributes a proportional timestamp
+          // to each line, without changing the existing manual seek target.
+          const time=start+(end-start)*consumed/total;
+          seg.line.followStart=seg.line.followStart===null?time:Math.min(seg.line.followStart,time);
+          consumed+=seg.width;
+        }
+        geometry.push({start,end,segments,total,last:NaN});
+      }
     }
   }
   lines.sort((a,b)=>a.y-b.y);
+  followAnchors=buildFollowAnchors(lines);
   // Stable sort preserves original document order for equal starts.
   geometry.sort((a,b)=>a.start-b.start);
   update(playback,true,manual);
@@ -164,17 +222,17 @@ function paintUnit(unit,fraction){
 }
 function update(state,immediate=false,previewOnly=false){
   if(manual && !previewOnly)return;
-  const wasAnimating=!!animation;
-  if(!state.playing && wasAnimating)cancelAnimation();
+  const wasPlaying=playback.playing;
+  const prior=previousPosition;
   playback=state;
   const t=state.position;
+  if(t!==prior || !wasPlaying || immediate)sampleAt=performance.now();
   // Forward playback visits newly started and still-active intervals only.
   // Rewind/reset restores all painted intervals, including overlapping timestamps.
   if(state.reset || (paintPosition!==null && t<paintPosition)){
     for(let i=0;i<started;i++)paintUnit(geometry[i],0);
     started=0;activeUnits.clear();
   }
-  let current=null;
   if(!state.reset){
     while(started<geometry.length && geometry[started].start<=t)
       activeUnits.add(geometry[started++]);
@@ -182,26 +240,17 @@ function update(state,immediate=false,previewOnly=false){
       paintUnit(unit,progress(t,unit.start,unit.end));
       if(t>=unit.end)activeUnits.delete(unit);
     }
-    // The last started unit also determines the visual line during a timestamp gap.
-    const unit=geometry[started-1];
-    if(unit){
-      let remaining=progress(t,unit.start,unit.end)*unit.total;
-      current=unit.segments.at(-1).line;
-      for(const seg of unit.segments){
-        if(remaining<seg.width){current=seg.line;break;}remaining-=seg.width;
-      }
-    }
   }
   paintPosition=state.reset?null:t;
-  const jumped=previousPosition!==null && (t<previousPosition || t-previousPosition>0.35);
+  const jumped=prior!==null && (t<prior || t-prior>0.35);
   previousPosition=t;
-  if(previewOnly){activeLine=current;return;}
-  if(state.reset){activeLine=null;moveTo(0,true);return;}
-  if(!current)return;
-  if(current!==activeLine || immediate || jumped || (!state.playing && wasAnimating)){
-    activeLine=current;
-    moveTo(scrollTarget(current.y,window.innerHeight,document.documentElement.scrollHeight),immediate||jumped||!state.playing);
-  }
+  if(previewOnly){cancelAnimation();return;}
+  if(state.reset){cancelAnimation();window.scrollTo(0,0);return;}
+  if(state.playing){followPlayback(t,immediate||jumped);return;}
+  // Pause freezes the displayed offset; seek and layout changes reposition.
+  cancelAnimation();
+  if(immediate||jumped||(!wasPlaying && t!==prior))
+    window.scrollTo(0,followOffset(t));
 }
 chrome.webview.addEventListener('message',({data})=>{
   if(data.type==='appearance'){
@@ -218,7 +267,7 @@ chrome.webview.addEventListener('message',({data})=>{
   else if(data.type==='playback' && data.epoch===epoch)update(data,data.immediate===true);
   else if(data.type==='cancel'){
     epoch=data.epoch;
-    if(manual){cancelManual();activeLine=null;previousPosition=null;}
+    if(manual){cancelManual();previousPosition=null;}
   }
   else if(data.type==='commit'){
     const preserveOffset=manual;

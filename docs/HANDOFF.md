@@ -44,6 +44,10 @@ After the 10 focused manual passes, source review identified modal cancellation,
 
 At `f900adb` both CI workflows passed (58 Core, 226 UI, 5 safeguards, 4 published checks; 293 total). The user confirmed all seven focused remediation manual checks, including long IELTS responsiveness, but reported a residual Script window shadow at the upper-left desktop when minimizing the main window. The owner now explicitly hides a visible companion on minimize and restores the same instance without activation on restore; a previously hidden companion remains hidden. New native visibility/lifecycle assertions use the isolated WebView2 test reader. Actual shadow disappearance requires Windows desktop visual confirmation. Latest local automated log for f900adb was not supplied. No merge authorization.
 
-## Smooth automatic line transition (pending verification)
+## Smooth automatic line transition (superseded; not accepted)
 
 At the user's request, automatic visual-line follow now uses 180 ms half-cosine interpolation instead of 50 ms. Existing requestAnimationFrame, progressive coloring, direct wheel navigation and 150 ms wheel debounce are preserved. A deterministic WebView2 frame-callback assertion is added; fresh CI and Windows visual acceptance remain pending, including the separate minimization-shadow check. No merge authorized.
+
+## Continuous subtitle scrolling (pending verification)
+
+The user clarified that subtitles should continuously move during playback, not ease between lines and stop. Replaced the 180 ms line-transition animation with an audio-time-to-position trajectory interpolated between visual-line anchors; frame callbacks extrapolate the host clock for at most 50 ms. Kept direct wheel navigation, 150 ms debounce, confirmed-clock coloring, natural bounds, pause/reset and immediate discontinuity handling. Replaced the prior animation assertion with continuous-offset and frame lifecycle checks. New CI and local visual acceptance are pending. The separate minimization-shadow visual check is still unresolved. No merge authorized.

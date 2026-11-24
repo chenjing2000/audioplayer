@@ -430,10 +430,10 @@ On Windows, close running AudioPlayer, switch to the feature branch and pull fas
 | B08 | Source JSON unchanged; no auto timestamp repair |
 | C01 | Progressive partial-word color follows actual playback |
 | C02 | Wrapped timed unit retains one interval |
-| C03 | Top boundary stationary until active line reaches center |
-| C04 | Middle visual line centered; gaps hold prior line |
+| C03 | Natural top boundary; continuous follow begins when scroll range permits |
+| C04 | Current visual line near center; interpolated motion between timed visual lines, including gaps |
 | C05 | Bottom natural scroll limit, short document no extra padding |
-| C06 | Automatic line transition smooth, approximately 180 ms |
+| C06 | Continuous automatic scrolling within and across lines, no per-line dwell |
 | C07 | Pause/resume, forward/backward seek, Stop and natural end |
 | C08 | Resize/font changes recalculate layout without audio seek |
 | D01 | Wheel both directions directly scrolls, no auto animation |
@@ -498,4 +498,8 @@ At `f900adb`, [push CI](https://github.com/chenjing2000/audioplayer/actions/runs
 
 ### Smooth automatic line transition (pending)
 
-Automatic visual-line follow now uses a 180 ms half-cosine animation rather than 50 ms; the existing frame-driven interpolation, progressive coloring and 150 ms wheel-seek debounce remain unchanged. A browser assertion drives synthetic frame timestamps and checks intermediate displacement and the exact final target. The new assertion and Windows visual acceptance are pending. Recheck C06, C07, D01–D04, F02 and rapid line changes; previous manual passes do not establish acceptance of the new duration. No merge authorized.
+Automatic visual-line follow now uses a 180 ms half-cosine animation rather than 50 ms; the existing frame-driven interpolation, progressive coloring and 150 ms wheel-seek debounce remain unchanged. A browser assertion drives synthetic frame timestamps and checks intermediate displacement and the exact final target. That implementation was superseded by continuous time-driven follow below; no visual acceptance was recorded. Recheck C06, C07, D01–D04, F02 and rapid line changes; previous manual passes do not establish acceptance of the new duration. No merge authorized.
+
+### Continuous audio-time-driven scroll (pending)
+
+The user requested continuously moving text rather than per-line animations with dwell. The reader now interpolates document Y between strictly increasing visual-line timestamps and uses requestAnimationFrame with bounded 50 ms clock extrapolation between host samples. Natural scroll boundaries, paused/reset states, direct wheel/150 ms debounced seek, and confirmed-clock coloring are retained. New synthetic WebView2 assertions cover intermediate offsets across line boundaries, irregular timestamps, limits and frame lifecycle. Recheck C03–C08, D01–D07 and F02/F03: uninterrupted in-line motion, speed changes with line duration, pause/resume, seek, resize, wheel interaction and long recordings. No real Windows visual acceptance or merge authorization yet.

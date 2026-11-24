@@ -667,38 +667,60 @@ internal static class UiChecks
                                 "update({position:0,playing:false,reset:true},true); geometry.every(u=>u.segments.every(s=>s.painted===0))");
                             Assert(cleared == "true", "Reader reset clears painted intervals");
 
-                            // Drive the real animation callback with synthetic frame times, without
-                            // depending on the hosted runner's refresh rate or document height.
-                            string smoothFollow = await reader.CoreWebView2.ExecuteScriptAsync(
+                            string continuousFollow = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """
                                 (() => {
-                                  const raf = window.requestAnimationFrame;
-                                  const caf = window.cancelAnimationFrame;
-                                  const scroll = window.scrollTo;
-                                  let callback, offset = window.scrollY, from = offset;
-                                  let writes = 0;
+                                  const saved = followAnchors;
                                   try {
-                                    window.requestAnimationFrame = cb => { callback = cb; return 1; };
-                                    window.cancelAnimationFrame = () => { callback = null; };
-                                    window.scrollTo = (_, y) => { offset = y; writes++; };
-                                    const before = performance.now();
-                                    moveTo(from + 100, false);
-                                    const after = performance.now();
-                                    if (!callback || writes !== 0 || LINE_TRANSITION_MS !== 180) return false;
-                                    callback((before + after) / 2 + 90);
-                                    if (!callback || !animation || offset <= from + 35 || offset >= from + 65) return false;
-                                    callback(after + 180);
-                                    return !animation && lastTarget === null && Math.abs(offset - from - 100) < 0.001;
+                                    followAnchors=buildFollowAnchors([
+                                      {y:150,followStart:0},{y:250,followStart:2},
+                                      {y:275,followStart:2},{y:290,followStart:1},
+                                      {y:300,followStart:null},{y:350,followStart:4}
+                                    ]);
+                                    const offsets=[0,0.5,1,1.5,2,2.5,3,3.5,4]
+                                      .map(t=>followOffset(t,100,1000));
+                                    return followAnchors.length===3 &&
+                                      offsets.every((x,i)=>x===100+25*i) &&
+                                      followOffset(10,100,220)===120 &&
+                                      followOffset(10,100,80)===0;
+                                  } finally {followAnchors=saved;}
+                                })()
+                                """);
+                            Assert(continuousFollow == "true", "Reader follows continuous time-position trajectory between visual lines");
+                            string followFrames = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const raf=window.requestAnimationFrame,caf=window.cancelAnimationFrame;
+                                  const saved=followAnchors;
+                                  let callback=null;
+                                  try {
+                                    window.requestAnimationFrame=cb=>{callback=cb;return 1;};
+                                    window.cancelAnimationFrame=()=>{callback=null;};
+                                    followAnchors=[{time:0,y:150},{time:2,y:250}];
+                                    update({position:0.5,playing:true,reset:false},true);
+                                    if(!callback || !animation)return false;
+                                    callback(sampleAt+16);
+                                    const a=followTime;
+                                    callback(sampleAt+32);
+                                    const b=followTime;
+                                    callback(sampleAt+500);
+                                    const capped=followTime;
+                                    update({position:0.525,playing:true,reset:false});
+                                    callback(sampleAt+16);
+                                    const monotone=followTime>=capped;
+                                    update({position:0.55,playing:false,reset:false});
+                                    return b>a && Math.abs(capped-0.55)<0.00001 && monotone &&
+                                      !callback && !animation;
                                   } finally {
                                     cancelAnimation();
-                                    window.requestAnimationFrame = raf;
-                                    window.cancelAnimationFrame = caf;
-                                    window.scrollTo = scroll;
+                                    window.requestAnimationFrame=raf;
+                                    window.cancelAnimationFrame=caf;
+                                    followAnchors=saved;
+                                    update({position:0,playing:false,reset:true},true);
                                   }
                                 })()
                                 """);
-                            Assert(smoothFollow == "true", "Reader automatic line transition interpolates over 180 ms");
-
+                            Assert(followFrames == "true", "Reader frame clock advances continuously, is bounded and cancels on pause");
 
                             // Keep the synthetic article isolated from MainWindow's playback timer
                             // until the rendering assertions finish. No real audio is loaded here.
