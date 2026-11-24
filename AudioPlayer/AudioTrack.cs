@@ -12,7 +12,7 @@ public sealed class AudioTrack : INotifyPropertyChanged
     public string? LoadError { get; init; }
     public string DisplayName => Path.GetFileNameWithoutExtension(FilePath);
     public string RowToolTip => string.Join(Environment.NewLine,
-        new[] { FilePath, Title == DisplayName ? null : Title, LoadError }
+        new[] { Path.GetDirectoryName(FilePath), LoadError }
             .Where(value => !string.IsNullOrWhiteSpace(value)));
     public string DurationText => Duration.HasValue ? FormatTime(Duration.Value) : "未知";
 

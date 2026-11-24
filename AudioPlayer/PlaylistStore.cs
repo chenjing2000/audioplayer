@@ -1,4 +1,6 @@
 using System.IO;
+using System.Text.Encodings.Web;
+using System.Text.Unicode;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -9,6 +11,7 @@ internal sealed class PlaylistStore
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
+        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 

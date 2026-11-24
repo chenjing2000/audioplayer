@@ -104,7 +104,27 @@
                 </Style>
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource NoFocusVisual}">
                     <EventSetter Event="PreviewKeyDown" Handler="TrackRow_PreviewKeyDown"/>
-                    <Setter Property="ToolTip" Value="{Binding RowToolTip}"/>
+                    <Setter Property="ToolTip">
+                        <Setter.Value>
+                            <ToolTip Background="{DynamicResource {x:Static SystemColors.InfoBrushKey}}"
+                                     Foreground="{DynamicResource {x:Static SystemColors.InfoTextBrushKey}}"
+                                     BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+                                     BorderThickness="1" Padding="8"
+                                     DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                <ToolTip.Template>
+                                    <ControlTemplate TargetType="ToolTip">
+                                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}" Padding="{TemplateBinding Padding}"
+                                                CornerRadius="8">
+                                            <ContentPresenter/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToolTip.Template>
+                                <TextBlock Text="{Binding RowToolTip}" TextWrapping="Wrap" TextTrimming="None" Margin="0"/>
+                            </ToolTip>
+                        </Setter.Value>
+                    </Setter>
+                    <EventSetter Event="ToolTipOpening" Handler="TrackRow_ToolTipOpening"/>
                     <Setter Property="Background" Value="White"/>
                     <Style.Triggers>
                         <Trigger Property="AlternationIndex" Value="1"><Setter Property="Background" Value="#F0F0F0"/></Trigger>

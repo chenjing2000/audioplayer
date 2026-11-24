@@ -120,9 +120,9 @@ internal static class UiChecks
                         Assert(playlistStore.Load()!.Files.SequenceEqual(new[] { original }),
                             "Opening a directory persists the absolute nested path");
                         Assert(((AudioTrack)list.Items[0]).DisplayName == "original" &&
-                            ((AudioTrack)list.Items[0]).RowToolTip.Contains(original) &&
+                            ((AudioTrack)list.Items[0]).RowToolTip == nested &&
                             ((DataGridTextColumn)list.Columns[1]).Binding is System.Windows.Data.Binding { Path.Path: "DisplayName" },
-                            "Filename column omits extension while row tooltip retains path");
+                            "Filename column omits extension while row tooltip shows parent directory");
                         list.SelectedIndex = 0;
                         File.Move(original, renamed);
                         using (var writer = new WaveFileWriter(added, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))

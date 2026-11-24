@@ -239,3 +239,7 @@ The user explicitly confirmed all ten Windows manual acceptance checks passed fo
 10. Existing playback, silence navigation and settings continue working.
 
 User-reported manual acceptance is distinct from hosted automated verification. The accepted implementation at `9479bca` passed [Windows PR CI #45305530107](https://github.com/chenjing2000/audioplayer/actions/runs/45305530107) and [push CI #45305513723](https://github.com/chenjing2000/audioplayer/actions/runs/45305513723). The earlier local log was from the pre-feature version after a failed Git fetch, so its counts are not attributed to this feature. No new local automated counts or previously deferred real-media/failure-path coverage are claimed. Merge into main awaits separate authorization.
+
+### PR #15 follow-up: tooltip and readable playlist JSON
+
+After the initial ten manual checks passed, the user requested parent-directory-only tooltips (wrapped, maximum main-window width minus 48 DIP, 8 DIP rounded corners) and literal Chinese characters in UTF-8 playlist JSON. Existing escaped JSON remains readable. Core regression assertions cover the revised tooltip text and JSON round-trip. New visual acceptance and CI remain pending.

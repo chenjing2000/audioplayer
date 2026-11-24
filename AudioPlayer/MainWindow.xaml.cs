@@ -185,6 +185,12 @@ public partial class MainWindow : Window
             await RunActionAsync(() => PlayTrackAsync(track));
     }
 
+    private void TrackRow_ToolTipOpening(object sender, ToolTipEventArgs e)
+    {
+        if (sender is DataGridRow { ToolTip: ToolTip tooltip })
+            tooltip.MaxWidth = Math.Max(1, ActualWidth - 48);
+    }
+
     private async void TrackRow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter || Keyboard.Modifiers != ModifierKeys.None) return;

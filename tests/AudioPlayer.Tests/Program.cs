@@ -453,7 +453,9 @@ try
             Path.Combine("nested", "4.mp3")
         }));
         Assert(tracks.All(t => t.DisplayName == Path.GetFileNameWithoutExtension(t.FilePath)));
-        Assert(tracks.All(t => t.RowToolTip.Contains(t.FilePath)));
+        Assert(tracks.All(t => t.RowToolTip.StartsWith(Path.GetDirectoryName(t.FilePath)!))); 
+        var tooltipTrack = new AudioTrack { FilePath = Path.Combine(fixture, "媒体文件.mp3"), Title = "Tag title" };
+        Assert(tooltipTrack.RowToolTip == fixture);
     });
 
     Check("Playlist JSON uses executable stem, preserves full paths and replaces safely", () =>
@@ -481,6 +483,15 @@ try
             catch (System.Text.Json.JsonException) { rejected = true; }
             Assert(rejected && File.ReadAllText(path) == invalid);
         }
+        string chineseRoot = Path.Combine(fixture, "英语学习");
+        string chineseFile = Path.Combine(chineseRoot, "剑桥雅思.mp3");
+        store.Save(chineseRoot, new[] { chineseFile });
+        string readableJson = File.ReadAllText(path);
+        Assert(readableJson.Contains("英语学习") && readableJson.Contains("剑桥雅思") &&
+            store.Load()!.Files.SequenceEqual(new[] { chineseFile }));
+        File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(
+            new { rootFolder = chineseRoot, files = new[] { chineseFile } }));
+        Assert(store.Load()!.Files.SequenceEqual(new[] { chineseFile }));
         File.Delete(path);
     });
 
