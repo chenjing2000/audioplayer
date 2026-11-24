@@ -332,3 +332,5 @@ The user confirmed 15 of 16 manual checks passed on the folder-exclusion impleme
 15. Existing playback and shortcuts remain functional.
 
 The remaining layout check failed: the new exclusion controls overlap the explanatory text. The layout correction retains only the allowed-silence explanation, reserves space for it, and adds a geometry assertion. Focused Windows visual acceptance and CI for that correction are pending. The 16 earlier seek-shortcut checks and these 15 checks are cumulative across revisions, not a full rerun on the new layout. No merge authorization.
+
+The user subsequently requested a 480 × 420 DIP settings dialog. Update the height regression while retaining the single-help-line and rendered geometry assertions. Prior 480 × 390 acceptance is historical; the revised layout requires focused visual acceptance. No application logic changes.

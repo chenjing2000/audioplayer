@@ -315,7 +315,7 @@ internal static class UiChecks
                     var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 480) < 0.01, "Settings window width is 480");
-                    Assert(Math.Abs(settingsWindow.Height - 390) < 0.01, "Settings window height is 390");
+                    Assert(Math.Abs(settingsWindow.Height - 420) < 0.01, "Settings window height is 420");
                     foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox", "BackwardStepTextBox", "ForwardStepTextBox" })
                     {
                         var textBox = (TextBox)settingsWindow.FindName(textBoxName);

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AudioPlayer"
         Title="设置" PreviewKeyDown="Window_PreviewKeyDown"
-        Width="480" Height="390"
+        Width="480" Height="420"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
