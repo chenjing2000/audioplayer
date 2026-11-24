@@ -39,3 +39,7 @@ At `0ada0d9`, user logs confirmed 58 Core, 260 UI, 5 publishing safeguards and 4
 ## Follow-up review remediation (pending verification)
 
 After the 10 focused manual passes, source review identified modal cancellation, seek rejection and device-error restoration risks. The branch now preserves playback intent when opening either modal, cancels on device errors, resynchronizes rejected browser previews at commit, retries a failed reader on reopen, cancels obsolete script loads, and indexes started/active timestamp intervals. The changes require fresh CI and targeted Windows regression. Playback-device clock calibration and mixed-DPI monitor sizing remain measurement-dependent; no speculative changes to the audio engine or geometry have been made.
+
+## Owner minimization correction (pending verification)
+
+At `f900adb` both CI workflows passed (58 Core, 226 UI, 5 safeguards, 4 published checks; 293 total). The user confirmed all seven focused remediation manual checks, including long IELTS responsiveness, but reported a residual Script window shadow at the upper-left desktop when minimizing the main window. The owner now explicitly hides a visible companion on minimize and restores the same instance without activation on restore; a previously hidden companion remains hidden. New native visibility/lifecycle assertions use the isolated WebView2 test reader. Actual shadow disappearance requires Windows desktop visual confirmation. Latest local automated log for f900adb was not supplied. No merge authorization.

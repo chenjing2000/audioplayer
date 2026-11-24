@@ -15,6 +15,10 @@ internal static class UiChecks
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern int GetWindowLong(IntPtr window, int index);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool IsWindowVisible(IntPtr window);
+
     public static Task<int> RunAsync(string audioFolder)
     {
         var done = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -637,6 +641,9 @@ internal static class UiChecks
                         {
                             File.WriteAllText(Path.Combine(readerFolder, "arbitrary.script.json"),
                                 """{"filetype":"script","title":"Reader test","paragraphs":[[{"text":"Hello, world.","timed_units":[["Hello",1,3],["world",0,2]]}]]}""");
+                            // Exercise the real owner lifecycle with this isolated reader/cache.
+                            typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
+                                .SetValue(window, readerWindow);
                             readerWindow.SetAudio(Path.Combine(readerFolder, "sample.wav"));
                             readerWindow.Show();
                             var deadline = DateTime.UtcNow.AddSeconds(25);
@@ -661,9 +668,33 @@ internal static class UiChecks
                             string cleared = await reader.CoreWebView2.ExecuteScriptAsync(
                                 "update({position:0,playing:false,reset:true},true); geometry.every(u=>u.segments.every(s=>s.painted===0))");
                             Assert(cleared == "true", "Reader reset clears painted intervals");
+
+                            var readerHandle = new System.Windows.Interop.WindowInteropHelper(readerWindow).Handle;
+                            double readerWidth = readerWindow.Width, readerHeight = readerWindow.Height;
+                            var originalCore = reader.CoreWebView2;
+                            window.WindowState = WindowState.Minimized;
+                            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                            Assert(readerWindow.Visibility != Visibility.Visible && !IsWindowVisible(readerHandle),
+                                "Minimizing owner explicitly hides native reader window");
+                            window.WindowState = WindowState.Normal;
+                            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                            Assert(readerWindow.IsVisible && IsWindowVisible(readerHandle) &&
+                                readerWindow.ReaderReady && ReferenceEquals(originalCore, reader.CoreWebView2) &&
+                                readerWindow.Width == readerWidth && readerWindow.Height == readerHeight,
+                                "Restoring owner shows same reader and preserves dimensions");
+                            readerWindow.Hide();
+                            window.WindowState = WindowState.Minimized;
+                            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                            window.WindowState = WindowState.Normal;
+                            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                            Assert(!readerWindow.IsVisible && !IsWindowVisible(readerHandle),
+                                "Restoring owner leaves previously hidden reader hidden");
                         }
                         finally
                         {
+                            typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
+                                .SetValue(window, null);
+                            window.WindowState = WindowState.Normal;
                             readerWindow.CloseForOwner();
                             for (int attempt = 0; attempt < 20; attempt++)
                             {

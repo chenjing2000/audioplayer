@@ -55,6 +55,7 @@ public partial class MainWindow : Window
     private bool modalDialogOpen;
     private bool completionQueued;
     private ScriptWindow? scriptWindow;
+    private bool restoreScriptAfterMinimize;
     private const int ScriptSeekDebounceMs = 150;
     private const int ReaderPlaybackUpdateMs = 25;
     private const int NormalProgressUpdateMs = 100;
@@ -105,7 +106,7 @@ public partial class MainWindow : Window
         Loaded += RestorePlaylistOnLoad;
         LocationChanged += (_, _) => PositionScriptWindow();
         SizeChanged += (_, _) => PositionScriptWindow();
-        StateChanged += (_, _) => PositionScriptWindow();
+        StateChanged += (_, _) => UpdateScriptWindowState();
     }
 
     private async void RestorePlaylistOnLoad(object sender, RoutedEventArgs e)
@@ -877,7 +878,7 @@ public partial class MainWindow : Window
 
     private void ScriptButton_Click(object sender, RoutedEventArgs e)
     {
-        if (closing || modalDialogOpen || operationBusy) return;
+        if (closing || modalDialogOpen || operationBusy || WindowState == WindowState.Minimized) return;
         if (scriptWindow is { IsVisible: false, ReaderFailure: not null })
         {
             scriptWindow.CloseForOwner();
@@ -892,7 +893,7 @@ public partial class MainWindow : Window
             scriptWindow.Shortcut += async (key, modifiers) => await HandleShortcutAsync(key, modifiers);
             scriptWindow.IsVisibleChanged += async (_, _) =>
             {
-                string label = scriptWindow?.IsVisible == true ? "隐藏原文" : "显示原文";
+                string label = scriptWindow?.IsVisible == true || restoreScriptAfterMinimize ? "隐藏原文" : "显示原文";
                 ScriptButton.ToolTip = label;
                 AutomationProperties.SetName(ScriptButton, label);
                 if (scriptWindow?.IsVisible != true) await RestoreCanceledScriptSeekAsync();
@@ -901,11 +902,44 @@ public partial class MainWindow : Window
         if (scriptWindow.IsVisible) scriptWindow.Hide();
         else
         {
-            PositionScriptWindow();
-            scriptWindow.Show();
-            SynchronizeScript(immediate: true);
-            RefreshProgress();
+            ShowScriptWindow();
         }
+    }
+
+    private void ShowScriptWindow()
+    {
+        if (scriptWindow is null || closing) return;
+        PositionScriptWindow();
+        scriptWindow.Show();
+        SynchronizeScript(immediate: true);
+        RefreshProgress();
+    }
+
+    private void UpdateScriptWindowState()
+    {
+        if (closing || scriptWindow is null) return;
+        if (WindowState == WindowState.Minimized)
+        {
+            // IsVisible may already reflect native owner minimization. Visibility
+            // retains the WPF show/hide request until we explicitly hide the window.
+            if (scriptWindow.Visibility == Visibility.Visible)
+            {
+                restoreScriptAfterMinimize = true;
+                scriptWindow.Hide();
+            }
+            return;
+        }
+
+        if (restoreScriptAfterMinimize)
+        {
+            restoreScriptAfterMinimize = false;
+            // Restoring the owner must not steal keyboard focus into the reader.
+            bool showActivated = scriptWindow.ShowActivated;
+            scriptWindow.ShowActivated = false;
+            try { ShowScriptWindow(); }
+            finally { scriptWindow.ShowActivated = showActivated; }
+        }
+        else PositionScriptWindow();
     }
 
     internal void PreviewScriptSeek(double seconds)
@@ -1040,6 +1074,7 @@ public partial class MainWindow : Window
         e.Cancel = true;
         if (closing) return;
         closing = true;
+        restoreScriptAfterMinimize = false;
         CancelScriptSeek();
         scriptWindow?.CloseForOwner();
         scanCancellation.Cancel();
