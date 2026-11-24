@@ -437,17 +437,58 @@ try
     Directory.CreateDirectory(Path.Combine(fixture, "nested"));
     File.WriteAllText(Path.Combine(fixture, "nested", "4.mp3"), "not an mp3");
 
-    Check("Natural order, extension and non-recursive scan", () =>
+    Directory.CreateDirectory(Path.Combine(fixture, "Book 9"));
+    Directory.CreateDirectory(Path.Combine(fixture, "Book 10", "deep"));
+    File.WriteAllText(Path.Combine(fixture, "Book 9", "2.wav"), "broken WAV fixture");
+    File.WriteAllText(Path.Combine(fixture, "Book 10", "deep", "2.m4a"), "broken M4A fixture");
+    File.WriteAllText(Path.Combine(fixture, "nested", "ignore.txt"), "not audio");
+
+    Check("Recursive scan, supported extensions and natural relative-path order", () =>
     {
         var tracks = AudioLibrary.LoadFolder(fixture);
-        Assert(string.Join(",", tracks.Select(t => Path.GetFileName(t.FilePath))) == "01.mp3,2.MP3,3.mp3,10.mp3");
+        Assert(tracks.Select(t => Path.GetRelativePath(fixture, t.FilePath)).SequenceEqual(new[]
+        {
+            "01.mp3", "2.MP3", "3.mp3", "10.mp3",
+            Path.Combine("Book 9", "2.wav"), Path.Combine("Book 10", "deep", "2.m4a"),
+            Path.Combine("nested", "4.mp3")
+        }));
+        Assert(tracks.All(t => t.DisplayName == Path.GetFileNameWithoutExtension(t.FilePath)));
+        Assert(tracks.All(t => t.RowToolTip.Contains(t.FilePath)));
+    });
+
+    Check("Playlist JSON uses executable stem, preserves full paths and replaces safely", () =>
+    {
+        string path = PlaylistStore.GetFilePath(Path.Combine(fixture, "Renamed Player.exe"));
+        var store = new PlaylistStore(path);
+        Assert(Path.GetFileName(path) == "Renamed Player.playlist.json" && store.Load() is null);
+        var files = AudioLibrary.LoadFolder(fixture).Select(t => t.FilePath).ToArray();
+        store.Save(fixture, files);
+        var saved = store.Load()!;
+        Assert(saved.RootFolder == fixture && saved.Files.SequenceEqual(files));
+        using (var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path)))
+            Assert(json.RootElement.GetProperty("rootFolder").GetString() == fixture
+                && json.RootElement.GetProperty("files").GetArrayLength() == files.Length);
+        var restored = AudioLibrary.LoadPaths(fixture, files.Concat(new[] { files[0], Path.Combine(fixture, "..", "outside.wav") }));
+        Assert(restored.Count == files.Length);
+        store.Save(null, Array.Empty<string>());
+        Assert(store.Load() is { RootFolder: null, Files.Length: 0 });
+        Assert(!Directory.EnumerateFiles(fixture, "*.tmp").Any());
+        foreach (string invalid in new[] { "{broken", "null", "{}", "{\"rootFolder\":null,\"files\":[\"relative.mp3\"]}" })
+        {
+            File.WriteAllText(path, invalid);
+            bool rejected = false;
+            try { store.Load(); }
+            catch (System.Text.Json.JsonException) { rejected = true; }
+            Assert(rejected && File.ReadAllText(path) == invalid);
+        }
+        File.Delete(path);
     });
 
     Check("Folder scans ignore only in-progress trim audio", () =>
     {
         string id = Guid.NewGuid().ToString("N");
         foreach (string extension in new[] { ".wav", ".mp3", ".m4a" })
-            File.WriteAllText(Path.Combine(fixture, ".lesson.new." + id + extension), "unfinished");
+            File.WriteAllText(Path.Combine(fixture, "nested", ".lesson.new." + id + extension), "unfinished");
         string ordinary = "lesson.new." + id + ".wav";
         string unusual = ".lesson.new.not-a-guid.wav";
         File.WriteAllText(Path.Combine(fixture, ordinary), "ordinary audio name");

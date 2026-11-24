@@ -47,6 +47,7 @@ internal static class UiChecks
                     Assert(Math.Abs(window.Left - expectedLeft) < 0.01 && Math.Abs(window.Top - expectedTop) < 0.01, "Window starts centered with rounded coordinates");
                     window.ShowInTaskbar = false; window.ShowActivated = false; window.Left = -20000; window.Top = -20000;
                     window.Show();
+                    if (Field<Task>(window, "activeOperation") is Task startupAction) await startupAction;
                     // The native window rounds its dimensions to whole physical pixels.
                     double expectedWidth = Math.Clamp(Math.Round(SystemParameters.WorkArea.Width * 0.5), window.MinWidth, window.MaxWidth);
                     double expectedHeight = Math.Clamp(Math.Round(SystemParameters.WorkArea.Height * 0.6), window.MinHeight, window.MaxHeight);
@@ -106,13 +107,22 @@ internal static class UiChecks
                     Directory.CreateDirectory(refreshFolder);
                     try
                     {
-                        string original = Path.Combine(refreshFolder, "original.wav");
-                        string renamed = Path.Combine(refreshFolder, "renamed.wav");
+                        string nested = Path.Combine(refreshFolder, "Book 2");
+                        Directory.CreateDirectory(nested);
+                        string original = Path.Combine(nested, "original.wav");
+                        string renamed = Path.Combine(nested, "renamed.wav");
                         string added = Path.Combine(refreshFolder, "added.wav");
                         using (var writer = new WaveFileWriter(original, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                             writer.WriteSamples(new float[44100], 0, 44100);
                         await window.LoadFolderAsync(refreshFolder);
-                        Assert(list.Items.Count == 1 && refreshButton.IsEnabled, "Refresh fixture loads one track");
+                        Assert(list.Items.Count == 1 && refreshButton.IsEnabled, "Recursive folder load includes nested audio");
+                        var playlistStore = Field<PlaylistStore>(window, "playlistStore")!;
+                        Assert(playlistStore.Load()!.Files.SequenceEqual(new[] { original }),
+                            "Opening a directory persists the absolute nested path");
+                        Assert(((AudioTrack)list.Items[0]).DisplayName == "original" &&
+                            ((AudioTrack)list.Items[0]).RowToolTip.Contains(original) &&
+                            ((DataGridTextColumn)list.Columns[1]).Binding is System.Windows.Data.Binding { Path.Path: "DisplayName" },
+                            "Filename column omits extension while row tooltip retains path");
                         list.SelectedIndex = 0;
                         File.Move(original, renamed);
                         using (var writer = new WaveFileWriter(added, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
@@ -134,6 +144,32 @@ internal static class UiChecks
                             Path.GetFileName(((AudioTrack)list.Items[0]).FilePath) == "renamed.wav",
                             "Refresh drops deleted audio files");
 
+                        string trimmed = Path.Combine(nested, "renamed.new.wav");
+                        File.Copy(renamed, trimmed);
+                        window.AddTrimmedOutput(trimmed);
+                        window.AddTrimmedOutput(trimmed);
+                        Assert(list.Items.Count == 2 && playlistStore.Load()!.Files.Contains(trimmed),
+                            "Nested trim output inserts and persists exactly once");
+                        string undiscovered = Path.Combine(nested, "new-file.wav");
+                        File.Copy(renamed, undiscovered);
+                        File.Delete(trimmed);
+                        var reopened = new MainWindow(settingsStore, playlistStore)
+                            { ShowInTaskbar = false, ShowActivated = false, Left = -20000, Top = -20000 };
+                        reopened.Show();
+                        if (Field<Task>(reopened, "activeOperation") is Task restoreAction) await restoreAction;
+                        await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                        try
+                        {
+                            var restoredList = (DataGrid)reopened.FindName("TrackList");
+                            Assert(restoredList.Items.Count == 1 &&
+                                ((AudioTrack)restoredList.Items[0]).FilePath == renamed &&
+                                Field<string>(reopened, "currentFolder") == refreshFolder &&
+                                !Field<PlayerEngine>(reopened, "player")!.IsLoaded,
+                                "Startup restores saved existing files without rescanning or playing");
+                            Assert(playlistStore.Load()!.Files.SequenceEqual(new[] { renamed }),
+                                "Startup prunes deleted saved paths");
+                        }
+                        finally { reopened.Close(); }
                         Directory.Delete(refreshFolder, true);
                         refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                         if (Field<Task>(window, "activeOperation") is Task failedAction) await failedAction;
@@ -143,6 +179,8 @@ internal static class UiChecks
                             !Field<PlayerEngine>(window, "player")!.IsLoaded &&
                             !refreshButton.IsEnabled && !playButton.IsEnabled && !stopButton.IsEnabled,
                             "Missing refresh folder clears playlist, folder path and playback controls");
+                        Assert(playlistStore.Load() is { RootFolder: null, Files.Length: 0 },
+                            "Failed scan persists the empty state");
 
                         // A failed scan from the Open Folder path clears the old state too.
                         await window.LoadFolderAsync(audioFolder);

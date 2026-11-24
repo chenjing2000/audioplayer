@@ -4,7 +4,9 @@
 
 AudioPlayer 是基于 C# / WPF / .NET 10 的本地英语学习播放器。使用 NAudio 解码播放并按 PCM RMS/dBFS 能量检测静音，不使用语音识别、VAD 或云服务。音频中若有背景音乐或持续噪声，能量阈值未必等于实际语义停顿。
 
-程序只扫描所选文件夹本身的 WAV、MP3、M4A，按文件名自然排序，读取标题、专辑、时长（TagLibSharp）。刷新或打开文件夹时先停止旧播放并清除文件列表、选择状态与旧文件夹路径；扫描成功后加载新文件，扫描失败则保持空列表和空路径并提示错误。正在写入的本程序裁剪临时音频不纳入扫描。双击行或聚焦行 Enter 播放，Space 播放/暂停，Stop 停止并归零，进度条 Seek，Left / Right 跳转相邻静音中点。
+程序递归扫描所选文件夹及其子目录的 WAV、MP3、M4A，不跟随重解析点，不忽略目录扫描错误；按相对路径自然排序，读取标题、专辑、时长（TagLibSharp）。名称列显示不带扩展名的文件名；行提示保留完整路径、标签标题及读取错误。刷新或打开文件夹时先停止旧播放并清除文件列表、选择状态与旧文件夹路径；扫描成功后加载新文件，扫描失败则保持空列表和空路径并提示错误。正在写入的本程序裁剪临时音频不纳入扫描。双击行或聚焦行 Enter 播放，Space 播放/暂停，Stop 停止并归零，进度条 Seek，Left / Right 跳转相邻静音中点。
+
+播放列表 `<实际 EXE 名>.playlist.json` 与 EXE 同目录，仅保存 `rootFolder` 和绝对路径数组 `files`。启动时只读取并验证已保存路径，不自动播放或递归扫描；缺失文件移除并保存，根目录不存在则清空，损坏 JSON 保留并提示错误。正常打开、刷新及当前目录树内裁剪输出插入后原子保存；目录扫描失败保存空状态，保存失败保留内存列表并提示。空目录仍保留根路径。
 
 ## 模块职责
 
@@ -12,7 +14,8 @@ AudioPlayer 是基于 C# / WPF / .NET 10 的本地英语学习播放器。使用
 | --- | --- |
 | `MainWindow.xaml(.cs)` | WPF 交互、当前播放/选中项、分析与裁剪任务协调、关闭时等待任务 |
 | `PlaybackEngine` | NAudio 播放设备和读取器、Play/Pause/Stop/Seek、同步停止与释放 |
-| `AudioLibrary` / `AudioTrack` | 目录扫描、自然排序、标签与播放列表绑定 |
+| `AudioLibrary` / `AudioTrack` | 递归扫描、路径排序、标签与播放列表绑定 |
+| `PlaylistStore` | EXE 同目录播放列表 JSON 读取及安全保存 |
 | `SilenceDetector` / `SilenceRange` | 帧级 RMS/dBFS 静音检测及前后中点导航 |
 | `SilenceResultStore` | 按文件保存结果、源元数据与区间验证、失败安全写入 |
 | `SilenceTrimmer` / `FfmpegM4aTrimmer` | PCM 裁剪与 AAC/M4A FFmpeg stream copy，输出验证及安全提交 |

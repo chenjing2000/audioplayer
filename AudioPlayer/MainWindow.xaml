@@ -104,7 +104,7 @@
                 </Style>
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource NoFocusVisual}">
                     <EventSetter Event="PreviewKeyDown" Handler="TrackRow_PreviewKeyDown"/>
-                    <Setter Property="ToolTip" Value="{Binding LoadError}"/>
+                    <Setter Property="ToolTip" Value="{Binding RowToolTip}"/>
                     <Setter Property="Background" Value="White"/>
                     <Style.Triggers>
                         <Trigger Property="AlternationIndex" Value="1"><Setter Property="Background" Value="#F0F0F0"/></Trigger>
@@ -131,7 +131,7 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTextColumn Header="名称" Binding="{Binding Title}" Width="*" MinWidth="200"/>
+                <DataGridTextColumn Header="名称" Binding="{Binding DisplayName}" Width="*" MinWidth="200"/>
                 <DataGridTextColumn Header="时长" Binding="{Binding DurationText}" Width="100">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">

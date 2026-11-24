@@ -4,6 +4,7 @@
 dist/
 *.settings.json
 *.settings.json.bak
+*.playlist.json
 TestResults/
 
 # Local SDK / IDE state

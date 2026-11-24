@@ -1,14 +1,14 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-23 (PR #11 merged and post-merge checks verified)  
+**Updated:** Recursive persistent playlist feature (in development)  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Latest application-code baseline:** `c90afec` (PR #11, squash merged; subsequent documentation-only commits do not change application behavior). [Post-merge Windows CI #45190102017](https://github.com/chenjing2000/audioplayer/actions/runs/45190102017) passed. After PR #11, the user confirmed that their local `main` matched `origin/main`, the worktree was clean, and the former `feature/code-and-doc-cleanup` branch was deleted locally and remotely.
+**Latest merged application-code baseline:** `7c1def7` (PR #14, squash merged). [Post-merge Windows CI #45302461775](https://github.com/chenjing2000/audioplayer/actions/runs/45302461775) passed after user-confirmed Windows acceptance. Current feature branch: `feature/recursive-persistent-playlist`; not merged or manually accepted.
 
 ## Current application behavior
 
 - C# / WPF / .NET 10, NAudio 2.2.1, TagLibSharp 2.3.0. Project `AudioPlayer/AudioPlayer.csproj`, tests `tests/AudioPlayer.Tests/AudioPlayer.Tests.csproj`, portable executable `dist/AudioPlayer.exe`. `PlaybackEngine` owns audio output.
-- Nonrecursive WAV/MP3/M4A scan, natural filenames, playback/seek/stop, silence midpoint navigation and selection-based trim. Folder load/refresh closes playback and clears the old list and folder path before scanning; a failed scan leaves them empty and reports an error without retrying the missing directory. Current toolbar has 36×36 hit areas, 28×28 icons, 5-DIP right-side gaps and a 36-DIP slider with `TranslateTransform Y=10`.
+- Recursive WAV/MP3/M4A scan, natural relative-path order, filename without extension, full path/metadata/error row tooltip, playback/seek/stop, silence midpoint navigation and selection-based trim. Folder load/refresh closes playback and clears the old list and folder path before scanning; a failed scan leaves them empty and reports an error without retrying the missing directory. Current toolbar has 36×36 hit areas, 28×28 icons, 5-DIP right-side gaps and a 36-DIP slider with `TranslateTransform Y=10`.
 - Source silence data: `results/<full audio filename>.silent_segments.json`. No SHA or legacy-result migration; invalid caches are re-detected. WAV/MP3 trim uses PCM and 10-ms fade. AAC/M4A trim uses separately installed FFmpeg `-c:a copy` without re-encoding or fade; only M4A trim requires FFmpeg.
 - Output naming: `<stem>.new.<ext>`, then `<stem>.new (N).<ext>` with no overwrite. The source remains untouched and the output gets independently analyzed. The optional installation instructions are in `docs/FFmpeg-Setup.txt`. User settings reside beside the EXE, named after its actual stem; no automatic migration.
 - User-reported Windows acceptance after PR #10: settings save, M4A playback and trim, refresh, taskbar icon and the final 10-DIP progress position passed. Real long-silence MP3/WAV listening, FFmpeg incomplete-DLL/cancellation/source-mutation edge cases and exact BtbN package checksum remain unverified.
@@ -39,6 +39,6 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Publish.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\Test-PublishedApp.ps1
 ```
 
-## Pending change: failed folder scans clear the player
+## Current feature: recursive persistent playlist
 
-On `feature/clear-playlist-on-folder-scan-failure`, both Open Folder and Refresh clear the previous playlist, selection, playback and folder path before scanning. A failed scan leaves these empty and disables Refresh until a folder is opened again. A successful scan of an empty directory retains the folder path but shows no media. WPF regressions cover failed Refresh, a failed direct folder load and subsequent recovery. This branch is not yet merged or user-accepted.
+The approved design scans all supported audio recursively, skips reparse points and temporary trim audio, sorts by relative path, and stores root folder plus absolute paths in `<exe stem>.playlist.json`. Startup restores existing saved paths without rescanning or playing. Refresh rescans and saves; failed scans save empty state, valid empty folders retain the root. Nested trim output is inserted and persisted, and save failures retain the in-memory list. Core and WPF regression checks have been added; feature CI and Windows manual acceptance are pending. PR #14's failed-scan behavior is already merged and accepted.

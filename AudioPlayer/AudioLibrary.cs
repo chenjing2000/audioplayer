@@ -6,15 +6,38 @@ public static class AudioLibrary
 {
     public static List<AudioTrack> LoadFolder(string folderPath)
     {
-        string[] files = Directory.GetFiles(folderPath).Where(path =>
-            new[] { ".mp3", ".m4a", ".wav" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)
-            && !IsTrimTemporaryFile(path)).ToArray();
-        Array.Sort(files, (left, right) => CompareNames(Path.GetFileName(left), Path.GetFileName(right)));
-        var tracks = new List<AudioTrack>();
-        foreach (string path in files)
-            tracks.Add(ReadTrack(path));
-        return tracks;
+        string root = Path.GetFullPath(folderPath);
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = false,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        };
+        return LoadPaths(root, Directory.EnumerateFiles(root, "*", options));
     }
+
+    internal static List<AudioTrack> LoadPaths(string root, IEnumerable<string> paths)
+    {
+        var files = paths.Select(Path.GetFullPath)
+            .Where(path => IsWithinFolder(root, path) && IsSupportedFile(path) && !IsTrimTemporaryFile(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        Array.Sort(files, (left, right) => ComparePaths(root, left, right));
+        return files.Select(ReadTrack).ToList();
+    }
+
+    internal static bool IsSupportedFile(string path)
+        => Path.GetExtension(path).ToLowerInvariant() is ".wav" or ".mp3" or ".m4a";
+
+    internal static bool IsWithinFolder(string root, string path)
+    {
+        string relative = Path.GetRelativePath(root, path);
+        return !Path.IsPathRooted(relative) && relative != "." && relative != ".."
+            && !relative.StartsWith(".." + Path.DirectorySeparatorChar, StringComparison.Ordinal);
+    }
+
+    internal static int ComparePaths(string root, string left, string right)
+        => CompareNames(Path.GetRelativePath(root, left), Path.GetRelativePath(root, right));
 
     // Only hide our own in-progress trim output; keep other dot-prefixed audio visible.
     internal static bool IsTrimTemporaryFile(string path)
