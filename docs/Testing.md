@@ -336,3 +336,7 @@ The remaining layout check failed: the new exclusion controls overlap the explan
 The user subsequently requested a 480 × 420 DIP settings dialog. Update the height regression while retaining the single-help-line and rendered geometry assertions. Prior 480 × 390 acceptance is historical; the revised layout requires focused visual acceptance. No application logic changes.
 
 The user subsequently confirmed that the revised settings window at `9aab81f` is acceptable, with a screenshot showing the single explanatory sentence and the exclusion row separated from the buttons without visible overlap. The outstanding layout check is accepted. All 16 folder-exclusion checks and the earlier 16 seek-shortcut checks are now accepted across successive revisions (32 total), not a complete rerun on one revision. No new local automated test counts are claimed. Merge remains deferred.
+
+### PR #16 follow-up: playlist row appearance
+
+User-reported intermittent left-edge strips emerge during scrolling and can disappear after Refresh. The first correction removes the unused row-header area and row border, preserving virtualization and existing row styling. The synthetic 120-file UI regression checks header visibility, border thickness and alternating backgrounds after distant scroll jumps. This is structural coverage, not pixel-level proof that the reported artifact is resolved. CI and focused Windows visual acceptance pending.

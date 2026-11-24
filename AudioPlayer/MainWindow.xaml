@@ -68,7 +68,7 @@
             <DataGrid x:Name="TrackList" AutoGenerateColumns="False" IsReadOnly="True"
                   CanUserAddRows="False" CanUserDeleteRows="False" CanUserSortColumns="False"
                   CanUserReorderColumns="False" SelectionMode="Single" SelectionUnit="FullRow"
-                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                  HeadersVisibility="Column" RowHeaderWidth="0" GridLinesVisibility="Horizontal"
                   HorizontalGridLinesBrush="#EEF1F5" Background="White" BorderThickness="0"
                   RowHeight="25" ColumnHeaderHeight="32" AlternationCount="2"
                   MouseDoubleClick="TrackList_MouseDoubleClick" SelectionChanged="TrackList_SelectionChanged">
@@ -102,7 +102,12 @@
                     <Setter Property="Margin" Value="12,0"/>
                     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                 </Style>
+                <Style TargetType="DataGridRowHeader">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                </Style>
                 <Style TargetType="DataGridRow" BasedOn="{StaticResource NoFocusVisual}">
+                    <Setter Property="BorderThickness" Value="0"/>
                     <EventSetter Event="PreviewKeyDown" Handler="TrackRow_PreviewKeyDown"/>
                     <Setter Property="ToolTip">
                         <Setter.Value>

@@ -215,6 +215,37 @@ internal static class UiChecks
                     }
 
 
+                    // Exercise row realization and recycling without optional MP3 fixtures.
+                    string scrollFolder = Path.Combine(audioFolder, "ui-scroll-" + Guid.NewGuid().ToString("N"));
+                    Directory.CreateDirectory(scrollFolder);
+                    try
+                    {
+                        string sample = Path.Combine(scrollFolder, "001.wav");
+                        using (var writer = new WaveFileWriter(sample, WaveFormat.CreateIeeeFloatWaveFormat(8000, 1)))
+                            writer.WriteSamples(new float[800], 0, 800);
+                        for (int i = 2; i <= 120; i++)
+                            File.Copy(sample, Path.Combine(scrollFolder, $"{i:D3}.wav"));
+                        await window.LoadFolderAsync(scrollFolder);
+                        Assert(list.Items.Count == 120 && list.EnableRowVirtualization && list.RowHeaderWidth == 0,
+                            "Playlist keeps virtualization and eliminates row header width");
+                        Assert(list.HeadersVisibility == DataGridHeadersVisibility.Column,
+                            "Playlist displays column headers only");
+                        foreach (int index in new[] { 0, 30, 75, 119, 40, 1, 0 })
+                        {
+                            list.ScrollIntoView(list.Items[index]);
+                            list.UpdateLayout();
+                            await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
+                            var row = (DataGridRow)list.ItemContainerGenerator.ContainerFromIndex(index);
+                            var header = row is null ? null : FindVisual<System.Windows.Controls.Primitives.DataGridRowHeader>(row);
+                            Assert(row is not null && row.BorderThickness == new Thickness(0)
+                                && (header is null || !header.IsVisible || header.ActualWidth < 0.01)
+                                && ColorOf(row.Background) == (index % 2 == 0 ? "#FFFFFFFF" : "#FFF0F0F0"),
+                                $"Scrolled row {index} has no visible row header or border and retains alternating color");
+                        }
+                        await window.LoadFolderAsync(audioFolder);
+                    }
+                    finally { Directory.Delete(scrollFolder, true); }
+
                     // Selection must inspect only existing results and never analyze an unopened audio file.
                     string resultFolder = Path.Combine(audioFolder, "ui-results-" + Guid.NewGuid().ToString("N"));
                     Directory.CreateDirectory(resultFolder);
