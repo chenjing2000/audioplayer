@@ -61,32 +61,46 @@ internal static class UiChecks
                     var toasts = (ToastHost)window.FindName("ToastMessages");
                     var toastStack = FindVisual<StackPanel>(toasts)!;
                     Assert(toastStack.Children.Count == 0, "Toast overlay starts empty");
-                    toasts.Show("测试信息", ToastLevel.Info);
+                    // Give the queue-order test its own lifetime budget, independent of
+                    // the separate expiration assertions and slow hosted rendering.
+                    toasts.Show("测试信息", ToastLevel.Info, TimeSpan.FromSeconds(30));
                     Assert(toastStack.Children.Count == 1 &&
                         FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "普通：测试信息",
                         "Normal toasts use the information prefix");
-                    toasts.Show("测试警告", ToastLevel.Warning);
+                    toasts.Show("测试警告", ToastLevel.Warning, TimeSpan.FromSeconds(30));
                     toasts.Show("测试错误", ToastLevel.Error);
                     Assert(toastStack.Children.Count == 3 &&
                         FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "错误：测试错误",
                         "Newest visible toast is on top");
-                    toasts.Show("排队消息", ToastLevel.Info);
+                    toasts.Show("排队消息", ToastLevel.Info, TimeSpan.FromSeconds(30));
                     Assert(toastStack.Children.Count == 3, "Only three toast slots are shown");
                     FindVisual<Button>((Border)toastStack.Children[2])!
                         .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    await Task.Delay(350);
-                    Assert(toastStack.Children.Count == 3 &&
-                        FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "普通：排队消息",
-                        "Closing the oldest toast dequeues the next message");
-                    await Task.Delay(5500);
-                    Assert(toastStack.Children.OfType<Border>().Any(x =>
-                        FindVisual<TextBlock>(x)?.Text == "错误：测试错误"), "Error toast persists");
+                    bool QueueAdvanced() => toastStack.Children.Count == 3 &&
+                        FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "普通：排队消息";
+                    var queueDeadline = System.Diagnostics.Stopwatch.StartNew();
+                    while (!QueueAdvanced() && queueDeadline.Elapsed < TimeSpan.FromSeconds(10))
+                        await Task.Delay(50);
+                    Assert(QueueAdvanced(), "Closing the oldest toast dequeues the next message");
+
+                    // Expiration is a separate behavior; use the real default lifetime.
+                    toasts.Clear();
+                    toasts.Show("测试错误", ToastLevel.Error);
+                    toasts.Show("测试信息", ToastLevel.Info);
+                    var expirationDeadline = System.Diagnostics.Stopwatch.StartNew();
+                    while (toastStack.Children.Count > 1 && expirationDeadline.Elapsed < TimeSpan.FromSeconds(15))
+                        await Task.Delay(50);
+                    Assert(toastStack.Children.Count == 1 &&
+                        FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "错误：测试错误",
+                        "Normal toast expires while error toast persists");
                     toasts.Clear();
                     var active = toasts.ShowTask("持续检测");
                     await Task.Delay(5300);
                     Assert(toastStack.Children.Count == 1, "Task toast remains visible");
                     toasts.CompleteTask(active, "检测完成", ToastLevel.Info, TimeSpan.FromMilliseconds(150));
-                    await Task.Delay(350);
+                    var completionDeadline = System.Diagnostics.Stopwatch.StartNew();
+                    while (toastStack.Children.Count != 0 && completionDeadline.Elapsed < TimeSpan.FromSeconds(10))
+                        await Task.Delay(50);
                     Assert(toastStack.Children.Count == 0, "Completed task expires in the same slot");
                     var refreshButton = (Button)window.FindName("RefreshButton");
                     Assert(!refreshButton.IsEnabled, "Refresh is disabled until a folder is opened");
