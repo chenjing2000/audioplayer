@@ -138,6 +138,7 @@
             <Button x:Name="CancelButton" Grid.Column="2" Width="54" Height="32" Padding="4,2" Margin="0,0,10,0" Content="取消" IsCancel="True"/>
             <Button x:Name="OkButton" Grid.Column="3" Width="54" Height="32" Padding="4,2" Content="确定" Click="OkButton_Click"/>
         </Grid>
+      </Grid>
       <local:ToastHost x:Name="ToastMessages" MaxWidth="280" Margin="14,0,14,12"
                        VerticalAlignment="Bottom" HorizontalAlignment="Center" Panel.ZIndex="10"/>
     </Grid>
