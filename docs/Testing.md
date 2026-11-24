@@ -242,4 +242,13 @@ User-reported manual acceptance is distinct from hosted automated verification. 
 
 ### PR #15 follow-up: tooltip and readable playlist JSON
 
-After the initial ten manual checks passed, the user requested parent-directory-only tooltips (wrapped, maximum main-window width minus 48 DIP, 8 DIP rounded corners) and literal Chinese characters in UTF-8 playlist JSON. Existing escaped JSON remains readable. Core regression assertions cover the revised tooltip text and JSON round-trip. New visual acceptance and CI remain pending.
+After the initial ten manual checks passed, the user requested parent-directory-only tooltips (wrapped, maximum main-window width minus 48 DIP, 8 DIP rounded corners) and literal Chinese characters in UTF-8 playlist JSON. Existing escaped JSON remains readable. Core regression assertions cover the revised tooltip text and JSON round-trip. Both [PR CI #45328234578](https://github.com/chenjing2000/audioplayer/actions/runs/45328234578) and [push CI #45328228807](https://github.com/chenjing2000/audioplayer/actions/runs/45328228807) passed at `e42547c`. The user supplied a checked screenshot confirming all six follow-up Windows manual checks:
+
+1. Parent directory displayed without media filename.
+2. Long directory paths wrap across multiple lines.
+3. Tooltip has rounded corners.
+4. Maximum tooltip width adjusts after main-window resizing.
+5. Chinese characters are directly readable in playlist JSON.
+6. Previously saved Unicode-escaped playlists still load normally.
+
+Together with the initial ten checks, sixteen user-reported manual acceptance checks have passed. No new local automated test counts are claimed. Merge remains deferred at the user's request.
