@@ -433,7 +433,7 @@ On Windows, close running AudioPlayer, switch to the feature branch and pull fas
 | C03 | Top boundary stationary until active line reaches center |
 | C04 | Middle visual line centered; gaps hold prior line |
 | C05 | Bottom natural scroll limit, short document no extra padding |
-| C06 | Automatic line transition smooth, approximately 50 ms |
+| C06 | Automatic line transition smooth, approximately 180 ms |
 | C07 | Pause/resume, forward/backward seek, Stop and natural end |
 | C08 | Resize/font changes recalculate layout without audio seek |
 | D01 | Wheel both directions directly scrolls, no auto animation |
@@ -495,3 +495,7 @@ The follow-up code review changes add indexed active-interval painting (includin
 ### Owner minimize/restore regression (pending)
 
 At `f900adb`, [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45405767173) and [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45405781370) passed 58 Core, 226 UI, 5 publishing safeguards and 4 published EXE checks (293 total). Audio-dependent cases skipped on hosted runner. User reported 7/7 focused remediation checks passed: Settings cancellation during wheel preview, rapid wheel synchronization, backward coloring, Stop reset, long Cambridge IELTS responsiveness, rapid track switches, and smooth follow/coloring. A06 remains failed on visual minimization: residual reader shadow in upper-left desktop. Latest local automated log not supplied. Correction explicitly hides the owned reader on minimize and restores only if previously shown, preserving browser instance and dimensions; automated checks verify native visibility, same reader on restore, and hidden-reader preference. Repeat minimize/restore with visible reader while playing and paused, with hidden reader, and check taskbar/desktop for residual shadow; verify no unintended playback change. Visual artifact resolution is not established by native visibility checks alone. No merge authorized.
+
+### Smooth automatic line transition (pending)
+
+Automatic visual-line follow now uses a 180 ms half-cosine animation rather than 50 ms; the existing frame-driven interpolation, progressive coloring and 150 ms wheel-seek debounce remain unchanged. A browser assertion drives synthetic frame timestamps and checks intermediate displacement and the exact final target. The new assertion and Windows visual acceptance are pending. Recheck C06, C07, D01–D04, F02 and rapid line changes; previous manual passes do not establish acceptance of the new duration. No merge authorized.

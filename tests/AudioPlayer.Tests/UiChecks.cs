@@ -667,6 +667,39 @@ internal static class UiChecks
                                 "update({position:0,playing:false,reset:true},true); geometry.every(u=>u.segments.every(s=>s.painted===0))");
                             Assert(cleared == "true", "Reader reset clears painted intervals");
 
+                            // Drive the real animation callback with synthetic frame times, without
+                            // depending on the hosted runner's refresh rate or document height.
+                            string smoothFollow = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const raf = window.requestAnimationFrame;
+                                  const caf = window.cancelAnimationFrame;
+                                  const scroll = window.scrollTo;
+                                  let callback, offset = window.scrollY, from = offset;
+                                  let writes = 0;
+                                  try {
+                                    window.requestAnimationFrame = cb => { callback = cb; return 1; };
+                                    window.cancelAnimationFrame = () => { callback = null; };
+                                    window.scrollTo = (_, y) => { offset = y; writes++; };
+                                    const before = performance.now();
+                                    moveTo(from + 100, false);
+                                    const after = performance.now();
+                                    if (!callback || writes !== 0 || LINE_TRANSITION_MS !== 180) return false;
+                                    callback((before + after) / 2 + 90);
+                                    if (!callback || !animation || offset <= from + 35 || offset >= from + 65) return false;
+                                    callback(after + 180);
+                                    return !animation && lastTarget === null && Math.abs(offset - from - 100) < 0.001;
+                                  } finally {
+                                    cancelAnimation();
+                                    window.requestAnimationFrame = raf;
+                                    window.cancelAnimationFrame = caf;
+                                    window.scrollTo = scroll;
+                                  }
+                                })()
+                                """);
+                            Assert(smoothFollow == "true", "Reader automatic line transition interpolates over 180 ms");
+
+
                             // Keep the synthetic article isolated from MainWindow's playback timer
                             // until the rendering assertions finish. No real audio is loaded here.
                             typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
