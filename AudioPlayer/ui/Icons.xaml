@@ -153,4 +153,19 @@
             </DrawingGroup>
         </DrawingImage.Drawing>
     </DrawingImage>
+    <DrawingImage x:Key="ScriptIcon">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="Transparent" Geometry="M0,0 H1024 V1024 H0 Z"/>
+                <GeometryDrawing Brush="#26798A"><GeometryDrawing.Geometry><EllipseGeometry Center="512,512" RadiusX="480" RadiusY="480"/></GeometryDrawing.Geometry></GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Pen><Pen Brush="White" Thickness="42" StartLineCap="Round" EndLineCap="Round" LineJoin="Round"/></GeometryDrawing.Pen>
+                    <GeometryDrawing.Geometry><RectangleGeometry Rect="330,255,364,514" RadiusX="38" RadiusY="38"/></GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing Geometry="M410,389 H614 M410,512 H614 M410,635 H555">
+                    <GeometryDrawing.Pen><Pen Brush="White" Thickness="42" StartLineCap="Round" EndLineCap="Round"/></GeometryDrawing.Pen>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
 </ResourceDictionary>

@@ -54,6 +54,7 @@ public partial class MainWindow : Window
     private Exception? displayedPlaybackError;
     private bool modalDialogOpen;
     private bool completionQueued;
+    private ScriptWindow? scriptWindow;
 
     public MainWindow() : this(new SettingsStore(),
         new PlaylistStore(PlaylistStore.GetFilePath(SettingsStore.GetExecutablePath())))
@@ -93,6 +94,9 @@ public partial class MainWindow : Window
         UpdatePlaybackModeButton();
         PlaybackModeButton.IsEnabled = settingsFileReady;
         Loaded += RestorePlaylistOnLoad;
+        LocationChanged += (_, _) => PositionScriptWindow();
+        SizeChanged += (_, _) => PositionScriptWindow();
+        StateChanged += (_, _) => PositionScriptWindow();
     }
 
     private async void RestorePlaylistOnLoad(object sender, RoutedEventArgs e)
@@ -823,12 +827,46 @@ public partial class MainWindow : Window
         await RunActionAsync(() => player.SeekAsync(target));
     }
 
+    private void ScriptButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (closing || modalDialogOpen) return;
+        if (scriptWindow is null)
+        {
+            scriptWindow = new ScriptWindow { Owner = this, Height = Math.Max(300, ActualHeight) };
+            scriptWindow.IsVisibleChanged += (_, _) =>
+            {
+                string label = scriptWindow?.IsVisible == true ? "隐藏原文" : "显示原文";
+                ScriptButton.ToolTip = label;
+                AutomationProperties.SetName(ScriptButton, label);
+            };
+        }
+        if (scriptWindow.IsVisible) scriptWindow.Hide();
+        else
+        {
+            PositionScriptWindow();
+            scriptWindow.Show();
+        }
+    }
+
+    private void PositionScriptWindow()
+    {
+        if (scriptWindow is null || closing || WindowState == WindowState.Minimized) return;
+        // Keep the companion accessible if the primary work area has no space on the right.
+        Rect area = SystemParameters.WorkArea;
+        double width = scriptWindow.Width;
+        double height = scriptWindow.Height;
+        double right = WindowState == WindowState.Maximized ? area.Right : Left + ActualWidth;
+        scriptWindow.Left = Math.Clamp(right, area.Left, Math.Max(area.Left, area.Right - width));
+        scriptWindow.Top = Math.Clamp(Top, area.Top, Math.Max(area.Top, area.Bottom - height));
+    }
+
     private async void Window_Closing(object? sender, CancelEventArgs e)
     {
         if (allowClose) return;
         e.Cancel = true;
         if (closing) return;
         closing = true;
+        scriptWindow?.CloseForOwner();
         scanCancellation.Cancel();
         CancelAnalysis();
         CancelSelectionCheck();
