@@ -14,10 +14,10 @@ internal sealed class ScriptWindowHost : IDisposable
     private HwndSource? source;
     private bool disposed;
 
-    public ScriptWindowHost(Window owner, Func<ScriptWindow>? createReader = null)
+    public ScriptWindowHost(Window owner, Func<ScriptWindow> createReader)
     {
         this.owner = owner;
-        this.createReader = createReader ?? (() => new ScriptWindow());
+        this.createReader = createReader;
         owner.SourceInitialized += OwnerSourceInitialized;
         owner.LocationChanged += OwnerLocationChanged;
         owner.SizeChanged += OwnerSizeChanged;

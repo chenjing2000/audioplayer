@@ -10,20 +10,21 @@ AudioPlayer 是基于 C# / WPF / .NET 10 的本地英语学习播放器。使用
 
 ## 模块职责
 
-| 类或文件 | 职责 |
-| --- | --- |
-| `MainWindow.xaml(.cs)` | WPF 交互、当前播放/选中项、分析与裁剪任务协调、关闭时等待任务 |
-| `PlaybackEngine` | NAudio 播放设备和读取器、Play/Pause/Stop/Seek、同步停止与释放 |
-| `AudioLibrary` / `AudioTrack` | 递归扫描、路径排序、标签与播放列表绑定 |
-| `PlaylistStore` | EXE 同目录播放列表 JSON 读取及安全保存 |
-| `SilenceDetector` / `SilenceRange` | 帧级 RMS/dBFS 静音检测及前后中点导航 |
-| `SilenceResultStore` | 按文件保存结果、源元数据与区间验证、失败安全写入 |
-| `SilenceTrimmer` / `FfmpegM4aTrimmer` | PCM 裁剪与 AAC/M4A FFmpeg stream copy，输出验证及安全提交 |
-| `SilenceSettings` / `SettingsStore` / `SilenceSettingsWindow` | 参数校验、EXE 同目录配置保存与设置 UI |
-| `ScriptContent` / `ScriptWindow` / `web/script.html` | 原文发现、校验、WebView2 渲染、时间同步与视觉行导航 |
-| `ToastHost` | 主窗口和设置窗口中的 WPF 消息通知 |
+所有模块仍在同一个 C#/WPF 项目中，目录与命名空间一致；不增加程序集、MVVM 框架、DI 容器或消息总线。
 
-这些具体模块直接协作，当前不需要 MVVM 框架、依赖注入或通用任务队列。播放器停止确认、后台检测取消、版本标记和安全关闭的异步保护属于必要逻辑，不应为缩短代码而去掉。
+| 模块 | 主要类型 | 职责 |
+| --- | --- | --- |
+| UI | `MainWindow`、`SettingsWindow`、`ToastHost` | 界面展示、输入映射、对话框、通知、窗口组装 |
+| Application | `PlayerController` | 目录切换、播放模式与自然续播、选中项的裁剪资格、配置应用、任务关闭协调 |
+| Playback | `PlaybackSession`、`PlaybackEngine`、`PlaybackMode` | 当前音频、唯一应用命令入口、滚动预览事务、防抖、设备播放与释放 |
+| Library | `Playlist`、`AudioLibrary`、`AudioTrack`、`PlaylistStore` | 根目录、只读可观察列表、扫描、恢复、排序插入与安全持久化 |
+| Silence | `SilenceTasks`、`SilenceOptions`、`SilenceDetector`、`SilenceRange`、`SilenceResultStore`、`SilenceTrimmer`、`FfmpegM4aTrimmer` | 分析与选择检查的独立生命周期、取消、缓存校验、导航、裁剪与输出提交 |
+| Settings | `AppSettings`、`SettingsStore` | 全局配置、校验、旧值归一化与原子保存；为静音任务生成不可变参数快照 |
+| Script | `ScriptWindowHost`、`ScriptWindow`、`ScriptContent`、`ScriptAppearance`、`web/script.html` | 原文窗口生命周期、定位、解析与 WebView2 通信、视觉同步 |
+
+UI 组装 Controller 和 ScriptWindowHost；Controller 依赖 Playback、Library、Silence、Settings，不依赖窗口或阅读器。Playback 使用 Library 的音频条目，Settings 使用 PlaybackMode、SilenceOptions 和 ScriptAppearance；Script 由 UI 注入实际 EXE 同目录的 WebView2 缓存路径，不再反向引用 Settings。Silence、Library 不依赖全局配置或 UI。Controller 和 PlaybackSession 使用同一 WPF Dispatcher 保持状态与原有调度顺序，但不访问 WPF 控件。通过普通方法和 C# 事件协作，不另设通用任务队列。
+
+播放器设备停止确认、唯一应用命令入口、待提交定位事务、后台取消与过期结果保护、关闭时等待所有任务均为必要逻辑。实际选中项与正在播放的音频不同；UI 的行指示状态是显示结果，不是第二套播放状态机。仅在确有缓存时打开音频进行缓存指纹验证。
 
 ## 静音分析与导航
 
@@ -55,7 +56,7 @@ WAV/MP3 采用 PCM 流式跳过与最多 10 ms 的保留静音边缘淡化；AAC
 
 当前加载音频所在目录按文件名顺序查找首个顶层 JSON 对象 `filetype: "script"`，不按文件名匹配，不递归，不自动修正裁剪时间戳。用户保证对应关系。格式与 ReadArticles 一致：字符串 title（可空）、非空二维 paragraphs，每个句子包含 text 与 timed_units，每个时间单元为 [显示文本, 起始秒, 结束秒]，时间为两个 null 或有限非负且结束大于起始的数。原始句子文本优先，未对齐及无时间戳文字不着色。缺失或可识别但无效的原文显示提示，不中断音频；无法识别 filetype 的损坏 JSON 跳过。原文文件不写入。
 
-WebView2 内嵌页面以实际播放器时间更新 SVG 裁剪着色；窗口可见且播放时约 25 ms 更新，否则恢复约 100 ms；只测量有效时间单元的实际换行位置，构建按文档顺序严格递增的时间—位置锚点，播放中在相邻锚点之间连续线性插值，并通过 requestAnimationFrame 逐帧跟随；音频采样间短时外推最多 50 ms，位置限制在自然滚动边界内。无每行固定停顿，时间戳不足或到达自然边界时不再移动；暂停冻结显示，显著跳转直接定位。滚轮以原位移的 25% 直接滚动，右侧原生滚动条拖动/点击使用同一时间—位置曲线反向插值定位，支持行内时间；自然上下边界选择首/末有效锚点，无有效锚点或未移动不触发定位。无时间戳文字不着色，但两锚点之间可连续插值定位。连续滚动预览更新主进度条，暂时暂停正在播放的音频，150 ms 无新事件后提交一次 Seek，恢复原播放状态；双击原文不定位。自动滚动不触发 Seek。主窗口使用单个待提交定位事务保存目标时间与原播放意图，提交与其他音频命令共用既有串行执行入口。异步命令结束后发送携带实际位置和新 epoch 的唯一 playback 快照；原文手动预览不覆盖音频时钟，过期请求/快照不生效，仅与已提交目标匹配的预览保留位置。主窗口命令优先，隐藏或阅读器故障取消待提交定位并恢复原播放意图，关闭应用不恢复。具体竞争边界及实际效果待实机验收。
+WebView2 内嵌页面以实际播放器时间更新 SVG 裁剪着色；窗口可见且播放时约 25 ms 更新，否则恢复约 100 ms；只测量有效时间单元的实际换行位置，构建按文档顺序严格递增的时间—位置锚点，播放中在相邻锚点之间连续线性插值，并通过 requestAnimationFrame 逐帧跟随；音频采样间短时外推最多 50 ms，位置限制在自然滚动边界内。无每行固定停顿，时间戳不足或到达自然边界时不再移动；暂停冻结显示，显著跳转直接定位。滚轮以原位移的 25% 直接滚动，右侧原生滚动条拖动/点击使用同一时间—位置曲线反向插值定位，支持行内时间；自然上下边界选择首/末有效锚点，无有效锚点或未移动不触发定位。无时间戳文字不着色，但两锚点之间可连续插值定位。连续滚动预览更新主进度条，暂时暂停正在播放的音频，150 ms 无新事件后提交一次 Seek，恢复原播放状态；双击原文不定位。自动滚动不触发 Seek。PlaybackSession 使用单个待提交定位事务保存目标时间与原播放意图，提交与其他音频命令共用唯一串行执行入口。异步命令结束后发送携带实际位置和新 epoch 的唯一 playback 快照；原文手动预览不覆盖音频时钟，过期请求/快照不生效，仅与已提交目标匹配的预览保留位置。主窗口命令优先，隐藏或阅读器故障取消待提交定位并恢复原播放意图，关闭应用不恢复。具体竞争边界及实际效果待实机验收。
 
 字幕参数保存在现有配置，字号可选 17、18、19、20，默认字号 17、行高 1.6、首行缩进 2；仅本次移除的旧合法值在读取时内存归一化，确认保存后应用，不触发静音复扫。WebView2 不可用时只影响原文窗口。详见 [Configuration](Configuration.md) 和 [Testing](Testing.md)。
 

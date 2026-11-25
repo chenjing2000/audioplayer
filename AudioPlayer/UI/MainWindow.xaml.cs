@@ -21,8 +21,8 @@ namespace AudioPlayer.UI;
 public partial class MainWindow : Window
 {
     internal PlayerController Controller { get; }
-    internal Playlist Playlist => Controller.Playlist;
-    internal SilenceTasks Silence => Controller.Silence;
+    private Playlist Playlist => Controller.Playlist;
+    private SilenceTasks Silence => Controller.Silence;
     private PlaybackSession Session => Controller.Session;
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(NormalProgressUpdateMs) };
     private AudioTrack? indicatedTrack;
@@ -43,7 +43,8 @@ public partial class MainWindow : Window
         // Test settings paths keep their playlists isolated from the real executable.
         Controller = new PlayerController(Dispatcher, settingsStore, playlistStore ?? new PlaylistStore(
             settingsStore.FilePath[..^".settings.json".Length] + ".playlist.json"));
-        ScriptHost = new ScriptWindowHost(this, scriptWindowFactory);
+        ScriptHost = new ScriptWindowHost(this, scriptWindowFactory ?? (() =>
+            new ScriptWindow(Path.Combine(Path.GetDirectoryName(SettingsStore.GetExecutablePath())!, "cache", "webview2"))));
         InitializeComponent();
         Rect workArea = SystemParameters.WorkArea;
         double desiredWidth = Math.Round(workArea.Width * 0.5);
@@ -409,7 +410,7 @@ public partial class MainWindow : Window
         AutomationProperties.SetName(ScriptButton, label);
     }
 
-    internal void PreviewScriptSeek(double seconds)
+    private void PreviewScriptSeek(double seconds)
         => Controller.PreviewScriptSeek(seconds, ScriptHost.IsVisible);
 
     private async void Window_Closing(object? sender, CancelEventArgs e)

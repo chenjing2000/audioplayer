@@ -3,7 +3,6 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
-using AudioPlayer.Settings;
 
 namespace AudioPlayer.Script;
 
@@ -11,7 +10,7 @@ public partial class ScriptWindow : Window
 {
     private const string ReaderOrigin = "https://audioplayer.invalid";
     private const string ReaderDocument = ReaderOrigin + "/script.html";
-    private readonly string? testCacheDirectory;
+    private readonly string cacheDirectory;
     private bool ownerClosing;
     private bool readerFailed;
     private ScriptAppearance appearance = new();
@@ -28,11 +27,9 @@ public partial class ScriptWindow : Window
     private string message = "尚未加载原文";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public ScriptWindow() : this(null) { }
-
-    internal ScriptWindow(string? cacheDirectory)
+    internal ScriptWindow(string cacheDirectory)
     {
-        testCacheDirectory = cacheDirectory;
+        this.cacheDirectory = cacheDirectory;
         InitializeComponent();
         Loaded += InitializeReader;
     }
@@ -65,8 +62,7 @@ public partial class ScriptWindow : Window
         initialized = true;
         try
         {
-            string folder = testCacheDirectory ?? Path.Combine(Path.GetDirectoryName(SettingsStore.GetExecutablePath())!, "cache", "webview2");
-            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: folder);
+            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: cacheDirectory);
             if (ownerClosing) return;
             await Reader.EnsureCoreWebView2Async(environment);
             if (ownerClosing) return;

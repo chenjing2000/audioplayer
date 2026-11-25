@@ -53,7 +53,7 @@ internal static class UiChecks
                 {
                     var settingsStore = new SettingsStore(Path.Combine(audioFolder, "UiPlayer-" + Guid.NewGuid().ToString("N") + ".settings.json"));
                     ScriptWindow? nextReader = null;
-                    window = new MainWindow(settingsStore, scriptWindowFactory: () => nextReader ?? new ScriptWindow());
+                    window = new MainWindow(settingsStore, scriptWindowFactory: () => nextReader ?? throw new InvalidOperationException("Missing test reader fixture"));
                     Assert(File.Exists(settingsStore.FilePath), "First launch initializes settings file");
                     Rect workArea = SystemParameters.WorkArea;
                     double expectedLeft = Math.Round(workArea.Left + (workArea.Width - window.Width) / 2);
@@ -228,7 +228,7 @@ internal static class UiChecks
                             var restoredList = (DataGrid)reopened.FindName("TrackList");
                             Assert(restoredList.Items.Count == 1 &&
                                 ((AudioTrack)restoredList.Items[0]).FilePath == renamed &&
-                                reopened.Playlist.RootFolder == refreshFolder &&
+                                reopened.Controller.Playlist.RootFolder == refreshFolder &&
                                 !Field<PlayerEngine>(reopened.Controller.Session, "player")!.IsLoaded,
                                 "Startup restores saved existing files without rescanning or playing");
                             Assert(playlistStore.Load()!.Files.SequenceEqual(new[] { renamed }),
@@ -240,7 +240,7 @@ internal static class UiChecks
                         if (window.Controller.Session.ActiveOperation is Task failedAction) await failedAction;
                         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                         Assert(list.Items.Count == 0 && list.SelectedItem is null &&
-                            window.Playlist.RootFolder is null &&
+                            window.Controller.Playlist.RootFolder is null &&
                             !Field<PlayerEngine>(window.Controller.Session, "player")!.IsLoaded &&
                             !refreshButton.IsEnabled && !playButton.IsEnabled && !stopButton.IsEnabled,
                             "Missing refresh folder clears playlist, folder path and playback controls");
@@ -250,13 +250,13 @@ internal static class UiChecks
                         // A failed scan from the Open Folder path clears the old state too.
                         await window.Controller.LoadFolderAsync(audioFolder);
                         Assert(refreshButton.IsEnabled &&
-                            window.Playlist.RootFolder == Path.GetFullPath(audioFolder),
+                            window.Controller.Playlist.RootFolder == Path.GetFullPath(audioFolder),
                             "Valid folder can reopen after failed refresh");
                         bool failedScan = false;
                         try { await window.Controller.LoadFolderAsync(refreshFolder); }
                         catch (DirectoryNotFoundException) { failedScan = true; }
                         Assert(failedScan && list.Items.Count == 0 &&
-                            window.Playlist.RootFolder is null &&
+                            window.Controller.Playlist.RootFolder is null &&
                             !refreshButton.IsEnabled && !playButton.IsEnabled,
                             "Failed folder load clears previously loaded folder");
                         // A successfully scanned empty folder is not a scan failure.
@@ -266,7 +266,7 @@ internal static class UiChecks
                         {
                             await window.Controller.LoadFolderAsync(emptyFolder);
                             Assert(list.Items.Count == 0 &&
-                                window.Playlist.RootFolder == Path.GetFullPath(emptyFolder) &&
+                                window.Controller.Playlist.RootFolder == Path.GetFullPath(emptyFolder) &&
                                 refreshButton.IsEnabled,
                                 "Empty valid folder retains folder path and Refresh");
                         }
@@ -334,7 +334,7 @@ internal static class UiChecks
                             writer.WriteSamples(new float[44100 * 4], 0, 44100 * 4);
                         await window.Controller.LoadFolderAsync(resultFolder);
                         list.SelectedIndex = 0;
-                        if (window.Silence.SelectionTask is Task missingCheck) await missingCheck;
+                        if (window.Controller.Silence.SelectionTask is Task missingCheck) await missingCheck;
                         Assert(!trimButton.IsEnabled && !File.Exists(SilenceResultStore.GetPath(source)),
                             "Selecting uncached audio does not trigger detection or enable trimming");
 
@@ -347,21 +347,21 @@ internal static class UiChecks
                         File.WriteAllText(resultPath, resultNode.ToJsonString());
                         list.SelectedIndex = -1;
                         list.SelectedIndex = 0;
-                        if (window.Silence.SelectionTask is Task validCheck) await validCheck;
+                        if (window.Controller.Silence.SelectionTask is Task validCheck) await validCheck;
                         Assert(trimButton.IsEnabled,
                             "Cached silence enables scissors even with a one-sample EOF rounding difference");
 
                         File.SetLastWriteTimeUtc(source, File.GetLastWriteTimeUtc(source).AddSeconds(5));
                         list.SelectedIndex = -1;
                         list.SelectedIndex = 0;
-                        if (window.Silence.SelectionTask is Task outdatedCheck) await outdatedCheck;
+                        if (window.Controller.Silence.SelectionTask is Task outdatedCheck) await outdatedCheck;
                         Assert(!trimButton.IsEnabled, "Changed source invalidates selected trim availability");
                         for (int i = 0; i < 12; i++)
                         {
                             list.SelectedIndex = -1;
                             list.SelectedIndex = 0;
                         }
-                        await window.Silence.WaitForPendingAsync();
+                        await window.Controller.Silence.WaitForPendingAsync();
                         Assert(!trimButton.IsEnabled, "Rapid selection changes leave stale caches disabled");
                         await window.Controller.LoadFolderAsync(audioFolder);
                     }
@@ -659,7 +659,7 @@ internal static class UiChecks
                     { ShowInTaskbar = false, ShowActivated = false, Left = -20000, Top = -20000 };
                     closingWindow.Show();
                     var pendingSelection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                    Field<List<Task>>(closingWindow.Silence, "runningSelectionChecks")!.Add(pendingSelection.Task);
+                    Field<List<Task>>(closingWindow.Controller.Silence, "runningSelectionChecks")!.Add(pendingSelection.Task);
                     var closeCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     closingWindow.Closed += (_, _) => closeCompleted.TrySetResult();
                     closingWindow.Close();
@@ -771,8 +771,9 @@ internal static class UiChecks
                             var deadline = DateTime.UtcNow.AddSeconds(60);
                             while (!readerWindow.ReaderReady && readerWindow.ReaderFailure is null && DateTime.UtcNow < deadline)
                                 await Task.Delay(100);
-                            Assert(readerWindow.ReaderReady, "Embedded WebView2 reader completes ready handshake: " +
-                                (readerWindow.ReaderFailure ?? "no ready message within 60 seconds"));
+                            Assert(readerWindow.ReaderReady, readerWindow.ReaderReady
+                                ? "Embedded WebView2 reader completes ready handshake"
+                                : "Embedded WebView2 reader failed: " + (readerWindow.ReaderFailure ?? "no ready message within 60 seconds"));
                             var reader = (Microsoft.Web.WebView2.Wpf.WebView2)readerWindow.FindName("Reader");
                             string renderedScriptText = "";
                             deadline = DateTime.UtcNow.AddSeconds(25);
@@ -1145,7 +1146,7 @@ internal static class UiChecks
                     finally
                     {
                         await window.Controller.LoadFolderAsync(audioFolder);
-                        await window.Silence.WaitForPendingAsync();
+                        await window.Controller.Silence.WaitForPendingAsync();
                         Directory.Delete(modeFolder, true);
                     }
                     string recoveryPath = Path.Combine(audioFolder, "recovery.wav");
@@ -1153,7 +1154,7 @@ internal static class UiChecks
                         writer.WriteSamples(new float[44100], 0, 44100);
                     var recoveryTrack = new AudioTrack { FilePath = recoveryPath };
                     await window.Controller.PlayTrackAsync(recoveryTrack);
-                    if (window.Silence.AnalysisTask is Task recoveryAnalysis) await recoveryAnalysis;
+                    if (window.Controller.Silence.AnalysisTask is Task recoveryAnalysis) await recoveryAnalysis;
                     await Field<PlayerEngine>(window.Controller.Session, "player")!.StopAsync();
                     string brokenPath = Path.Combine(audioFolder, "broken.wav");
                     File.WriteAllText(brokenPath, "not an audio file");
@@ -1163,7 +1164,7 @@ internal static class UiChecks
                     Assert(failedOpen, "Broken replacement track is rejected");
                     await window.Controller.PlayTrackAsync(recoveryTrack);
                     Assert(Field<PlayerEngine>(window.Controller.Session, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
-                    if (window.Silence.AnalysisTask is Task recoveredAnalysis) await recoveredAnalysis;
+                    if (window.Controller.Silence.AnalysisTask is Task recoveredAnalysis) await recoveredAnalysis;
                     var scriptPlayer = Field<PlayerEngine>(window.Controller.Session, "player")!;
                     string seekPath = Path.Combine(audioFolder, "script-seek-test.wav");
                     using (var writer = new WaveFileWriter(seekPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
@@ -1229,7 +1230,7 @@ internal static class UiChecks
                     Assert(!scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime() == TimeSpan.Zero &&
                         !window.Controller.Session.PreviewTimerEnabled,
                         "Stop cancels pending wheel seek without restarting");
-                    if (window.Silence.AnalysisTask is Task seekAnalysis) await seekAnalysis;
+                    if (window.Controller.Silence.AnalysisTask is Task seekAnalysis) await seekAnalysis;
                     await scriptPlayer.CloseAsync();
                     File.Delete(seekPath);
                     if (Directory.GetFiles(audioFolder, "*.mp3").Length == 0)
@@ -1247,7 +1248,7 @@ internal static class UiChecks
                     Assert(ColorOf(row0.Background) == "#FFFFFFFF" && ColorOf(row1.Background) == "#FFF0F0F0", "Alternating white and light grey rows");
                     list.SelectedIndex = 0;
                     await window.HandleShortcutAsync(Key.Space);
-                    Task? analysis = window.Silence.AnalysisTask;
+                    Task? analysis = window.Controller.Silence.AnalysisTask;
                     if (analysis is not null) await analysis;
                     var player = Field<PlayerEngine>(window.Controller.Session, "player")!;
                     Assert(player.PlaybackState == PlaybackState.Playing, "Space opens selected track and plays");
@@ -1305,7 +1306,7 @@ internal static class UiChecks
                     Assert(rowEnter.Handled, "Focused table row consumes Enter");
                     Task? enterOperation = window.Controller.Session.ActiveOperation;
                     if (enterOperation is not null) await enterOperation;
-                    Task? enterAnalysis = window.Silence.AnalysisTask;
+                    Task? enterAnalysis = window.Controller.Silence.AnalysisTask;
                     if (enterAnalysis is not null) await enterAnalysis;
                     var row1Track = (AudioTrack)row1.Item;
                     Assert(ReferenceEquals(window.Controller.Session.LoadedTrack, row1Track) && player.PlaybackState == PlaybackState.Playing, "Enter on focused table row plays that row");
@@ -1395,7 +1396,7 @@ internal static class UiChecks
                     if (window.Controller.Session.ActiveOperation is Task restoredStartup) await restoredStartup;
                     await window.Controller.LoadFolderAsync(audioFolder);
                     await window.HandleShortcutAsync(Key.Space);
-                    Assert(window.Silence.IsAnalyzing, "Analysis in progress before close");
+                    Assert(window.Controller.Silence.IsAnalyzing, "Analysis in progress before close");
                     var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     window.Closed += (_, _) => closed.TrySetResult();
                     window.Close();
