@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #19 playback palette accepted; shared settings dimensions pending verification  
+**Updated:** 2026-11-25 — PR #19 playback palette accepted; settings text clipping correction pending verification  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `21f5f75` (PR #18, squash merged).  
@@ -23,6 +23,6 @@ R1–R7 passed local Windows automated verification and GitHub CI. At `e655cfa`,
 
 ## Next action
 
-The equal-halves subtitle layout and two color rows at `992dd59` passed branch and PR CI and 398 local automated checks; the user requested another size adjustment after inspecting the UI. The new shared settings dimensions are 26-DIP controls, 80-DIP numeric widths, 160-DIP font width and 43-DIP rows, with centered controls on both tabs. See Testing for the new verification scope. Complete fresh CI, local verification and focused manual acceptance before seeking explicit merge authorization. After merge, synchronize main, verify and clean up the feature branch. No release tag or assets authorized.
+The equal-halves subtitle layout and two color rows at `992dd59` passed branch and PR CI and 398 local automated checks; the user requested another size adjustment after inspecting the UI. At `2fff393`, the 26-DIP sizing revision passed both CI runs and 401 local automated checks, but the user screenshot revealed clipped audio input text. The follow-up uses 30-DIP controls, reduced internal padding without the duplicated content-host margin, 80-DIP numeric widths, 160-DIP font width and unchanged 43-DIP rows. New checks cover text viewport space. See Testing for the new verification scope. Complete fresh CI, local verification and focused manual acceptance before seeking explicit merge authorization. After merge, synchronize main, verify and clean up the feature branch. No release tag or assets authorized.
 
 For future changes, start from synchronized main, follow root AGENTS.md and WindowsAppPlaybook, and preserve existing functionality and user files. Use Full / Publish / Test-PublishedApp for new application revisions; no repeat local test is necessary for a documentation-only update.

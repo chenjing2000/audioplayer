@@ -509,13 +509,24 @@ internal static class UiChecks
                      var audioParameterBounds = audioParameterInputs.Select(Bounds).ToArray();
                      var audioParameterRows = audioParameterGrid.RowDefinitions.Take(5).Select(row => row.ActualHeight).ToArray();
                      Assert(audioParameterRows.All(height => Math.Abs(height - 43) <= 0.5) &&
-                         audioParameterBounds.All(bounds => Math.Abs(bounds.Height - 26) <= 0.5 &&
-                             Math.Abs(bounds.Width - 80) <= 0.5) && Math.Abs(excludedBox.ActualHeight - 26) <= 0.5,
-                         "Audio parameter rows are 43 DIP and input boxes are 26 DIP high");
+                         audioParameterBounds.All(bounds => Math.Abs(bounds.Height - 30) <= 0.5 &&
+                             Math.Abs(bounds.Width - 80) <= 0.5) && Math.Abs(excludedBox.ActualHeight - 30) <= 0.5,
+                         "Audio parameter rows are 43 DIP and input boxes are 30 DIP high");
                      Assert(audioParameterInputs.Select((box, index) =>
                          Math.Abs(audioParameterBounds[index].Top - Bounds(audioParameterGrid).Top -
-                             Grid.GetRow(box) * 43 - 8.5) <= 0.5).All(centered => centered),
+                             Grid.GetRow(box) * 43 - 6.5) <= 0.5).All(centered => centered),
                          "Audio inputs are vertically centered in their parameter rows");
+                     foreach (var input in audioParameterInputs.Append(excludedBox))
+                     {
+                         var host = (ScrollViewer)input.Template.FindName("PART_ContentHost", input);
+                         var line = new TextBlock { Text = input.Text.Length == 0 ? "audio" : input.Text,
+                             FontFamily = input.FontFamily, FontSize = input.FontSize, FontWeight = input.FontWeight };
+                         line.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                         Assert(input.Padding == new Thickness(6, 1, 6, 1) && host.Margin == new Thickness(0) &&
+                             host.ViewportHeight >= line.DesiredSize.Height - 0.5 &&
+                             host.ExtentHeight <= host.ViewportHeight + 0.5,
+                             input.Name + " has enough internal viewport height for a full text line");
+                     }
                      Rect helpBounds = Bounds(help);
                      Rect exclusionBounds = Bounds(excludedBox);
                      Rect labelBounds = Bounds(exclusionLabel);
@@ -534,7 +545,7 @@ internal static class UiChecks
                          selectors[1].Items.Cast<int>().SequenceEqual(new[] { 17, 18, 19, 20 }) &&
                          selectors.All(box => box.SelectedItem is not null && box.FontWeight == FontWeights.Normal && box.Margin == new Thickness(0) &&
                              box.HorizontalContentAlignment == HorizontalAlignment.Center &&
-                             Math.Abs(box.ActualHeight - 26) <= 0.5 && Bounds(box).Bottom <= buttonsBounds.Top),
+                             Math.Abs(box.ActualHeight - 30) <= 0.5 && Bounds(box).Bottom <= buttonsBounds.Top),
                          "Script combo choices are reduced, aligned, and fit above dialog buttons");
                      var subtitleGrid = (Grid)selectors[0].Parent;
                      var columns = subtitleGrid.ColumnDefinitions;
@@ -565,6 +576,12 @@ internal static class UiChecks
                          box.ApplyTemplate();
                          var toggle = FindVisual<System.Windows.Controls.Primitives.ToggleButton>(box)!;
                          toggle.ApplyTemplate();
+                         var presenter = (ContentPresenter)box.Template.FindName("SelectedValue", box);
+                         var line = new TextBlock { Text = box.SelectedItem!.ToString(), FontFamily = box.FontFamily,
+                             FontSize = box.FontSize, FontWeight = box.FontWeight };
+                         line.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                         Assert(presenter.ActualHeight >= line.DesiredSize.Height - 0.5 &&
+                             Bounds(presenter).Top >= Bounds(box).Top && Bounds(presenter).Bottom <= Bounds(box).Bottom + 0.5, "Subtitle selector has space for a full text line");
                          Assert(((Border)toggle.Template.FindName("Outline", toggle)).CornerRadius.TopLeft == 6,
                              "Script combo box shares rounded input styling");
                      }

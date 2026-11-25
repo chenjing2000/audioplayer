@@ -12,8 +12,9 @@
         FontSize="12">
     <Window.Resources>
         <Style x:Key="RoundedInput" TargetType="TextBox">
+            <Setter Property="Padding" Value="6,1"/>
             <Setter Property="FontWeight" Value="Normal"/>
-            <Setter Property="Height" Value="26"/>
+            <Setter Property="Height" Value="30"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -23,7 +24,7 @@
                         <Border BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Background="{TemplateBinding Background}" CornerRadius="6">
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="False"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -69,8 +70,7 @@
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="Height" Value="26"/>
+            <Setter Property="Height" Value="30"/>
             <Setter Property="Width" Value="80"/>
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -99,10 +99,10 @@
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                             </ToggleButton>
-                            <ContentPresenter IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}"
+                            <ContentPresenter x:Name="SelectedValue" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                               ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                              Margin="6,4,24,4" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              Margin="6,1,24,1" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="Center"/>
                             <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
                                    AllowsTransparency="True" Focusable="False">
@@ -208,34 +208,34 @@
         </Grid.ColumnDefinitions>
 
         <TextBlock Grid.Row="0" Text="分析帧长度（ms）" VerticalAlignment="Center" Margin="0,0,4,0"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="FrameMillisecondsTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="0" Grid.Column="1" Padding="6,4"
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="FrameMillisecondsTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="0" Grid.Column="1"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"/>
 
         <TextBlock Grid.Row="1" Text="最短停顿时长（ms）" VerticalAlignment="Center" Margin="0,0,4,0"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="MinimumSilenceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="1" Grid.Column="1" Padding="6,4"
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="MinimumSilenceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="1" Grid.Column="1"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"
                  LostKeyboardFocus="SilenceInput_LostKeyboardFocus"/>
 
         <TextBlock Grid.Row="2" Text="静音阈值（dBFS）" VerticalAlignment="Center" Margin="0,0,4,0"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="SilenceThresholdTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="2" Grid.Column="1" Padding="6,4"
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="SilenceThresholdTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="2" Grid.Column="1"
                  PreviewTextInput="SignedIntegerTextBox_PreviewTextInput" DataObject.Pasting="SignedIntegerTextBox_Pasting"/>
 
         <TextBlock Grid.Row="3" Text="前后跳转容差（ms）" VerticalAlignment="Center" Margin="0,0,4,0"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="NavigationToleranceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="3" Grid.Column="1" Padding="6,4"
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="NavigationToleranceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="3" Grid.Column="1"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"/>
 
         <TextBlock Grid.Row="4" Text="允许静音时长 (s)" VerticalAlignment="Center" Margin="0,0,4,0"/>
         <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="AllowedSilenceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center"
-                 AllowDrop="False" Grid.Row="4" Grid.Column="1" Padding="6,4"
+                 AllowDrop="False" Grid.Row="4" Grid.Column="1"
                  PreviewTextInput="AllowedSilenceTextBox_PreviewTextInput" DataObject.Pasting="AllowedSilenceTextBox_Pasting"
                  LostKeyboardFocus="SilenceInput_LostKeyboardFocus"/>
 
         <TextBlock Grid.Row="0" Grid.Column="3" Text="后退步长 (s)" VerticalAlignment="Center" Margin="0,0,4,0"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="BackwardStepTextBox" Width="80" MaxLength="2" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="0" Grid.Column="4" Padding="6,4"
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="BackwardStepTextBox" Width="80" MaxLength="2" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="0" Grid.Column="4"
                  PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting"/>
 
         <TextBlock Grid.Row="1" Grid.Column="3" Text="前进步长 (s)" VerticalAlignment="Center" Margin="0,0,4,0"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="ForwardStepTextBox" Width="80" MaxLength="2" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="1" Grid.Column="4" Padding="6,4"
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="ForwardStepTextBox" Width="80" MaxLength="2" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="1" Grid.Column="4"
                  PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting"/>
 
         <TextBlock x:Name="HelpText" Grid.Row="5" Grid.ColumnSpan="5" Foreground="#6B7280" TextWrapping="Wrap"
@@ -243,7 +243,7 @@
 
         <TextBlock Grid.Row="6" x:Name="ExcludedFolderNamesLabel" Text="需排除的文件夹" VerticalAlignment="Center" Margin="0,0,4,0"/>
         <TextBox x:Name="ExcludedFolderNamesTextBox" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="4"
-                 Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" Padding="6,4"
+                 Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged"
                  TextAlignment="Left" VerticalContentAlignment="Center" AllowDrop="False"
                  ToolTip="多个文件夹名称用逗号或分号分隔，不区分大小写。"/>
 
