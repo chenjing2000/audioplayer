@@ -617,20 +617,22 @@ Branch: `refactor/modular-architecture`, based on `main@bca0333`. No merge or re
 | R4 — SilenceTasks | `e7ab8c5` | 66 | 307 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45523315002) |
 | R5 — ScriptWindowHost | `d34a3e7` | 66 | 311 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45523913114) |
 | R6 — session/controller | `3978cab` | 66 | 313 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45524695021) |
+| R7 — final cleanup | `e655cfa` | 66 | 313 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45525173631) |
 
 Each listed local run had zero failures and published a fresh EXE. R1 fixed a missing Settings import. R4 initially failed a rename race: the cache verifier opened audio even when no result existed. The missing-cache fast path and exclusive-file regression passed without weakening cache validation. R6 initially failed its command-gate test; the test was isolated from asynchronous startup restoration and now explicitly verifies that the held command entered the gate. The fixed test passed without business-code changes.
 
-The current test runners remain `Program.cs` (core and entry point) and `UiChecks.cs` (WPF integration), organized by test purpose; existing assertions are retained. Direct module access replaces obsolete MainWindow reflection where practical. No additional runner or test framework is required. R7 retains the same 388 expected executed checks when optional media is not supplied; actual R7 counts and results remain pending.
+The current test runners remain `Program.cs` (core and entry point) and `UiChecks.cs` (WPF integration), organized by test purpose; existing assertions are retained. Direct module access replaces obsolete MainWindow reflection where practical. No additional runner or test framework is required. R7 passed all 388 executed checks locally and completed GitHub CI successfully at `e655cfa`.
 
-### Final refactor acceptance (pending)
+### Final refactor acceptance (passed, 2026-11-25)
 
-Run Full, Publish and Test-PublishedApp on the exact R7 revision and check its CI. Verify using a real Windows installation:
+Application revision: `e655cfa`. Full, Publish and Test-PublishedApp passed on Windows. The user explicitly confirmed the following 21 manual checks:
 
-- Open/refresh/restart: correct natural order, restored list without autoplay, missing files and root, no loss of settings or playlist.
-- Play/pause/stop, focus-independent Space and arrow shortcuts, timed and silence seeks, main slider and all four playback modes, including manual commands overriding natural continuation.
-- Select a different track from the playing one; verify cache reuse, selection-only eligibility, safe numbered trim output, source unchanged, and listening quality (real AAC/M4A with FFmpeg where available).
-- Reader open/hide/reopen, word highlighting and smooth following, wheel and scrollbar previews, rapid seek, pause/resume and manual-command precedence, owner minimize/restore and close.
-- Save/cancel/restart settings, verify appearance and analysis options, close during analysis or selection check; no stale task updates or retained audio handles.
-- If available: mixed-DPI monitors, real device errors, actual MP3 metadata/playback and real long-pause WAV/MP3. Record untested cases as such, not passed.
+| Area | Confirmed checks | Result |
+| --- | --- | --- |
+| Library | Open directory, recursive scan and natural sort; refresh after adding/deleting audio; restart restores list without autoplay | 3/3 |
+| Playback | Play/pause/stop and slider; focus-independent Space/Left/Right; Ctrl+Left/Right timed seeks; four modes; manual stop/seek does not trigger auto-advance | 5/5 |
+| Silence | First-play analysis and subsequent cache reuse; trim eligibility for a different selected track; safe trim without source changes or overwrite; listening confirms complete speech without obvious pops | 4/4 |
+| Script | Show/hide/reopen; progressive coloring and smooth scrolling; wheel/scrollbar seek; restore prior playback state; main-window command priority; owner minimize/restore/close | 6/6 |
+| Settings and shutdown | Save/cancel audio and subtitle settings; restart restores configuration; shutdown without apparent hang, residual window or file lock | 3/3 |
 
-The earlier 43 manual PR #17 checks are historical evidence only. The nonfatal temporary WebView2 cache cleanup warning persists; no claim that temporary cache was deleted. Optional private MP3 checks were skipped in the R6 log; no new real-device listening or multi-monitor acceptance has been supplied for the refactor.
+Totals: **388 automated checks + 21 manual checks = 409 passed**, zero reported failures within the executed scope. The media format used for the manual trim was not specified; do not claim format-specific coverage. Real MP3-specific automated tests were skipped; mixed DPI and actual playback device failure remain unverified. Real long-pause WAV/MP3 format-specific acceptance remains deferred. The nonfatal temporary WebView2 test-cache cleanup warning persists. Earlier PR #17's 43 manual checks are historical evidence only. No merge or release authorization has been given.
