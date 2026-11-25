@@ -1,11 +1,11 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #19 settings cleanup pending verification  
+**Updated:** 2026-11-25 — PR #19 settings cleanup accepted; awaiting merge authorization  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main:** `15e796e` (application baseline `21f5f75`, PR #18).  
 **Feature branch:** `feature/playback-colors` ([PR #19](https://github.com/chenjing2000/audioplayer/pull/19)).  
-**Last verified application:** `c01bad9` before the settings cleanup.
+**Last verified application:** `d831725` (final settings cleanup).
 
 ## Current implementation
 
@@ -17,10 +17,10 @@ PR #19 replaces the playback palette and normalizes retired values on load witho
 
 - PR #18: 388 automated checks and 21 manual checks passed; post-merge local verification passed. The obsolete refactor branch was removed.
 - PR #19: `c01bad9` passed 424 automated checks (66 Core, 349 UI, 5 publishing safeguards and 4 published EXE), portable publish, branch and PR CI. Earlier palette and layout checks passed and the user accepted the final dropdown appearance. Separate keyboard-dropdown acceptance was not explicitly reported.
-- Current cleanup requires fresh CI, local Full / Publish / Test-PublishedApp and focused settings acceptance. See [Testing](Testing.md) for detailed historical evidence, [Configuration](Configuration.md) for exact settings values, and remaining real MP3, mixed DPI, device failure and nonfatal WebView2 cleanup boundaries.
+- Final cleanup `d831725`: both CI runs and all 424 executed local automated checks passed, portable publish succeeded, and the user confirmed all seven focused manual checks, including keyboard dropdown navigation. See [Testing](Testing.md) for detailed historical evidence, [Configuration](Configuration.md) for exact settings values, and remaining real MP3, mixed DPI, device failure and nonfatal WebView2 cleanup boundaries.
 
 ## Next action
 
-Verify the cleanup and await explicit authorization to merge PR #19. After merge, synchronize main, verify and clean up the feature branch. No release tag or assets authorized.
+Await explicit authorization to merge PR #19 after final documentation-head CI succeeds. After merge, synchronize main, verify and clean up the feature branch. No release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.
