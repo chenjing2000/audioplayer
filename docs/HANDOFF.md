@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — native script scroll implemented; verification pending  
+**Updated:** 2026-11-25 — native script scroll accepted; pre-merge review and final CI pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `d8458d6` (PR #20 squash merge).  
@@ -28,8 +28,10 @@ On `feature/native-script-scroll` from main `275e9bf`, remove the dedicated Java
 
 - PR #20 post-merge: final feature head `6bb4683` passed both CI runs and was squash-merged with user authorization into `d8458d6`. Remote and local Git trees match the accepted feature tree exactly. Main CI passed on its first attempt. Local Full passed 66 Core, 351 UI and 5 publishing safeguards; after an occupied EXE blocked the first publish, retry and subsequent four published EXE checks succeeded (**426 executed checks passed, zero failed**). Prior manual acceptance applies to identical application code. See Testing for exact evidence and limitations.
 
+- PR #21 application `7762204`: both branch and PR CI passed on their first attempt. User's synchronized clean Windows checkout passed Full / Publish / Test-PublishedApp (66 Core, 351 UI, 5 publishing safeguards, 4 published EXE; 426 executed checks, zero failures). Publish succeeded on first attempt. All ten focused native-scroll manual checks accepted, including wheel speed, automatic follow competition and paused seek. See Testing for evidence and limits.
+
 ## Next action
 
-Verify feature and PR CI, local Full / Publish / Test-PublishedApp, and focused native-wheel/scrollbar checks while playing and paused, including automatic follow competition and boundary behavior. Obtain explicit authorization before merging. No release tag or assets authorized.
+Complete pre-merge review, confirm final documentation-only head CI, and obtain explicit authorization before squash-merging PR #21. No repeat local application run is necessary for documentation-only changes. No release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.
