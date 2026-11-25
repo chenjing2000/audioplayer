@@ -584,6 +584,17 @@ internal static class UiChecks
                              Bounds(presenter).Top >= Bounds(box).Top && Bounds(presenter).Bottom <= Bounds(box).Bottom + 0.5, "Subtitle selector has space for a full text line");
                          Assert(((Border)toggle.Template.FindName("Outline", toggle)).CornerRadius.TopLeft == 6,
                              "Script combo box shares rounded input styling");
+                         var option = new ComboBoxItem { Style = box.ItemContainerStyle, Content = box.SelectedItem };
+                         option.ApplyTemplate();
+                         var surface = (Border)option.Template.FindName("OptionSurface", option);
+                         Assert(surface.CornerRadius.TopLeft == 4 && surface.BorderThickness == new Thickness(0) &&
+                             ColorOf(surface.Background) == "#00FFFFFF" && option.FocusVisualStyle is null &&
+                             option.Template.Triggers.OfType<Trigger>().Any(trigger =>
+                                 trigger.Property == ComboBoxItem.IsHighlightedProperty),
+                             "Dropdown item uses borderless rounded highlight styling");
+                         option.IsSelected = true;
+                         Assert(ColorOf(surface.Background) == "#FFD9EBEF" && ColorOf(option.Foreground) == "#FF26798A",
+                             "Dropdown selected item uses the settings theme");
                      }
                      var colorLists = new[] { "TextColorBox", "PlaybackColorBox", "BackgroundColorBox" }
                          .Select(name => (ListBox)settingsWindow.FindName(name)).ToArray();

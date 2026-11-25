@@ -64,7 +64,33 @@
             <Setter Property="FontWeight" Value="Normal"/>
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
-                    <Style TargetType="ComboBoxItem"><Setter Property="FontWeight" Value="Normal"/></Style>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="FontWeight" Value="Normal"/>
+                        <Setter Property="Padding" Value="6,2"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="OptionSurface" Background="Transparent" CornerRadius="4"
+                                            Margin="1" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsHighlighted" Value="True">
+                                            <Setter TargetName="OptionSurface" Property="Background" Value="#E8EDF2"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="OptionSurface" Property="Background" Value="#D9EBEF"/>
+                                            <Setter Property="Foreground" Value="#26798A"/>
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.5"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
                 </Setter.Value>
             </Setter>
             <Setter Property="Background" Value="White"/>
