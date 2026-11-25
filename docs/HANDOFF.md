@@ -1,11 +1,11 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #18 merged; post-merge Windows verification and CI passed  
+**Updated:** 2026-11-25 — PR #18 merged; post-merge verification and branch cleanup complete  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `21f5f75` (PR #18, squash merged).  
 **Accepted feature head:** `867638d` (application revision `e655cfa`); identical Git tree to `21f5f75`.  
-**Local verification:** user log confirms main, origin/main and origin/HEAD matched at `21f5f75`. Subsequent handoff changes are documentation-only. The merged refactor branch was still present remotely at the last check; branch cleanup remains a Git housekeeping step.
+**Local verification:** full post-merge tests passed at `21f5f75`; the user subsequently synchronized main to documentation revision `593abd6` with a clean working tree. Local and remote `refactor/modular-architecture` branches were deleted; remote branch listing independently confirms only main remains. Subsequent handoff changes are documentation-only.
 
 ## Current implementation
 
@@ -19,6 +19,6 @@ R1–R7 passed local Windows automated verification and GitHub CI. At `e655cfa`,
 
 ## Next action
 
-The modular refactor is complete. Synchronize main to the latest documentation revision and remove the merged refactor branch locally and remotely after confirming it has no unique changes (the accepted head is `867638d`; its tree matches the squash merge `21f5f75`). Local branch deletion after squash requires an explicit force-delete of the verified branch only. No release tag or assets authorized.
+The modular refactor and branch cleanup are complete. Synchronize main to the latest documentation revision before the next development task. No release tag or assets authorized.
 
 For future changes, start from synchronized main, follow root AGENTS.md and WindowsAppPlaybook, and preserve existing functionality and user files. No application changes are required for this milestone. Use Full / Publish / Test-PublishedApp for new application revisions; no repeat local test is necessary for a documentation-only update.
