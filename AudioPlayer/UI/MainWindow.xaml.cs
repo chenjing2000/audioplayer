@@ -41,7 +41,7 @@ public partial class MainWindow : Window
     private Exception? displayedPlaybackError;
     private bool modalDialogOpen;
     private bool completionQueued;
-    private ScriptWindow? scriptWindow;
+    internal ScriptWindowHost ScriptHost { get; }
     private const int ScriptSeekDebounceMs = 150;
     private const int ReaderPlaybackUpdateMs = 25;
     private const int NormalProgressUpdateMs = 100;
@@ -57,12 +57,14 @@ public partial class MainWindow : Window
     {
     }
 
-    internal MainWindow(SettingsStore settingsStore, PlaylistStore? playlistStore = null)
+    internal MainWindow(SettingsStore settingsStore, PlaylistStore? playlistStore = null,
+        Func<ScriptWindow>? scriptWindowFactory = null)
     {
         this.settingsStore = settingsStore;
         // Test settings paths keep their playlists isolated from the real executable.
         Playlist = new Playlist(playlistStore ?? new PlaylistStore(
             settingsStore.FilePath[..^".settings.json".Length] + ".playlist.json"));
+        ScriptHost = new ScriptWindowHost(this, scriptWindowFactory);
         InitializeComponent();
         Rect workArea = SystemParameters.WorkArea;
         double desiredWidth = Math.Round(workArea.Width * 0.5);
@@ -99,25 +101,10 @@ public partial class MainWindow : Window
         UpdatePlaybackModeButton();
         PlaybackModeButton.IsEnabled = settingsFileReady;
         Loaded += RestorePlaylistOnLoad;
-        LocationChanged += (_, _) => PositionScriptWindow();
-        SizeChanged += (_, _) => PositionScriptWindow();
-        StateChanged += (_, _) => UpdateScriptWindowState();
-    }
-
-    protected override void OnSourceInitialized(EventArgs e)
-    {
-        base.OnSourceInitialized(e);
-        var source = System.Windows.Interop.HwndSource.FromHwnd(new System.Windows.Interop.WindowInteropHelper(this).Handle);
-        source?.AddHook(MainWindowMessage);
-    }
-
-    private IntPtr MainWindowMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
-    {
-        // Native caption/system-menu minimize: close the reader synchronously
-        // before Windows processes SC_MINIMIZE. Leave the default action intact.
-        if (message == 0x0112 && (wParam.ToInt64() & 0xfff0) == 0xf020)
-            CloseScriptForMinimize();
-        return IntPtr.Zero;
+        ScriptHost.VisibilityChanged += UpdateScriptButton;
+        ScriptHost.NavigationPreview += PreviewScriptSeek;
+        ScriptHost.NavigationCanceled += async () => await RestoreCanceledScriptSeekAsync();
+        ScriptHost.Shortcut += async (key, modifiers) => await HandleShortcutAsync(key, modifiers);
     }
 
     private async void RestorePlaylistOnLoad(object sender, RoutedEventArgs e)
@@ -460,7 +447,7 @@ public partial class MainWindow : Window
             || appSettings.MinimumSilenceMilliseconds != dialog.Settings.MinimumSilenceMilliseconds
             || appSettings.SilenceThresholdDb != dialog.Settings.SilenceThresholdDb;
         appSettings = dialog.Settings;
-        scriptWindow?.SetAppearance(appSettings.ScriptAppearance);
+        ScriptHost.SetAppearance(appSettings.ScriptAppearance);
         UpdatePlaybackModeButton();
         if (detectionChanged && loadedTrack is not null)
         {
@@ -629,10 +616,10 @@ public partial class MainWindow : Window
     private void RefreshProgress()
     {
         if (closing || scriptSeek is not null) return;
-        bool scriptVisible = scriptWindow?.IsVisible == true && WindowState != WindowState.Minimized;
+        bool scriptVisible = ScriptHost.IsVisible && WindowState != WindowState.Minimized;
         var interval = TimeSpan.FromMilliseconds(scriptVisible && player.IsPlaying ? ReaderPlaybackUpdateMs : NormalProgressUpdateMs);
         if (timer.Interval != interval) timer.Interval = interval;
-        if (!player.IsLoaded || loadedTrack is null) scriptWindow?.SetAudio(null);
+        if (!player.IsLoaded || loadedTrack is null) ScriptHost.SetAudio(null);
         // The reader receives no intermediate engine states during an async
         // command or main-slider gesture. Reconcile once the command finishes.
         if (operationBusy || dragging) return;
@@ -645,12 +632,12 @@ public partial class MainWindow : Window
 
     private void SynchronizeScript(bool reconcile = false, double? committedTarget = null)
     {
-        if (scriptWindow is null) return;
-        scriptWindow.SetAudio(player.IsLoaded ? loadedTrack?.FilePath : null);
+        if (!ScriptHost.HasWindow) return;
+        ScriptHost.SetAudio(player.IsLoaded ? loadedTrack?.FilePath : null);
         double position = player.GetCurrentTime().TotalSeconds;
         bool reset = !player.IsLoaded || (!player.IsPlaying && !player.IsPaused &&
             (position <= 0 || position >= player.GetDuration().TotalSeconds));
-        scriptWindow.UpdatePlayback(position, player.IsPlaying, reset, reconcile, committedTarget);
+        ScriptHost.UpdatePlayback(position, player.IsPlaying, reset, reconcile, committedTarget);
     }
 
     private void PlaylistBorder_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -699,77 +686,18 @@ public partial class MainWindow : Window
     private void ScriptButton_Click(object sender, RoutedEventArgs e)
     {
         if (closing || modalDialogOpen || operationBusy || WindowState == WindowState.Minimized) return;
-        if (scriptWindow is { IsVisible: false, ReaderFailure: not null })
-            CloseScriptWindow();
-        if (scriptWindow is null)
+        if (ScriptHost.Toggle(appSettings.ScriptAppearance))
         {
-            var reader = new ScriptWindow { Owner = this, Height = Math.Max(300, ActualHeight) };
-            scriptWindow = reader;
-            reader.SetAppearance(appSettings.ScriptAppearance);
-            reader.NavigationPreview += seconds =>
-            {
-                if (ReferenceEquals(scriptWindow, reader)) PreviewScriptSeek(seconds);
-            };
-            reader.NavigationCanceled += async () =>
-            {
-                if (ReferenceEquals(scriptWindow, reader)) await RestoreCanceledScriptSeekAsync();
-            };
-            reader.Shortcut += async (key, modifiers) =>
-            {
-                if (ReferenceEquals(scriptWindow, reader)) await HandleShortcutAsync(key, modifiers);
-            };
-            reader.IsVisibleChanged += async (_, _) =>
-            {
-                if (!ReferenceEquals(scriptWindow, reader)) return;
-                UpdateScriptButton();
-                if (!reader.IsVisible) await RestoreCanceledScriptSeekAsync();
-            };
+            SynchronizeScript(reconcile: true);
+            RefreshProgress();
         }
-        if (scriptWindow.IsVisible) scriptWindow.Hide();
-        else
-        {
-            ShowScriptWindow();
-        }
-    }
-
-    private void ShowScriptWindow()
-    {
-        if (scriptWindow is null || closing) return;
-        PositionScriptWindow();
-        scriptWindow.Show();
-        SynchronizeScript(reconcile: true);
-        RefreshProgress();
-    }
-
-    private void UpdateScriptWindowState()
-    {
-        if (closing) return;
-        // Fallback for programmatic WindowState changes or shell paths that
-        // bypass the native system command.
-        if (WindowState == WindowState.Minimized) CloseScriptForMinimize();
-        else PositionScriptWindow();
     }
 
     private void UpdateScriptButton()
     {
-        string label = scriptWindow?.IsVisible == true ? "隐藏原文" : "显示原文";
+        string label = ScriptHost.IsVisible ? "隐藏原文" : "显示原文";
         ScriptButton.ToolTip = label;
         AutomationProperties.SetName(ScriptButton, label);
-    }
-
-    private void CloseScriptWindow()
-    {
-        var reader = scriptWindow;
-        scriptWindow = null;
-        reader?.CloseForOwner();
-        UpdateScriptButton();
-    }
-
-    private void CloseScriptForMinimize()
-    {
-        if (closing || scriptWindow is null) return;
-        CloseScriptWindow();
-        _ = RestoreCanceledScriptSeekAsync();
     }
 
     internal void PreviewScriptSeek(double seconds)
@@ -778,7 +706,7 @@ public partial class MainWindow : Window
         // completion will reconcile the reader; do not send competing replies.
         if (closing || operationBusy || dragging || navigating) return;
         if (modalDialogOpen || !player.IsLoaded || player.LastError is not null ||
-            player.NaturalCompletion is not null || scriptWindow?.IsVisible != true)
+            player.NaturalCompletion is not null || !ScriptHost.IsVisible)
         {
             _ = RestoreCanceledScriptSeekAsync();
             return;
@@ -859,39 +787,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PositionScriptWindow()
-    {
-        if (scriptWindow is null || closing || WindowState == WindowState.Minimized) return;
-        Rect area = SystemParameters.WorkArea;
-        var source = PresentationSource.FromVisual(this);
-        if (source?.CompositionTarget is { } target)
-        {
-            IntPtr handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            var info = new MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<MonitorInfo>() };
-            if (GetMonitorInfo(MonitorFromWindow(handle, 2), ref info))
-            {
-                var scale = target.TransformFromDevice;
-                area = new Rect(scale.Transform(new Point(info.Work.Left, info.Work.Top)),
-                    scale.Transform(new Point(info.Work.Right, info.Work.Bottom)));
-            }
-        }
-        double width = scriptWindow.Width;
-        double height = scriptWindow.Height;
-        double right = WindowState == WindowState.Maximized ? area.Right : Left + ActualWidth;
-        scriptWindow.Left = Math.Clamp(right, area.Left, Math.Max(area.Left, area.Right - width));
-        scriptWindow.Top = Math.Clamp(Top, area.Top, Math.Max(area.Top, area.Bottom - height));
-    }
-
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    private struct NativeRect { public int Left, Top, Right, Bottom; }
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    private struct MonitorInfo { public int Size; public NativeRect Monitor, Work; public uint Flags; }
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern IntPtr MonitorFromWindow(IntPtr handle, uint flags);
-    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
-    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
-    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
-
     private async void Window_Closing(object? sender, CancelEventArgs e)
     {
         if (allowClose) return;
@@ -899,7 +794,7 @@ public partial class MainWindow : Window
         if (closing) return;
         closing = true;
         TakeScriptSeek();
-        CloseScriptWindow();
+        ScriptHost.Dispose();
         Playlist.CancelPending();
         Silence.CancelPending();
         timer.Stop();

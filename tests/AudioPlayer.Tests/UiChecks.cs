@@ -52,7 +52,8 @@ internal static class UiChecks
                 try
                 {
                     var settingsStore = new SettingsStore(Path.Combine(audioFolder, "UiPlayer-" + Guid.NewGuid().ToString("N") + ".settings.json"));
-                    window = new MainWindow(settingsStore);
+                    ScriptWindow? nextReader = null;
+                    window = new MainWindow(settingsStore, scriptWindowFactory: () => nextReader ?? new ScriptWindow());
                     Assert(File.Exists(settingsStore.FilePath), "First launch initializes settings file");
                     Rect workArea = SystemParameters.WorkArea;
                     double expectedLeft = Math.Round(workArea.Left + (workArea.Width - window.Width) / 2);
@@ -909,8 +910,26 @@ internal static class UiChecks
 
                             // Keep the synthetic article isolated from MainWindow's playback timer
                             // until the rendering assertions finish. No real audio is loaded here.
-                            typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
-                                .SetValue(window, readerWindow);
+                            readerWindow.Hide();
+                            nextReader = readerWindow;
+                            var readerButton = (Button)window.FindName("ScriptButton");
+                            readerButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                            Assert(window.ScriptHost.HasWindow && window.ScriptHost.IsVisible &&
+                                readerWindow.IsVisible && readerButton.ToolTip?.ToString() == "隐藏原文",
+                                "Script host opens the reader and updates the button");
+                            readerButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                            Assert(window.ScriptHost.HasWindow && !window.ScriptHost.IsVisible &&
+                                !readerWindow.IsVisible && readerButton.ToolTip?.ToString() == "显示原文",
+                                "Script host hides the reader without destroying it");
+                            readerButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                            Assert(window.ScriptHost.IsVisible && readerWindow.IsVisible,
+                                "Script host reuses the existing reader when shown again");
+                            // Closing the companion itself also hides it and preserves the instance.
+                            readerWindow.Close();
+                            Assert(window.ScriptHost.HasWindow && !window.ScriptHost.IsVisible &&
+                                readerButton.ToolTip?.ToString() == "显示原文",
+                                "Companion close hides it and updates the owner");
+                            readerButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                             var readerHandle = new System.Windows.Interop.WindowInteropHelper(readerWindow).Handle;
                             int readerStyle = GetWindowLong(readerHandle, -16);
                             Assert((readerStyle & 0x00030000) == 0 && (readerStyle & 0x00040000) != 0,
@@ -920,22 +939,23 @@ internal static class UiChecks
                             SendMessage(new System.Windows.Interop.WindowInteropHelper(window).Handle, 0x0112, new IntPtr(0xf020), IntPtr.Zero);
                             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                             Assert(closedBeforeMinimize && window.WindowState == WindowState.Minimized && !IsWindow(readerHandle) &&
-                                Field<ScriptWindow>(window, "scriptWindow") is null,
+                                !window.ScriptHost.HasWindow,
                                 "Native minimize command closes reader before minimizing owner");
                             window.WindowState = WindowState.Normal;
                             await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                            Assert(Field<ScriptWindow>(window, "scriptWindow") is null && !IsWindow(readerHandle),
+                            Assert(!window.ScriptHost.HasWindow && !IsWindow(readerHandle),
                                 "Restoring owner does not reopen closed reader");
                             var hiddenReader = new ScriptWindow(Path.Combine(readerFolder, "cache"));
                             try
                             {
-                                typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
-                                    .SetValue(window, hiddenReader);
+                                nextReader = hiddenReader;
+                                readerButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                                readerButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                                 bool hiddenClosed = false;
                                 hiddenReader.Closed += (_, _) => hiddenClosed = true;
                                 window.WindowState = WindowState.Minimized;
                                 await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                                Assert(hiddenClosed && Field<ScriptWindow>(window, "scriptWindow") is null,
+                                Assert(hiddenClosed && !window.ScriptHost.HasWindow,
                                     "Programmatic minimize closes even a hidden reader");
                                 window.WindowState = WindowState.Normal;
                             }
@@ -943,8 +963,11 @@ internal static class UiChecks
                         }
                         finally
                         {
-                            typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
-                                .SetValue(window, null);
+                            nextReader = null;
+                            // On an assertion failure, dispose through the owner host before
+                            // releasing the standalone fixture.
+                            if (window.ScriptHost.HasWindow)
+                                window.WindowState = WindowState.Minimized;
                             window.WindowState = WindowState.Normal;
                             readerWindow.CloseForOwner();
                             for (int attempt = 0; attempt < 20; attempt++)
