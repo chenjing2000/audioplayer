@@ -4,7 +4,7 @@
 
 | 文档 | 用途 |
 | --- | --- |
-| [HANDOFF](HANDOFF.md) | 最新已确认的 `main` 基线、未完成验证与下一轮开发 |
+| [HANDOFF](HANDOFF.md) | 最新已确认的 main / 开发分支基线、未完成验证与下一轮开发 |
 | [Program overview](program-overview.md) | 当前功能、模块和运行逻辑 |
 | [Project contract](project-contract.md) | 技术、数据安全与项目约束 |
 | [Getting Started](Getting-Started.md) | 最简运行说明 |

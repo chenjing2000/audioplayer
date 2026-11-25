@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace AudioPlayer;
+namespace AudioPlayer.Script;
 
 // Script is a companion view, not another playable article or a Passage SID source.
 public sealed record ScriptArticle(string Title, IReadOnlyList<ScriptParagraph> Paragraphs);

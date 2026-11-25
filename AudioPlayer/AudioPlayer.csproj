@@ -6,10 +6,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Version>0.1.7</Version>
-    <ApplicationIcon>ui/main.ico</ApplicationIcon>
+    <ApplicationIcon>UI/main.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <Resource Include="ui/main.ico" />
+    <Resource Include="UI/main.ico" />
     <Content Include="../docs/FFmpeg-Setup.txt" Link="FFmpeg-Setup.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <None Remove="web/script.html" />

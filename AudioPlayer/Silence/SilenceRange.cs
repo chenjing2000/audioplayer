@@ -1,4 +1,4 @@
-namespace AudioPlayer;
+namespace AudioPlayer.Silence;
 
 public sealed class SilenceRange
 {

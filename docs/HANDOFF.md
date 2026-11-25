@@ -1,39 +1,22 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #17 merged, post-merge Windows verification passed  
+**Updated:** 2026-11-25 — R1–R7 verified; final manual acceptance passed  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Merged application baseline:** `5b5c428` (PR #17; accepted feature head `d3920b6`, application revision `a0f5540`).  
-**Verified development baseline:** `8a165d1` on main (application unchanged from `5b5c428`); latest user log confirms local and remote synchronization at that revision. Only main remains; the feature branch was deleted locally and remotely.
+**Main baseline:** `bca0333` (application from PR #17, squash merge `5b5c428`).  
+**Development branch:** `refactor/modular-architecture` (not merged).  
+**Last verified development revision:** `e655cfa` (R7 application code). Subsequent acceptance-record commits change documentation only.
 
 ## Current implementation
 
-AudioPlayer is a C#/WPF/.NET 10 Windows audio player with an optional WebView2 Script companion window. The reader discovers ReadArticles-format Script JSON in the loaded audio directory, displays read-only text, progressively colors timed words and follows a continuous time-position trajectory. Manual wheel (25% displacement) and scrollbar navigation share inverse interpolation and a 150 ms debounce; the host audio engine is authoritative. The reader cannot minimize/maximize independently; minimizing the owner closes it first. Restore does not reopen it automatically.
+AudioPlayer remains a C#/WPF/.NET 10 portable Windows audio player. The seven modules are UI, Application, Playback, Library, Silence, Settings and Script. See [program overview](program-overview.md) for ownership and dependency direction and [project contract](project-contract.md) for unchanged behavior and data safety.
 
-Settings use a fixed 480 × 430 DIP dialog with 音频设置 and 字幕参数 tabs, rounded normal-weight inputs, five swatches per color group and no sample preview. Font sizes 17/18/19/20 DIP, default 17; line height default 1.6, paragraph spacing 16, indent 2 em. Retired valid settings normalize in memory on load; explicit saves retain the existing atomic workflow. See [Configuration](Configuration.md), [program overview](program-overview.md), [project contract](project-contract.md) and [Publishing](Publishing.md).
+R1 organized directories and namespaces; R2 extracted Playlist; R3 separated AppSettings and immutable SilenceOptions; R4 extracted SilenceTasks and avoided opening audio without a cache; R5 extracted ScriptWindowHost; R6 extracted PlaybackSession and PlayerController. R7 removes the reverse Script-to-Settings dependency by supplying the cache path at composition, narrows old test-facing UI aliases and clarifies a test success message. No version, package dependency, UI layout, media algorithm, or persisted JSON format change is intended.
 
 ## Verification
 
-PR #17 was squash-merged at `5b5c428` with explicit user authorization. Accepted feature head `d3920b6` passed [Feature validation #251](https://github.com/chenjing2000/audioplayer/actions/runs/45517740732). The 22 reader, 14 settings and 7 final typography manual checks passed across successive revisions (43 total).
-
-The user-provided Windows PowerShell 5.1 log confirms that local main fast-forwarded to `8a165d1` (HEAD, origin/main and origin/HEAD matched), and that both local and remote `feature/script-companion-window` were deleted. The remote branch listing was independently verified: only main remains. At `8a165d1`, the complete local post-merge sequence passed: `Test.ps1 -Suite Full` (59 Core, 307 UI and 5 publishing safeguards, zero failures), `Publish.ps1` (successful win-x64 .NET 10 portable EXE at dist/AudioPlayer.exe), and `Test-PublishedApp.ps1` (4/4, zero failures). Total: 375 executed checks passed in this single verification sequence. Both earlier failing checks (WebView2 ready handshake and renamed EXE playlist restoration) passed. The WebView2 success message misleadingly includes the timeout fallback text; the assertion passed and subsequent reader tests passed. Optional real MP3 playback, MP3 metadata and MP3-dependent UI checks were skipped; temporary test WebView2 cache remained in use during cleanup (nonfatal). No post-merge workflow run was returned for either `5b5c428` or `8a165d1` at the latest check; pre-merge CI #45517740732 remains verified successful. No new release tag or assets were requested.
-
-Detailed historical evidence and remaining unverified edge cases (including mixed DPI and actual device failure) are preserved in [Testing](Testing.md).
+R1–R7 passed local Windows automated verification and GitHub CI. At `e655cfa`, the user supplied a complete local sequence: 66 Core, 313 UI, 5 publishing safeguards and 4 published EXE checks = **388 passed, zero failed**; portable publish succeeded. [R7 CI](https://github.com/chenjing2000/audioplayer/actions/runs/45525173631) passed. The user explicitly confirmed all **21 final manual checks** on the published refactor EXE: playlist, playback, silence processing (including listening), Script companion, settings and shutdown. Optional real MP3 playback/metadata/UI cases were skipped in the automated run; mixed DPI and actual device failure remain unverified. Temporary WebView2 test cache remained in use during cleanup. Earlier PR #17's 43 manual checks remain historical evidence. See [Testing](Testing.md) for the detailed results.
 
 ## Next action
 
-This development milestone is complete. Keep the accepted application unchanged unless a new requirement or reproducible defect warrants changes. Synchronize main before starting another feature; the following commands are the standard local verification procedure, not an outstanding acceptance requirement.
-
-```powershell
-cd C:\Projects\AudioPlayer
-git status --short
-git fetch origin --prune
-git switch main
-git pull --ff-only origin main
-git log -1 --oneline
-.\tools\Test.ps1 -Suite Full
-.\tools\Publish.ps1
-.\tools\Test-PublishedApp.ps1
-```
-
-Follow root AGENTS.md and WindowsAppPlaybook. Preserve user files, discuss new features before implementation, use English commit messages and avoid unnecessary complexity. Future feature merges require explicit authorization. No release tag authorized.
+The refactor is ready for a single pull request into `main`. The application revision `e655cfa` is accepted; the acceptance record changes docs only. Verify the PR checks and merge only after explicit user authorization. After merge, synchronize the Windows checkout to main, rerun Full / Publish / Test-PublishedApp, and clean up the refactor branch. No release tag or assets authorized. Follow root AGENTS.md and WindowsAppPlaybook; preserve user files and avoid unnecessary complexity.

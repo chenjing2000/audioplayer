@@ -4,7 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 
-namespace AudioPlayer;
+namespace AudioPlayer.Silence;
 
 internal sealed class FfmpegUnavailableException : IOException
 {

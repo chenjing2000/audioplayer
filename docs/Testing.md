@@ -604,3 +604,35 @@ Post-merge CI is separate; its result was not yet available when this documentat
 ### PR #17 post-merge Windows verification and branch cleanup (2026-11-25)
 
 The user-provided Windows PowerShell 5.1 log confirms that local main fast-forwarded to `8a165d1` (HEAD, origin/main and origin/HEAD matched), and that both local and remote `feature/script-companion-window` were deleted. The remote branch listing was independently verified: only main remains. At `8a165d1`, the complete local post-merge sequence passed: `Test.ps1 -Suite Full` (59 Core, 307 UI and 5 publishing safeguards, zero failures), `Publish.ps1` (successful win-x64 .NET 10 portable EXE at dist/AudioPlayer.exe), and `Test-PublishedApp.ps1` (4/4, zero failures). Total: 375 executed checks passed in this single verification sequence. Both earlier failing checks (WebView2 ready handshake and renamed EXE playlist restoration) passed. The WebView2 success message misleadingly includes the timeout fallback text; the assertion passed and subsequent reader tests passed. Optional real MP3 playback, MP3 metadata and MP3-dependent UI checks were skipped; temporary test WebView2 cache remained in use during cleanup (nonfatal). No post-merge workflow run was returned for either `5b5c428` or `8a165d1` at the latest check; pre-merge CI #45517740732 remains verified successful. No new release tag or assets were requested.
+
+## 2026-11-25: modular architecture refactor
+
+Branch: `refactor/modular-architecture`, based on `main@bca0333`. No merge or release authorized. The user provided full Windows test/publish logs at each accepted stage; remote CI was independently checked.
+
+| Stage | Accepted commit | Core | UI | Publish safeguards | Published EXE | CI |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| R1 — source organization | `9a6c45e` | 59 | 307 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45520972876) |
+| R2 — Playlist | `96bc4a4` | 62 | 307 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45521718204) |
+| R3 — settings/options | `88ef87d` | 63 | 307 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45522142184) |
+| R4 — SilenceTasks | `e7ab8c5` | 66 | 307 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45523315002) |
+| R5 — ScriptWindowHost | `d34a3e7` | 66 | 311 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45523913114) |
+| R6 — session/controller | `3978cab` | 66 | 313 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45524695021) |
+| R7 — final cleanup | `e655cfa` | 66 | 313 | 5 | 4 | [pass](https://github.com/chenjing2000/audioplayer/actions/runs/45525173631) |
+
+Each listed local run had zero failures and published a fresh EXE. R1 fixed a missing Settings import. R4 initially failed a rename race: the cache verifier opened audio even when no result existed. The missing-cache fast path and exclusive-file regression passed without weakening cache validation. R6 initially failed its command-gate test; the test was isolated from asynchronous startup restoration and now explicitly verifies that the held command entered the gate. The fixed test passed without business-code changes.
+
+The current test runners remain `Program.cs` (core and entry point) and `UiChecks.cs` (WPF integration), organized by test purpose; existing assertions are retained. Direct module access replaces obsolete MainWindow reflection where practical. No additional runner or test framework is required. R7 passed all 388 executed checks locally and completed GitHub CI successfully at `e655cfa`.
+
+### Final refactor acceptance (passed, 2026-11-25)
+
+Application revision: `e655cfa`. Full, Publish and Test-PublishedApp passed on Windows. The user explicitly confirmed the following 21 manual checks:
+
+| Area | Confirmed checks | Result |
+| --- | --- | --- |
+| Library | Open directory, recursive scan and natural sort; refresh after adding/deleting audio; restart restores list without autoplay | 3/3 |
+| Playback | Play/pause/stop and slider; focus-independent Space/Left/Right; Ctrl+Left/Right timed seeks; four modes; manual stop/seek does not trigger auto-advance | 5/5 |
+| Silence | First-play analysis and subsequent cache reuse; trim eligibility for a different selected track; safe trim without source changes or overwrite; listening confirms complete speech without obvious pops | 4/4 |
+| Script | Show/hide/reopen; progressive coloring and smooth scrolling; wheel/scrollbar seek; restore prior playback state; main-window command priority; owner minimize/restore/close | 6/6 |
+| Settings and shutdown | Save/cancel audio and subtitle settings; restart restores configuration; shutdown without apparent hang, residual window or file lock | 3/3 |
+
+Totals: **388 automated checks + 21 manual checks = 409 passed**, zero reported failures within the executed scope. The media format used for the manual trim was not specified; do not claim format-specific coverage. Real MP3-specific automated tests were skipped; mixed DPI and actual playback device failure remain unverified. Real long-pause WAV/MP3 format-specific acceptance remains deferred. The nonfatal temporary WebView2 test-cache cleanup warning persists. Earlier PR #17's 43 manual checks are historical evidence only. No merge or release authorization has been given.

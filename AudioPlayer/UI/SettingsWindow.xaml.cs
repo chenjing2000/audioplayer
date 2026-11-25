@@ -5,15 +5,19 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace AudioPlayer;
+using AudioPlayer.Playback;
+using AudioPlayer.Script;
+using AudioPlayer.Settings;
 
-public partial class SilenceSettingsWindow : Window
+namespace AudioPlayer.UI;
+
+public partial class SettingsWindow : Window
 {
     private TextBox? invalidField;
     private PlaybackMode playbackMode;
-    public SilenceSettings Settings { get; private set; }
+    public AppSettings Settings { get; private set; }
 
-    public SilenceSettingsWindow(SilenceSettings settings)
+    public SettingsWindow(AppSettings settings)
     {
         InitializeComponent();
         Settings = settings;
@@ -31,7 +35,7 @@ public partial class SilenceSettingsWindow : Window
 
     private void RestoreDefaultsButton_Click(object sender, RoutedEventArgs e)
     {
-        var defaults = new SilenceSettings();
+        var defaults = new AppSettings();
         LoadValues(defaults);
         ClearValueError();
         ToastMessages.Clear();
@@ -39,12 +43,12 @@ public partial class SilenceSettingsWindow : Window
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!TryReadValues(out SilenceSettings settings)) return;
+        if (!TryReadValues(out AppSettings settings)) return;
         Settings = settings;
         DialogResult = true;
     }
 
-    private void LoadValues(SilenceSettings settings)
+    private void LoadValues(AppSettings settings)
     {
         var appearance = settings.ScriptAppearance;
         FontBox.SelectedItem = appearance.Font;
@@ -66,9 +70,9 @@ public partial class SilenceSettingsWindow : Window
         AllowedSilenceTextBox.Text = settings.AllowedSilenceSeconds.ToString("0.0", CultureInfo.InvariantCulture);
     }
 
-    private bool TryReadValues(out SilenceSettings settings)
+    private bool TryReadValues(out AppSettings settings)
     {
-        settings = new SilenceSettings { PlaybackMode = playbackMode, ScriptAppearance = ReadAppearance() };
+        settings = new AppSettings { PlaybackMode = playbackMode, ScriptAppearance = ReadAppearance() };
 
         if (!int.TryParse(FrameMillisecondsTextBox.Text.Trim(), out int frameMilliseconds))
             return ShowValueError("分析帧长度必须是整数。", FrameMillisecondsTextBox);
@@ -106,13 +110,13 @@ public partial class SilenceSettingsWindow : Window
         {
             TextBox field = ex.ParamName switch
             {
-                nameof(SilenceSettings.FrameMilliseconds) => FrameMillisecondsTextBox,
-                nameof(SilenceSettings.MinimumSilenceMilliseconds) => MinimumSilenceTextBox,
-                nameof(SilenceSettings.SilenceThresholdDb) => SilenceThresholdTextBox,
-                nameof(SilenceSettings.NavigationToleranceMilliseconds) => NavigationToleranceTextBox,
-                nameof(SilenceSettings.BackwardStepSeconds) => BackwardStepTextBox,
-                nameof(SilenceSettings.ForwardStepSeconds) => ForwardStepTextBox,
-                nameof(SilenceSettings.ExcludedFolderNames) => ExcludedFolderNamesTextBox,
+                nameof(AppSettings.FrameMilliseconds) => FrameMillisecondsTextBox,
+                nameof(AppSettings.MinimumSilenceMilliseconds) => MinimumSilenceTextBox,
+                nameof(AppSettings.SilenceThresholdDb) => SilenceThresholdTextBox,
+                nameof(AppSettings.NavigationToleranceMilliseconds) => NavigationToleranceTextBox,
+                nameof(AppSettings.BackwardStepSeconds) => BackwardStepTextBox,
+                nameof(AppSettings.ForwardStepSeconds) => ForwardStepTextBox,
+                nameof(AppSettings.ExcludedFolderNames) => ExcludedFolderNamesTextBox,
                 _ => AllowedSilenceTextBox
             };
             return ShowValueError(ex.Message.Split('\n')[0], field);
@@ -283,7 +287,7 @@ public partial class SilenceSettingsWindow : Window
     {
         if (ReferenceEquals(box, ExcludedFolderNamesTextBox))
         {
-            try { new SilenceSettings { ExcludedFolderNames = box.Text }.GetExcludedFolderNames(); return true; }
+            try { new AppSettings { ExcludedFolderNames = box.Text }.GetExcludedFolderNames(); return true; }
             catch (ArgumentOutOfRangeException) { return false; }
         }
         if (ReferenceEquals(box, BackwardStepTextBox) || ReferenceEquals(box, ForwardStepTextBox))
