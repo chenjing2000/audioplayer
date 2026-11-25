@@ -12,7 +12,13 @@
         FontSize="12">
     <Window.Resources>
         <Style x:Key="RoundedInput" TargetType="TextBox">
+            <Setter Property="Padding" Value="6,1"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="AllowDrop" Value="False"/>
             <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Template">
@@ -21,7 +27,7 @@
                         <Border BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Background="{TemplateBinding Background}" CornerRadius="6">
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"/>
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="False"/>
                         </Border>
                     </ControlTemplate>
                 </Setter.Value>
@@ -61,16 +67,43 @@
             <Setter Property="FontWeight" Value="Normal"/>
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
-                    <Style TargetType="ComboBoxItem"><Setter Property="FontWeight" Value="Normal"/></Style>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="FontWeight" Value="Normal"/>
+                        <Setter Property="Padding" Value="6,2"/>
+                        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ComboBoxItem">
+                                    <Border x:Name="OptionSurface" Background="Transparent" CornerRadius="4"
+                                            Margin="1" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsHighlighted" Value="True">
+                                            <Setter TargetName="OptionSurface" Property="Background" Value="#E8EDF2"/>
+                                        </Trigger>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="OptionSurface" Property="Background" Value="#D9EBEF"/>
+                                            <Setter Property="Foreground" Value="#26798A"/>
+                                        </Trigger>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.5"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
                 </Setter.Value>
             </Setter>
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Width" Value="80"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
             <Setter Property="Template">
@@ -94,10 +127,10 @@
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                             </ToggleButton>
-                            <ContentPresenter IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}"
+                            <ContentPresenter x:Name="SelectedValue" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}"
                                               ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
                                               ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
-                                              Margin="6,4,24,4" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              Margin="6,1,24,1" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="Center"/>
                             <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
                                    AllowsTransparency="True" Focusable="False">
@@ -123,7 +156,7 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="SelectionMode" Value="Single"/>
-            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -140,7 +173,7 @@
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ListBoxItem">
-                        <Setter Property="Width" Value="32"/>
+                        <Setter Property="Width" Value="28"/>
                         <Setter Property="Height" Value="28"/>
                         <Setter Property="Padding" Value="0"/>
                         <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
@@ -179,18 +212,18 @@
                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="1"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                 <TabPanel x:Name="HeaderPanel" IsItemsHost="True" KeyboardNavigation.TabIndex="1"/>
                 <Border Grid.Row="1" Background="#DDE2E9"/>
-                <ContentPresenter x:Name="PART_SelectedContentHost" Grid.Row="2" ContentSource="SelectedContent" Margin="0"/>
+                <ContentPresenter x:Name="PART_SelectedContentHost" Grid.Row="2" ContentSource="SelectedContent"/>
               </Grid>
             </ControlTemplate>
           </TabControl.Template>
           <TabItem Header="音频设置">
       <Grid Margin="8,12,8,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="43"/>
+            <RowDefinition Height="43"/>
+            <RowDefinition Height="43"/>
+            <RowDefinition Height="43"/>
+            <RowDefinition Height="43"/>
             <RowDefinition Height="*" MinHeight="24"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -202,35 +235,34 @@
             <ColumnDefinition Width="80"/>
         </Grid.ColumnDefinitions>
 
-        <TextBlock Grid.Row="0" Text="分析帧长度（ms）" VerticalAlignment="Center" Margin="0,0,4,10"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="FrameMillisecondsTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="0" Grid.Column="1" Margin="0,0,0,10" Padding="6,4"
+        <TextBlock Grid.Row="0" Text="分析帧长度（ms）" VerticalAlignment="Center" Margin="0,0,4,0"/>
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="FrameMillisecondsTextBox" Grid.Row="0" Grid.Column="1"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"/>
 
-        <TextBlock Grid.Row="1" Text="最短停顿时长（ms）" VerticalAlignment="Center" Margin="0,0,4,10"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="MinimumSilenceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="1" Grid.Column="1" Margin="0,0,0,10" Padding="6,4"
+        <TextBlock Grid.Row="1" Text="最短停顿时长（ms）" VerticalAlignment="Center" Margin="0,0,4,0"/>
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="MinimumSilenceTextBox" Grid.Row="1" Grid.Column="1"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"
                  LostKeyboardFocus="SilenceInput_LostKeyboardFocus"/>
 
-        <TextBlock Grid.Row="2" Text="静音阈值（dBFS）" VerticalAlignment="Center" Margin="0,0,4,10"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="SilenceThresholdTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="2" Grid.Column="1" Margin="0,0,0,10" Padding="6,4"
+        <TextBlock Grid.Row="2" Text="静音阈值（dBFS）" VerticalAlignment="Center" Margin="0,0,4,0"/>
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="SilenceThresholdTextBox" Grid.Row="2" Grid.Column="1"
                  PreviewTextInput="SignedIntegerTextBox_PreviewTextInput" DataObject.Pasting="SignedIntegerTextBox_Pasting"/>
 
-        <TextBlock Grid.Row="3" Text="前后跳转容差（ms）" VerticalAlignment="Center" Margin="0,0,4,10"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="NavigationToleranceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="3" Grid.Column="1" Margin="0,0,0,10" Padding="6,4"
+        <TextBlock Grid.Row="3" Text="前后跳转容差（ms）" VerticalAlignment="Center" Margin="0,0,4,0"/>
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="NavigationToleranceTextBox" Grid.Row="3" Grid.Column="1"
                  PreviewTextInput="PositiveIntegerTextBox_PreviewTextInput" DataObject.Pasting="PositiveIntegerTextBox_Pasting"/>
 
-        <TextBlock Grid.Row="4" Text="允许静音时长 (s)" VerticalAlignment="Center" Margin="0,0,4,10"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="AllowedSilenceTextBox" Width="80" TextAlignment="Center" VerticalContentAlignment="Center"
-                 AllowDrop="False" Grid.Row="4" Grid.Column="1" Margin="0,0,0,10" Padding="6,4"
+        <TextBlock Grid.Row="4" Text="允许静音时长 (s)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="AllowedSilenceTextBox" Grid.Row="4" Grid.Column="1"
                  PreviewTextInput="AllowedSilenceTextBox_PreviewTextInput" DataObject.Pasting="AllowedSilenceTextBox_Pasting"
                  LostKeyboardFocus="SilenceInput_LostKeyboardFocus"/>
 
-        <TextBlock Grid.Row="0" Grid.Column="3" Text="后退步长 (s)" VerticalAlignment="Center" Margin="0,0,4,10"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="BackwardStepTextBox" Width="80" MaxLength="2" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="0" Grid.Column="4" Margin="0,0,0,10" Padding="6,4"
+        <TextBlock Grid.Row="0" Grid.Column="3" Text="后退步长 (s)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="BackwardStepTextBox" MaxLength="2" Grid.Row="0" Grid.Column="4"
                  PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting"/>
 
-        <TextBlock Grid.Row="1" Grid.Column="3" Text="前进步长 (s)" VerticalAlignment="Center" Margin="0,0,4,10"/>
-        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="ForwardStepTextBox" Width="80" MaxLength="2" TextAlignment="Center" VerticalContentAlignment="Center" AllowDrop="False" Grid.Row="1" Grid.Column="4" Margin="0,0,0,10" Padding="6,4"
+        <TextBlock Grid.Row="1" Grid.Column="3" Text="前进步长 (s)" VerticalAlignment="Center" Margin="0,0,4,0"/>
+        <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="ForwardStepTextBox" MaxLength="2" Grid.Row="1" Grid.Column="4"
                  PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting"/>
 
         <TextBlock x:Name="HelpText" Grid.Row="5" Grid.ColumnSpan="5" Foreground="#6B7280" TextWrapping="Wrap"
@@ -238,8 +270,8 @@
 
         <TextBlock Grid.Row="6" x:Name="ExcludedFolderNamesLabel" Text="需排除的文件夹" VerticalAlignment="Center" Margin="0,0,4,0"/>
         <TextBox x:Name="ExcludedFolderNamesTextBox" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="4"
-                 Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" Padding="6,4"
-                 TextAlignment="Left" VerticalContentAlignment="Center" AllowDrop="False"
+                 Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged"
+                 TextAlignment="Left"
                  ToolTip="多个文件夹名称用逗号或分号分隔，不区分大小写。"/>
 
       </Grid>
@@ -247,34 +279,34 @@
           <TabItem Header="字幕参数">
             <Grid Margin="8,12,8,0">
               <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-                <RowDefinition Height="1"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                <RowDefinition Height="43"/><RowDefinition Height="43"/><RowDefinition Height="43"/>
+                <RowDefinition Height="1"/><RowDefinition Height="43"/><RowDefinition Height="43"/>
                 <RowDefinition Height="*"/>
               </Grid.RowDefinitions>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="88"/><ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="12"/><ColumnDefinition Width="92"/><ColumnDefinition Width="80"/>
+                <ColumnDefinition Width="92"/><ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/><ColumnDefinition Width="92"/><ColumnDefinition Width="*"/>
               </Grid.ColumnDefinitions>
-              <TextBlock Text="字体" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ComboBox x:Name="FontBox" Grid.Column="1" Style="{StaticResource RoundedComboBox}" Margin="0,0,0,10" AutomationProperties.Name="字体"/>
-              <TextBlock Grid.Column="3" Text="字号（DIP）" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ComboBox x:Name="FontSizeBox" Grid.Column="4" Style="{StaticResource RoundedComboBox}" Margin="0,0,0,10" AutomationProperties.Name="字号"/>
-              <TextBlock Grid.Row="1" Text="行高" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ComboBox x:Name="LineHeightBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource RoundedComboBox}" Width="80" HorizontalAlignment="Right" Margin="0,0,0,10" AutomationProperties.Name="行高"/>
-              <TextBlock Grid.Row="1" Grid.Column="3" Text="段后间距（DIP）" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ComboBox x:Name="ParagraphAfterBox" Grid.Row="1" Grid.Column="4" Style="{StaticResource RoundedComboBox}" Margin="0,0,0,10" AutomationProperties.Name="段后间距"/>
-              <TextBlock Grid.Row="2" Text="首行缩进（em）" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ComboBox x:Name="IndentBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource RoundedComboBox}" Width="80" HorizontalAlignment="Right" Margin="0,0,0,10" AutomationProperties.Name="首行缩进"/>
+              <TextBlock Text="字体" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,0"/>
+              <ComboBox x:Name="FontBox" Grid.ColumnSpan="2" Width="160" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="字体"/>
+              <TextBlock Grid.Column="3" Text="字号（DIP）" VerticalAlignment="Center" Margin="0,0,4,0"/>
+              <ComboBox x:Name="FontSizeBox" Grid.Column="4" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="字号"/>
+              <TextBlock Grid.Row="1" Text="行高" VerticalAlignment="Center" Margin="0,0,4,0"/>
+              <ComboBox x:Name="LineHeightBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="行高"/>
+              <TextBlock Grid.Row="1" Grid.Column="3" Text="段后间距（DIP）" VerticalAlignment="Center" Margin="0,0,4,0"/>
+              <ComboBox x:Name="ParagraphAfterBox" Grid.Row="1" Grid.Column="4" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="段后间距"/>
+              <TextBlock Grid.Row="2" Text="首行缩进（em）" VerticalAlignment="Center" Margin="0,0,4,0"/>
+              <ComboBox x:Name="IndentBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="首行缩进"/>
               <Border Grid.Row="3" Grid.ColumnSpan="5" Background="#DDE2E9"/>
-              <TextBlock Grid.Row="4" Text="正文颜色" VerticalAlignment="Center" Margin="0,10,4,10"/>
-              <ListBox x:Name="TextColorBox" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="4" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
-                       Foreground="White" Margin="0,10,0,10" AutomationProperties.Name="正文颜色"/>
-              <TextBlock Grid.Row="5" Text="播放颜色" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ListBox x:Name="PlaybackColorBox" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="4" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
-                       Foreground="White" Margin="0,0,0,10" AutomationProperties.Name="播放颜色"/>
-              <TextBlock Grid.Row="6" Text="背景颜色" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ListBox x:Name="BackgroundColorBox" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="4" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
-                       Background="#E2E6EB" Foreground="#283747" Margin="0,0,0,10" AutomationProperties.Name="背景颜色"/>
+              <TextBlock Grid.Row="4" Text="正文颜色" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,0"/>
+              <ListBox x:Name="TextColorBox" Grid.Row="4" Grid.ColumnSpan="2" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
+                       Foreground="White" AutomationProperties.Name="正文颜色"/>
+              <TextBlock Grid.Row="4" Grid.Column="3" Text="播放颜色" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,0"/>
+              <ListBox x:Name="PlaybackColorBox" Grid.Row="4" Grid.Column="3" Grid.ColumnSpan="2" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
+                       Foreground="White" AutomationProperties.Name="播放颜色"/>
+              <TextBlock Grid.Row="5" Text="背景颜色" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,0"/>
+              <ListBox x:Name="BackgroundColorBox" Grid.Row="5" Grid.ColumnSpan="2" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
+                       Background="#E2E6EB" Foreground="#283747" AutomationProperties.Name="背景颜色"/>
             </Grid>
           </TabItem>
         </TabControl>

@@ -8,6 +8,7 @@ using System.Windows.Media;
 using AudioPlayer.Playback;
 using AudioPlayer.Script;
 using AudioPlayer.Settings;
+using AudioPlayer.Silence;
 
 namespace AudioPlayer.UI;
 
@@ -164,48 +165,25 @@ public partial class SettingsWindow : Window
         => e.Handled = !IsStepText(BuildCandidateText((TextBox)sender, e.Text));
 
     private void StepTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
-    {
-        if (!e.DataObject.GetDataPresent(DataFormats.Text)
-            || !IsStepText(BuildCandidateText((TextBox)sender, (string)e.DataObject.GetData(DataFormats.Text))))
-            e.CancelCommand();
-    }
+        => ValidatePaste((TextBox)sender, e, IsStepText);
 
     private void PositiveIntegerTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
-    {
-        var textBox = (TextBox)sender;
-        string candidate = BuildCandidateText(textBox, e.Text);
-        e.Handled = !IsPositiveIntegerText(candidate);
-    }
+        => e.Handled = !IsIntegerText(BuildCandidateText((TextBox)sender, e.Text), false);
 
     private void SignedIntegerTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
-    {
-        var textBox = (TextBox)sender;
-        string candidate = BuildCandidateText(textBox, e.Text);
-        e.Handled = !IsSignedIntegerText(candidate);
-    }
+        => e.Handled = !IsIntegerText(BuildCandidateText((TextBox)sender, e.Text), true);
 
     private void PositiveIntegerTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
-    {
-        ValidatePaste((TextBox)sender, e, false);
-    }
+        => ValidatePaste((TextBox)sender, e, text => IsIntegerText(text, false));
 
     private void SignedIntegerTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
-    {
-        ValidatePaste((TextBox)sender, e, true);
-    }
+        => ValidatePaste((TextBox)sender, e, text => IsIntegerText(text, true));
 
-    private static void ValidatePaste(TextBox textBox, DataObjectPastingEventArgs e, bool allowNegative)
+    private static void ValidatePaste(TextBox textBox, DataObjectPastingEventArgs e, Func<string, bool> isValid)
     {
-        if (!e.DataObject.GetDataPresent(DataFormats.Text))
-        {
+        if (!e.DataObject.GetDataPresent(DataFormats.Text)
+            || !isValid(BuildCandidateText(textBox, (string)e.DataObject.GetData(DataFormats.Text))))
             e.CancelCommand();
-            return;
-        }
-
-        string pastedText = (string)e.DataObject.GetData(DataFormats.Text);
-        string candidate = BuildCandidateText(textBox, pastedText);
-        bool valid = allowNegative ? IsSignedIntegerText(candidate) : IsPositiveIntegerText(candidate);
-        if (!valid) e.CancelCommand();
     }
 
     private static string BuildCandidateText(TextBox textBox, string input)
@@ -215,23 +193,11 @@ public partial class SettingsWindow : Window
                       .Insert(textBox.SelectionStart, input);
     }
 
-    private static bool IsPositiveIntegerText(string text)
+    private static bool IsIntegerText(string text, bool allowNegative)
     {
         if (text.Length == 0) return true;
 
-        int start = text[0] == '+' ? 1 : 0;
-        for (int i = start; i < text.Length; i++)
-        {
-            if (text[i] < '0' || text[i] > '9') return false;
-        }
-        return true;
-    }
-
-    private static bool IsSignedIntegerText(string text)
-    {
-        if (text.Length == 0) return true;
-
-        int start = text[0] == '+' || text[0] == '-' ? 1 : 0;
+        int start = text[0] == '+' || (allowNegative && text[0] == '-') ? 1 : 0;
         for (int i = start; i < text.Length; i++)
         {
             if (text[i] < '0' || text[i] > '9') return false;
@@ -249,12 +215,7 @@ public partial class SettingsWindow : Window
         => e.Handled = !IsEditableSilenceSeconds(BuildCandidateText((TextBox)sender, e.Text));
 
     private void AllowedSilenceTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
-    {
-        if (!e.DataObject.GetDataPresent(DataFormats.Text)
-            || !IsEditableSilenceSeconds(BuildCandidateText((TextBox)sender,
-                (string)e.DataObject.GetData(DataFormats.Text))))
-            e.CancelCommand();
-    }
+        => ValidatePaste((TextBox)sender, e, IsEditableSilenceSeconds);
 
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -293,13 +254,13 @@ public partial class SettingsWindow : Window
         if (ReferenceEquals(box, BackwardStepTextBox) || ReferenceEquals(box, ForwardStepTextBox))
             return box.Text.Length > 0 && IsStepText(box.Text);
         if (ReferenceEquals(box, FrameMillisecondsTextBox))
-            return int.TryParse(box.Text, out int frameValue) && frameValue is >= 1 and <= 100;
+            return int.TryParse(box.Text, out int frameValue) && frameValue is >= SilenceOptions.MinFrameMilliseconds and <= SilenceOptions.MaxFrameMilliseconds;
         if (ReferenceEquals(box, MinimumSilenceTextBox))
-            return int.TryParse(box.Text, out int minimumValue) && minimumValue is >= 50 and <= 5000;
+            return int.TryParse(box.Text, out int minimumValue) && minimumValue is >= SilenceOptions.MinMinimumSilenceMilliseconds and <= SilenceOptions.MaxMinimumSilenceMilliseconds;
         if (ReferenceEquals(box, SilenceThresholdTextBox))
-            return int.TryParse(box.Text, out int thresholdValue) && thresholdValue is >= -100 and <= 0;
+            return int.TryParse(box.Text, out int thresholdValue) && thresholdValue is >= SilenceOptions.MinSilenceThresholdDb and <= SilenceOptions.MaxSilenceThresholdDb;
         if (ReferenceEquals(box, NavigationToleranceTextBox))
-            return int.TryParse(box.Text, out int toleranceValue) && toleranceValue is >= 1 and <= 5000;
+            return int.TryParse(box.Text, out int toleranceValue) && toleranceValue is >= SilenceOptions.MinNavigationToleranceMilliseconds and <= SilenceOptions.MaxNavigationToleranceMilliseconds;
         string input = box.Text.Trim();
         return IsCompleteSilenceSeconds(input)
             && decimal.TryParse(input, NumberStyles.AllowDecimalPoint,

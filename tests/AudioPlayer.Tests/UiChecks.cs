@@ -484,7 +484,7 @@ internal static class UiChecks
                     foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox", "BackwardStepTextBox", "ForwardStepTextBox" })
                     {
                         var textBox = (TextBox)settingsWindow.FindName(textBoxName);
-                        Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop && textBox.FontWeight == FontWeights.Normal, textBoxName + " retains input size, alignment and normal weight");
+                        Assert(textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop && textBox.FontWeight == FontWeights.Normal, textBoxName + " retains input alignment and normal weight");
                         textBox.ApplyTemplate();
                         Assert(FindVisual<Border>(textBox)!.CornerRadius.TopLeft == 6, "Input has rounded corners");
                     }
@@ -501,6 +501,32 @@ internal static class UiChecks
                      settingsWindow.UpdateLayout();
                      Rect Bounds(FrameworkElement element) => element.TransformToAncestor(settingsWindow)
                          .TransformBounds(new Rect(new Point(), element.RenderSize));
+                     var audioParameterInputs = new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox",
+                         "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox",
+                         "BackwardStepTextBox", "ForwardStepTextBox" }
+                         .Select(name => (TextBox)settingsWindow.FindName(name)).ToArray();
+                     var audioParameterGrid = (Grid)audioParameterInputs[0].Parent;
+                     var audioParameterBounds = audioParameterInputs.Select(Bounds).ToArray();
+                     var audioParameterRows = audioParameterGrid.RowDefinitions.Take(5).Select(row => row.ActualHeight).ToArray();
+                     Assert(audioParameterRows.All(height => Math.Abs(height - 43) <= 0.5) &&
+                         audioParameterBounds.All(bounds => Math.Abs(bounds.Height - 30) <= 0.5 &&
+                             Math.Abs(bounds.Width - 80) <= 0.5) && Math.Abs(excludedBox.ActualHeight - 30) <= 0.5,
+                         "Audio parameter rows are 43 DIP and input boxes are 30 DIP high");
+                     Assert(audioParameterInputs.Select((box, index) =>
+                         Math.Abs(audioParameterBounds[index].Top - Bounds(audioParameterGrid).Top -
+                             Grid.GetRow(box) * 43 - 6.5) <= 0.5).All(centered => centered),
+                         "Audio inputs are vertically centered in their parameter rows");
+                     foreach (var input in audioParameterInputs.Append(excludedBox))
+                     {
+                         var host = (ScrollViewer)input.Template.FindName("PART_ContentHost", input);
+                         var line = new TextBlock { Text = input.Text.Length == 0 ? "audio" : input.Text,
+                             FontFamily = input.FontFamily, FontSize = input.FontSize, FontWeight = input.FontWeight };
+                         line.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                         Assert(input.Padding == new Thickness(6, 1, 6, 1) && host.Margin == new Thickness(0) &&
+                             host.ViewportHeight >= line.DesiredSize.Height - 0.5 &&
+                             host.ExtentHeight <= host.ViewportHeight + 0.5,
+                             input.Name + " has enough internal viewport height for a full text line");
+                     }
                      Rect helpBounds = Bounds(help);
                      Rect exclusionBounds = Bounds(excludedBox);
                      Rect labelBounds = Bounds(exclusionLabel);
@@ -517,21 +543,86 @@ internal static class UiChecks
                          .Select(name => (ComboBox)settingsWindow.FindName(name)).ToArray();
                      Assert(selectors.Select(box => box.Items.Count).SequenceEqual(new[] { 5, 4, 4, 4, 3 }) &&
                          selectors[1].Items.Cast<int>().SequenceEqual(new[] { 17, 18, 19, 20 }) &&
-                         selectors.All(box => box.SelectedItem is not null && box.FontWeight == FontWeights.Normal && box.Margin.Bottom == 10 &&
+                         selectors.All(box => box.SelectedItem is not null && box.FontWeight == FontWeights.Normal && box.Margin == new Thickness(0) &&
                              box.HorizontalContentAlignment == HorizontalAlignment.Center &&
-                             box.ActualHeight > 0 && Bounds(box).Bottom <= buttonsBounds.Top),
+                             Math.Abs(box.ActualHeight - 30) <= 0.5 && Bounds(box).Bottom <= buttonsBounds.Top),
                          "Script combo choices are reduced, aligned, and fit above dialog buttons");
+                     var subtitleGrid = (Grid)selectors[0].Parent;
+                     var columns = subtitleGrid.ColumnDefinitions;
+                     double leftWidth = columns[0].ActualWidth + columns[1].ActualWidth;
+                     double rightWidth = columns[3].ActualWidth + columns[4].ActualWidth;
+                     var fontBounds = Bounds(selectors[0]);
+                     var fontLabel = subtitleGrid.Children.OfType<TextBlock>().Single(label => label.Text == "字体");
+                     Assert(Math.Abs(leftWidth - rightWidth) <= 1 && Math.Abs(columns[2].ActualWidth - 12) <= 0.5 &&
+                         selectors.Skip(1).All(box => Math.Abs(box.ActualWidth - audioParameterBounds[0].Width) <= 0.5) &&
+                         Math.Abs(fontBounds.Width - 160) <= 0.5 && Bounds(fontLabel).Right <= fontBounds.Left + 0.5 &&
+                         Math.Abs(fontBounds.Right - Bounds(selectors[2]).Right) <= 0.5,
+                         "Subtitle columns split available width equally; numeric selectors align and font selector is wider");
+                     Assert(subtitleGrid.RowDefinitions.Take(3).Select((row, index) =>
+                         Math.Abs(row.ActualHeight - audioParameterRows[index]) <= 0.5).All(matches => matches) &&
+                         selectors.All(box => Math.Abs(box.ActualHeight - audioParameterBounds[0].Height) <= 0.5 &&
+                             Math.Abs(Bounds(box).Top - audioParameterBounds[Grid.GetRow(box)].Top) <= 0.5),
+                         "Subtitle and audio parameter rows share the same height, spacing and vertical positions");
+                     foreach (string font in selectors[0].Items)
+                     {
+                         var text = new TextBlock { Text = font, FontFamily = selectors[0].FontFamily,
+                             FontSize = selectors[0].FontSize, FontWeight = selectors[0].FontWeight };
+                         text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                         Assert(text.DesiredSize.Width <= fontBounds.Width - 30,
+                             "Font selector has space for " + font);
+                     }
                      foreach (var box in selectors)
                      {
                          box.ApplyTemplate();
                          var toggle = FindVisual<System.Windows.Controls.Primitives.ToggleButton>(box)!;
                          toggle.ApplyTemplate();
+                         var presenter = (ContentPresenter)box.Template.FindName("SelectedValue", box);
+                         var line = new TextBlock { Text = box.SelectedItem!.ToString(), FontFamily = box.FontFamily,
+                             FontSize = box.FontSize, FontWeight = box.FontWeight };
+                         line.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                         Assert(presenter.ActualHeight >= line.DesiredSize.Height - 0.5 &&
+                             Bounds(presenter).Top >= Bounds(box).Top && Bounds(presenter).Bottom <= Bounds(box).Bottom + 0.5, "Subtitle selector has space for a full text line");
                          Assert(((Border)toggle.Template.FindName("Outline", toggle)).CornerRadius.TopLeft == 6,
                              "Script combo box shares rounded input styling");
+                         var option = new ComboBoxItem { Style = box.ItemContainerStyle, Content = box.SelectedItem };
+                         option.ApplyTemplate();
+                         var surface = (Border)option.Template.FindName("OptionSurface", option);
+                         Assert(surface.CornerRadius.TopLeft == 4 && surface.BorderThickness == new Thickness(0) &&
+                             ColorOf(surface.Background) == "#00FFFFFF" && option.FocusVisualStyle is null &&
+                             option.Template.Triggers.OfType<Trigger>().Any(trigger =>
+                                 trigger.Property == ComboBoxItem.IsHighlightedProperty),
+                             "Dropdown item uses borderless rounded highlight styling");
+                         option.IsSelected = true;
+                         Assert(ColorOf(surface.Background) == "#FFD9EBEF" && ColorOf(option.Foreground) == "#FF26798A",
+                             "Dropdown selected item uses the settings theme");
                      }
                      var colorLists = new[] { "TextColorBox", "PlaybackColorBox", "BackgroundColorBox" }
                          .Select(name => (ListBox)settingsWindow.FindName(name)).ToArray();
                      Assert(settingsWindow.FindName("AppearancePreview") is null, "Settings text preview removed");
+                     var textBounds = Bounds(colorLists[0]);
+                     var playbackBounds = Bounds(colorLists[1]);
+                     var backgroundBounds = Bounds(colorLists[2]);
+                     var gridBounds = Bounds(subtitleGrid);
+                     Assert(Math.Abs(subtitleGrid.RowDefinitions[4].ActualHeight - 43) <= 0.5 &&
+                         Math.Abs(subtitleGrid.RowDefinitions[5].ActualHeight - 43) <= 0.5 &&
+                         Math.Abs(backgroundBounds.Top - textBounds.Top - 43) <= 0.5 &&
+                         Math.Abs(textBounds.Top - playbackBounds.Top) <= 0.5 &&
+                         Math.Abs(textBounds.Left - backgroundBounds.Left) <= 0.5 &&
+                         backgroundBounds.Top >= textBounds.Bottom &&
+                         textBounds.Right <= gridBounds.Left + leftWidth + 0.5 &&
+                         playbackBounds.Left >= gridBounds.Left + leftWidth + columns[2].ActualWidth - 0.5 &&
+                         playbackBounds.Right <= gridBounds.Right + 0.5 &&
+                         Math.Abs(textBounds.Right - fontBounds.Right) <= 0.5 &&
+                         Math.Abs(playbackBounds.Right - Bounds(selectors[1]).Right) <= 0.5,
+                         "Text and playback palettes share a row in separate halves; background stays below text");
+                     foreach (var colors in colorLists)
+                     {
+                         var label = subtitleGrid.Children.OfType<TextBlock>().Single(item =>
+                             Grid.GetRow(item) == Grid.GetRow(colors) && Grid.GetColumn(item) == Grid.GetColumn(colors));
+                         Assert(Bounds(label).Right <= Bounds(colors).Left + 0.5 &&
+                             Math.Abs(colors.ActualWidth - 140) <= 0.5,
+                             "Palette label and all five compact swatches fit within their half");
+                     }
                      foreach (var colors in colorLists)
                      {
                          Assert(colors.Items.Count == 5 && colors.SelectedIndex == 0 &&
@@ -543,7 +634,8 @@ internal static class UiChecks
                              item.ApplyTemplate();
                              var swatch = (System.Windows.Shapes.Ellipse)item.Template.FindName("Swatch", item);
                              var tick = (System.Windows.Shapes.Path)item.Template.FindName("Check", item);
-                             Assert(swatch.Width == 24 && swatch.Height == 24 && swatch.StrokeThickness == 0 &&
+                             Assert(item.Width == 28 && item.Height == 28 && swatch.Width == 24 && swatch.Height == 24 && swatch.StrokeThickness == 0 &&
+                                 Bounds(swatch).Right <= Bounds(colors).Right + 0.5 &&
                                  ColorOf(swatch.Fill) == "#FF" + ((string)colors.Items[i])[1..] &&
                                  (tick.Visibility == Visibility.Visible) == (i == colors.SelectedIndex),
                                  "Color swatch is borderless and only the selected item shows a check");
@@ -574,10 +666,13 @@ internal static class UiChecks
                      Assert(MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control) && MainWindow.IsPlaybackShortcut(Key.Right, ModifierKeys.Control)
                          && MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.None) && !MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.Control)
                          && !MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control | ModifierKeys.Shift), "Shortcut modifier routing");
-                     MethodInfo positiveInput = typeof(SettingsWindow).GetMethod("IsPositiveIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
-                    MethodInfo signedInput = typeof(SettingsWindow).GetMethod("IsSignedIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
-                    Assert((bool)positiveInput.Invoke(null, new object[] { "+123" })! && !(bool)positiveInput.Invoke(null, new object[] { "-1" })! && !(bool)positiveInput.Invoke(null, new object[] { "1.5" })! && !(bool)positiveInput.Invoke(null, new object[] { "abc" })!, "Positive parameter boxes accept only digits and optional leading plus sign");
-                    Assert((bool)signedInput.Invoke(null, new object[] { "-45" })! && (bool)signedInput.Invoke(null, new object[] { "+45" })! && !(bool)signedInput.Invoke(null, new object[] { "4-5" })! && !(bool)signedInput.Invoke(null, new object[] { "-4.5" })!, "Silence threshold box accepts digits and one leading sign only");
+                     MethodInfo integerInput = typeof(SettingsWindow).GetMethod("IsIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     Assert(new[] { "", "+", "+123", "0", "123" }.All(v => (bool)integerInput.Invoke(null, new object[] { v, false })!)
+                         && new[] { "-", "-1", "1.5", "abc", "５", "1+2" }.All(v => !(bool)integerInput.Invoke(null, new object[] { v, false })!),
+                         "Positive parameter boxes accept only digits and optional leading plus sign");
+                     Assert(new[] { "", "+", "-", "-45", "+45", "0" }.All(v => (bool)integerInput.Invoke(null, new object[] { v, true })!)
+                         && new[] { "4-5", "-4.5", "--1", "５", "a" }.All(v => !(bool)integerInput.Invoke(null, new object[] { v, true })!),
+                         "Silence threshold box accepts digits and one leading sign only");
                     MethodInfo editableSeconds = typeof(SettingsWindow).GetMethod("IsEditableSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
                      MethodInfo completeSeconds = typeof(SettingsWindow).GetMethod("IsCompleteSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
                      Assert((bool)editableSeconds.Invoke(null, new object[] { "2." })!

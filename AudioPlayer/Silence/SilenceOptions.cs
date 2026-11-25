@@ -13,6 +13,11 @@ public sealed record SilenceOptions(
     public const int DefaultNavigationToleranceMilliseconds = 200;
     public const decimal DefaultAllowedSilenceSeconds = 2.0m;
 
+    internal const int MinFrameMilliseconds = 1, MaxFrameMilliseconds = 100;
+    internal const int MinMinimumSilenceMilliseconds = 50, MaxMinimumSilenceMilliseconds = 5000;
+    internal const int MinSilenceThresholdDb = -100, MaxSilenceThresholdDb = 0;
+    internal const int MinNavigationToleranceMilliseconds = 1, MaxNavigationToleranceMilliseconds = 5000;
+
     public void Validate()
     {
         ValidateDetection();
@@ -21,12 +26,12 @@ public sealed record SilenceOptions(
 
     internal void ValidateDetection()
     {
-        if (FrameMilliseconds < 1 || FrameMilliseconds > 100)
-            throw new ArgumentOutOfRangeException(nameof(FrameMilliseconds), "分析帧长度必须在 1 到 100 ms 之间。");
-        if (MinimumSilenceMilliseconds < 50 || MinimumSilenceMilliseconds > 5000)
-            throw new ArgumentOutOfRangeException(nameof(MinimumSilenceMilliseconds), "最短停顿时长必须在 50 到 5000 ms 之间。");
-        if (SilenceThresholdDb < -100 || SilenceThresholdDb > 0)
-            throw new ArgumentOutOfRangeException(nameof(SilenceThresholdDb), "静音阈值必须在 -100 到 0 dBFS 之间。");
+        if (FrameMilliseconds is < MinFrameMilliseconds or > MaxFrameMilliseconds)
+            throw new ArgumentOutOfRangeException(nameof(FrameMilliseconds), $"分析帧长度必须在 {MinFrameMilliseconds} 到 {MaxFrameMilliseconds} ms 之间。");
+        if (MinimumSilenceMilliseconds is < MinMinimumSilenceMilliseconds or > MaxMinimumSilenceMilliseconds)
+            throw new ArgumentOutOfRangeException(nameof(MinimumSilenceMilliseconds), $"最短停顿时长必须在 {MinMinimumSilenceMilliseconds} 到 {MaxMinimumSilenceMilliseconds} ms 之间。");
+        if (SilenceThresholdDb is < MinSilenceThresholdDb or > MaxSilenceThresholdDb)
+            throw new ArgumentOutOfRangeException(nameof(SilenceThresholdDb), $"静音阈值必须在 {MinSilenceThresholdDb} 到 {MaxSilenceThresholdDb} dBFS 之间。");
     }
 
     internal void ValidateAllowedSilence()
@@ -39,7 +44,7 @@ public sealed record SilenceOptions(
 
     internal static void ValidateNavigationTolerance(int navigationToleranceMilliseconds)
     {
-        if (navigationToleranceMilliseconds < 1 || navigationToleranceMilliseconds > 5000)
-            throw new ArgumentOutOfRangeException("NavigationToleranceMilliseconds", "导航容差必须在 1 到 5000 ms 之间。");
+        if (navigationToleranceMilliseconds is < MinNavigationToleranceMilliseconds or > MaxNavigationToleranceMilliseconds)
+            throw new ArgumentOutOfRangeException("NavigationToleranceMilliseconds", $"导航容差必须在 {MinNavigationToleranceMilliseconds} 到 {MaxNavigationToleranceMilliseconds} ms 之间。");
     }
 }
