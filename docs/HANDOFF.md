@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #21 review R1–R4 implemented; fresh verification pending  
+**Updated:** 2026-11-25 — PR #21 review R1–R4 accepted; final documentation CI pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `d8458d6` (PR #20 squash merge).  
@@ -30,8 +30,10 @@ On `feature/native-script-scroll` from main `275e9bf`, remove the dedicated Java
 
 - PR #21 application `7762204`: both branch and PR CI passed on their first attempt. User's synchronized clean Windows checkout passed Full / Publish / Test-PublishedApp (66 Core, 351 UI, 5 publishing safeguards, 4 published EXE; 426 executed checks, zero failures). Publish succeeded on first attempt. All ten focused native-scroll manual checks accepted, including wheel speed, automatic follow competition and paused seek. See Testing for evidence and limits.
 
+- PR #21 final application `87689a0`: R1–R4 review remediation passed both branch and PR CI on their first attempts. The synchronized clean local Windows checkout passed Full / Publish / Test-PublishedApp (66 Core, 351 UI, 5 publishing safeguards and 4 published EXE checks; 426 executed, zero failures), with first-attempt publishing. All nine focused manual checks passed, including actual Ctrl+wheel/keyboard zoom suppression and scrolling untimed text without seeking. Earlier ten-item acceptance is recorded separately. See Testing for remaining validation boundaries.
+
 ## Next action
 
-Verify R1–R4 with fresh feature/PR CI, Windows Full / Publish / Test-PublishedApp and focused checks for disabled browser zoom, normal native wheel and scrollbar scrolling, follow interruption and scrollable text without timed anchors. Prior acceptance applies to application revision 7762204. Obtain explicit authorization before squash-merging PR #21. No release tag or assets authorized.
+Verify final documentation-only head CI and obtain explicit authorization before squash-merging PR #21. Verify identical merged tree, main CI and local post-merge Full / Publish / Test-PublishedApp before cleanup. No repeat local application run is necessary for the documentation-only feature commit itself. No release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.
