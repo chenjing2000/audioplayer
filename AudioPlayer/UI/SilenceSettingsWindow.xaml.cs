@@ -5,7 +5,11 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 
-namespace AudioPlayer;
+using AudioPlayer.Playback;
+using AudioPlayer.Script;
+using AudioPlayer.Settings;
+
+namespace AudioPlayer.UI;
 
 public partial class SilenceSettingsWindow : Window
 {

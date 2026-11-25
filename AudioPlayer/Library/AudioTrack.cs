@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.IO;
 
-namespace AudioPlayer;
+namespace AudioPlayer.Library;
 
 public sealed class AudioTrack : INotifyPropertyChanged
 {

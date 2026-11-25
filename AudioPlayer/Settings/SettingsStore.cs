@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace AudioPlayer;
+namespace AudioPlayer.Settings;
 
 internal sealed class SettingsStore
 {

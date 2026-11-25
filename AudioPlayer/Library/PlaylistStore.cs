@@ -4,7 +4,7 @@ using System.Text.Unicode;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace AudioPlayer;
+namespace AudioPlayer.Library;
 
 internal sealed class PlaylistStore
 {

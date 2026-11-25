@@ -1,6 +1,6 @@
 using NAudio.Wave;
 
-namespace AudioPlayer;
+namespace AudioPlayer.Playback;
 
 public sealed class PlaybackEngine : IDisposable
 {

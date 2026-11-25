@@ -11,7 +11,13 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Microsoft.Win32;
 
-namespace AudioPlayer;
+using AudioPlayer.Playback;
+using AudioPlayer.Library;
+using AudioPlayer.Silence;
+using AudioPlayer.Script;
+using AudioPlayer.Settings;
+
+namespace AudioPlayer.UI;
 
 public partial class MainWindow : Window
 {
