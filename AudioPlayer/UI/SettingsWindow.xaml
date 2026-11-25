@@ -68,7 +68,7 @@
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="6,4"/>
-            <Setter Property="MinHeight" Value="26"/>
+            <Setter Property="MinHeight" Value="33"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
@@ -140,7 +140,7 @@
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ListBoxItem">
-                        <Setter Property="Width" Value="32"/>
+                        <Setter Property="Width" Value="28"/>
                         <Setter Property="Height" Value="28"/>
                         <Setter Property="Padding" Value="0"/>
                         <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBox}}"/>
@@ -248,32 +248,32 @@
             <Grid Margin="8,12,8,0">
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-                <RowDefinition Height="1"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+                <RowDefinition Height="1"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
               </Grid.RowDefinitions>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="88"/><ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="12"/><ColumnDefinition Width="92"/><ColumnDefinition Width="80"/>
+                <ColumnDefinition Width="92"/><ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="12"/><ColumnDefinition Width="92"/><ColumnDefinition Width="*"/>
               </Grid.ColumnDefinitions>
-              <TextBlock Text="字体" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ComboBox x:Name="FontBox" Grid.Column="1" Style="{StaticResource RoundedComboBox}" Margin="0,0,0,10" AutomationProperties.Name="字体"/>
+              <TextBlock Text="字体" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,10"/>
+              <ComboBox x:Name="FontBox" Grid.ColumnSpan="2" Width="160" HorizontalAlignment="Right" Style="{StaticResource RoundedComboBox}" Margin="0,0,0,10" AutomationProperties.Name="字体"/>
               <TextBlock Grid.Column="3" Text="字号（DIP）" VerticalAlignment="Center" Margin="0,0,4,10"/>
               <ComboBox x:Name="FontSizeBox" Grid.Column="4" Style="{StaticResource RoundedComboBox}" Margin="0,0,0,10" AutomationProperties.Name="字号"/>
               <TextBlock Grid.Row="1" Text="行高" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ComboBox x:Name="LineHeightBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource RoundedComboBox}" Width="80" HorizontalAlignment="Right" Margin="0,0,0,10" AutomationProperties.Name="行高"/>
+              <ComboBox x:Name="LineHeightBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource RoundedComboBox}" Margin="0,0,0,10" AutomationProperties.Name="行高"/>
               <TextBlock Grid.Row="1" Grid.Column="3" Text="段后间距（DIP）" VerticalAlignment="Center" Margin="0,0,4,10"/>
               <ComboBox x:Name="ParagraphAfterBox" Grid.Row="1" Grid.Column="4" Style="{StaticResource RoundedComboBox}" Margin="0,0,0,10" AutomationProperties.Name="段后间距"/>
               <TextBlock Grid.Row="2" Text="首行缩进（em）" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ComboBox x:Name="IndentBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource RoundedComboBox}" Width="80" HorizontalAlignment="Right" Margin="0,0,0,10" AutomationProperties.Name="首行缩进"/>
+              <ComboBox x:Name="IndentBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource RoundedComboBox}" Margin="0,0,0,10" AutomationProperties.Name="首行缩进"/>
               <Border Grid.Row="3" Grid.ColumnSpan="5" Background="#DDE2E9"/>
-              <TextBlock Grid.Row="4" Text="正文颜色" VerticalAlignment="Center" Margin="0,10,4,10"/>
-              <ListBox x:Name="TextColorBox" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="4" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
+              <TextBlock Grid.Row="4" Text="正文颜色" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,10,4,10"/>
+              <ListBox x:Name="TextColorBox" Grid.Row="4" Grid.ColumnSpan="2" HorizontalAlignment="Right" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
                        Foreground="White" Margin="0,10,0,10" AutomationProperties.Name="正文颜色"/>
-              <TextBlock Grid.Row="5" Text="播放颜色" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ListBox x:Name="PlaybackColorBox" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="4" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
-                       Foreground="White" Margin="0,0,0,10" AutomationProperties.Name="播放颜色"/>
-              <TextBlock Grid.Row="6" Text="背景颜色" VerticalAlignment="Center" Margin="0,0,4,10"/>
-              <ListBox x:Name="BackgroundColorBox" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="4" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
+              <TextBlock Grid.Row="4" Grid.Column="3" Text="播放颜色" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,10,4,10"/>
+              <ListBox x:Name="PlaybackColorBox" Grid.Row="4" Grid.Column="3" Grid.ColumnSpan="2" HorizontalAlignment="Right" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
+                       Foreground="White" Margin="0,10,0,10" AutomationProperties.Name="播放颜色"/>
+              <TextBlock Grid.Row="5" Text="背景颜色" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,10"/>
+              <ListBox x:Name="BackgroundColorBox" Grid.Row="5" Grid.ColumnSpan="2" HorizontalAlignment="Right" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
                        Background="#E2E6EB" Foreground="#283747" Margin="0,0,0,10" AutomationProperties.Name="背景颜色"/>
             </Grid>
           </TabItem>

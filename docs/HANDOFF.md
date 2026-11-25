@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #19 playback palette accepted; awaiting merge authorization  
+**Updated:** 2026-11-25 — PR #19 playback palette accepted; subtitle layout refinement pending verification  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `21f5f75` (PR #18, squash merged).  
@@ -19,10 +19,10 @@ R1–R7 passed local Windows automated verification and GitHub CI. At `e655cfa`,
 
 ## Playback palette update
 
-[PR #19](https://github.com/chenjing2000/audioplayer/pull/19) changes only the five playback colors, their default, retired-value normalization, and matching reader CSS fallback, with test and documentation updates. Application revision `8379a96` passed both branch and PR CI, all 388 executed local automated checks, portable publish and all seven user-confirmed manual checks. See [Testing](Testing.md) for evidence and remaining verification boundaries, and [Configuration](Configuration.md) for exact values and mappings. The main application baseline remains `21f5f75` until explicit merge authorization.
+[PR #19](https://github.com/chenjing2000/audioplayer/pull/19) initially changed the five playback colors, their default, retired-value normalization, and matching reader CSS fallback, with test and documentation updates. Application revision `8379a96` passed both branch and PR CI, all 388 executed local automated checks, portable publish and all seven user-confirmed manual checks. See [Testing](Testing.md) for evidence and remaining verification boundaries, and [Configuration](Configuration.md) for exact values and mappings. The main application baseline remains `21f5f75` until explicit merge authorization.
 
 ## Next action
 
-Await explicit authorization to merge PR #19. After merge, synchronize main, verify and clean up the feature branch. No release tag or assets authorized.
+The approved subtitle settings layout refinement is implemented on the same branch: equal halves, taller selectors and two color rows. See Testing for the new verification scope. Complete fresh CI, local verification and focused manual acceptance before seeking explicit merge authorization. After merge, synchronize main, verify and clean up the feature branch. No release tag or assets authorized.
 
-For future changes, start from synchronized main, follow root AGENTS.md and WindowsAppPlaybook, and preserve existing functionality and user files. No application changes are required for this milestone. Use Full / Publish / Test-PublishedApp for new application revisions; no repeat local test is necessary for a documentation-only update.
+For future changes, start from synchronized main, follow root AGENTS.md and WindowsAppPlaybook, and preserve existing functionality and user files. Use Full / Publish / Test-PublishedApp for new application revisions; no repeat local test is necessary for a documentation-only update.

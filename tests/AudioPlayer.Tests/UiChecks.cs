@@ -519,8 +519,27 @@ internal static class UiChecks
                          selectors[1].Items.Cast<int>().SequenceEqual(new[] { 17, 18, 19, 20 }) &&
                          selectors.All(box => box.SelectedItem is not null && box.FontWeight == FontWeights.Normal && box.Margin.Bottom == 10 &&
                              box.HorizontalContentAlignment == HorizontalAlignment.Center &&
-                             box.ActualHeight > 0 && Bounds(box).Bottom <= buttonsBounds.Top),
+                             Math.Abs(box.ActualHeight - 33) <= 0.5 && Bounds(box).Bottom <= buttonsBounds.Top),
                          "Script combo choices are reduced, aligned, and fit above dialog buttons");
+                     var subtitleGrid = (Grid)selectors[0].Parent;
+                     var columns = subtitleGrid.ColumnDefinitions;
+                     double leftWidth = columns[0].ActualWidth + columns[1].ActualWidth;
+                     double rightWidth = columns[3].ActualWidth + columns[4].ActualWidth;
+                     var fontBounds = Bounds(selectors[0]);
+                     var fontLabel = subtitleGrid.Children.OfType<TextBlock>().Single(label => label.Text == "字体");
+                     Assert(Math.Abs(leftWidth - rightWidth) <= 1 && Math.Abs(columns[2].ActualWidth - 12) <= 0.5 &&
+                         selectors.Skip(1).All(box => Math.Abs(box.ActualWidth - selectors[1].ActualWidth) <= 1) &&
+                         fontBounds.Width > selectors[1].ActualWidth && Bounds(fontLabel).Right <= fontBounds.Left + 0.5 &&
+                         Math.Abs(fontBounds.Right - Bounds(selectors[2]).Right) <= 0.5,
+                         "Subtitle columns split available width equally; numeric selectors align and font selector is wider");
+                     foreach (string font in selectors[0].Items)
+                     {
+                         var text = new TextBlock { Text = font, FontFamily = selectors[0].FontFamily,
+                             FontSize = selectors[0].FontSize, FontWeight = selectors[0].FontWeight };
+                         text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                         Assert(text.DesiredSize.Width <= fontBounds.Width - 30,
+                             "Font selector has space for " + font);
+                     }
                      foreach (var box in selectors)
                      {
                          box.ApplyTemplate();
@@ -532,6 +551,27 @@ internal static class UiChecks
                      var colorLists = new[] { "TextColorBox", "PlaybackColorBox", "BackgroundColorBox" }
                          .Select(name => (ListBox)settingsWindow.FindName(name)).ToArray();
                      Assert(settingsWindow.FindName("AppearancePreview") is null, "Settings text preview removed");
+                     var textBounds = Bounds(colorLists[0]);
+                     var playbackBounds = Bounds(colorLists[1]);
+                     var backgroundBounds = Bounds(colorLists[2]);
+                     var gridBounds = Bounds(subtitleGrid);
+                     Assert(Math.Abs(textBounds.Top - playbackBounds.Top) <= 0.5 &&
+                         Math.Abs(textBounds.Left - backgroundBounds.Left) <= 0.5 &&
+                         backgroundBounds.Top >= textBounds.Bottom &&
+                         textBounds.Right <= gridBounds.Left + leftWidth + 0.5 &&
+                         playbackBounds.Left >= gridBounds.Left + leftWidth + columns[2].ActualWidth - 0.5 &&
+                         playbackBounds.Right <= gridBounds.Right + 0.5 &&
+                         Math.Abs(textBounds.Right - fontBounds.Right) <= 0.5 &&
+                         Math.Abs(playbackBounds.Right - Bounds(selectors[1]).Right) <= 0.5,
+                         "Text and playback palettes share a row in separate halves; background stays below text");
+                     foreach (var colors in colorLists)
+                     {
+                         var label = subtitleGrid.Children.OfType<TextBlock>().Single(item =>
+                             Grid.GetRow(item) == Grid.GetRow(colors) && Grid.GetColumn(item) == Grid.GetColumn(colors));
+                         Assert(Bounds(label).Right <= Bounds(colors).Left + 0.5 &&
+                             Math.Abs(colors.ActualWidth - 140) <= 0.5,
+                             "Palette label and all five compact swatches fit within their half");
+                     }
                      foreach (var colors in colorLists)
                      {
                          Assert(colors.Items.Count == 5 && colors.SelectedIndex == 0 &&
@@ -543,7 +583,8 @@ internal static class UiChecks
                              item.ApplyTemplate();
                              var swatch = (System.Windows.Shapes.Ellipse)item.Template.FindName("Swatch", item);
                              var tick = (System.Windows.Shapes.Path)item.Template.FindName("Check", item);
-                             Assert(swatch.Width == 24 && swatch.Height == 24 && swatch.StrokeThickness == 0 &&
+                             Assert(item.Width == 28 && item.Height == 28 && swatch.Width == 24 && swatch.Height == 24 && swatch.StrokeThickness == 0 &&
+                                 Bounds(swatch).Right <= Bounds(colors).Right + 0.5 &&
                                  ColorOf(swatch.Fill) == "#FF" + ((string)colors.Items[i])[1..] &&
                                  (tick.Visibility == Visibility.Visible) == (i == colors.SelectedIndex),
                                  "Color swatch is borderless and only the selected item shows a check");
