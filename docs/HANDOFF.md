@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #17 subtitle settings accepted at 73df725; size and typography follow-up pending verification  
+**Updated:** 2026-11-25 — PR #17 size and typography manual acceptance passed; automated test reruns pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Merged main baseline:** `52bb0b8` (application from PR #16, `af27658`).  
@@ -75,6 +75,10 @@ User approved modern local WPF tabs (音频设置/字幕参数), consistent roun
 
 At `73df725`, [Feature validation CI](https://github.com/chenjing2000/audioplayer/actions/runs/45515160423) passed. User-provided Windows log confirms local HEAD at that revision, 59 Core + 307 UI + 5 publishing safeguards + 4 published EXE checks = 375 passed, zero failed; local publish succeeded. Optional real MP3, MP3 metadata and MP3-dependent UI tests skipped; temporary WebView2 test-cache cleanup still reported a nonfatal in-use warning. All 14 focused manual checks passed: modern tabs, consistency with audio page, rounded inputs/alignment/spacing, full font names, correct option ranges, five borderless swatches per group, single selection/checkmark, no text preview, then-current defaults 16/1.6/2, confirmation applies, cancel preserves, restart restores, audio settings work, and reader scrolling/seeking/coloring unchanged. This acceptance applies to 73df725, before the next settings adjustment.
 
-## Subtitle size and input typography follow-up (pending verification)
+## Subtitle size and input typography follow-up (manual acceptance passed; automated failures)
 
 User requested font sizes 17/18/19/20 DIP, fixed window height 430 (width 480 unchanged), and normal-weight text in edit boxes and combo boxes. With 16 retired, default is 17; former 14/15/16 normalize to 17, former 22/24/26/28 to 20; 17–20 stay valid (20 no longer normalizes). Only known retired values are normalized on load; unknown values (e.g. 21) still fail validation and loading never rewrites the file. Selected tab header alone remains semibold; text boxes, selected combo values and dropdown items explicitly use normal weight. Core and UI assertions updated; CI and focused local checks for this revision pending. Playback/reader source unchanged. No merge authorized.
+
+At `a0f5540` the user confirmed all seven focused manual checks (17/18/19/20 options, default 17, 430 DIP height, normal edit and dropdown text, selected header semibold, persistence/cancel/restart). The supplied local log verifies this HEAD and 59 Core, 307 UI, 5 publishing safeguards passed; publish succeeded; published EXE checks 3 passed, 1 failed (374 automated passes, 1 failure total). The failing isolated renamed-EXE check reported the seeded playlist path missing during the asynchronous restore poll. Optional MP3 checks skipped; temporary WebView2 cache in-use warning repeated. [CI #45516634249](https://github.com/chenjing2000/audioplayer/actions/runs/45516634249) failed in WPF UI at the 25-second WebView2 ready handshake with no ReaderFailure reported; Core and workflow smoke passed, publish steps skipped. These are distinct failures, not proof of a settings regression.
+
+Test-only follow-up: the published EXE check now polls for the complete expected restored snapshot for a separate bounded 20-second interval, tolerates transient IO exceptions during file replacement, and still fails on malformed JSON, premature process exit or incorrect/missing persisted state at deadline. The WebView2 cold-start test allows a bounded 60-second ready handshake, still stops on reader-reported error and identifies timeout explicitly. Both suspected timing issues require reruns; neither cause is proven by the previous logs alone. No application source changes, no skipped assertions, no merge authorized.

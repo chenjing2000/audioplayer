@@ -721,10 +721,14 @@ internal static class UiChecks
                                 """{"filetype":"script","title":"Reader test","paragraphs":[[{"text":"Hello, world.","timed_units":[["Hello",1,3],["world",0,2]]}]]}""");
                             readerWindow.SetAudio(Path.Combine(readerFolder, "sample.wav"));
                             readerWindow.Show();
-                            var deadline = DateTime.UtcNow.AddSeconds(25);
+                            // A cold WebView2 profile on a hosted Windows runner can take
+                            // longer than a local startup. Keep a finite deadline and
+                            // fail immediately when the reader reports an actual error.
+                            var deadline = DateTime.UtcNow.AddSeconds(60);
                             while (!readerWindow.ReaderReady && readerWindow.ReaderFailure is null && DateTime.UtcNow < deadline)
                                 await Task.Delay(100);
-                            Assert(readerWindow.ReaderReady, "Embedded WebView2 reader completes ready handshake: " + readerWindow.ReaderFailure);
+                            Assert(readerWindow.ReaderReady, "Embedded WebView2 reader completes ready handshake: " +
+                                (readerWindow.ReaderFailure ?? "no ready message within 60 seconds"));
                             var reader = (Microsoft.Web.WebView2.Wpf.WebView2)readerWindow.FindName("Reader");
                             string renderedScriptText = "";
                             deadline = DateTime.UtcNow.AddSeconds(25);
