@@ -108,21 +108,27 @@ Check("Retired script options normalize only on load without rewriting the file"
     {
         var store = new SettingsStore(Path.Combine(folder, "player.settings.json"));
         var settings = new AppSettings();
+        void CheckMigration(ScriptAppearance oldAppearance, ScriptAppearance expected)
+        {
+            settings.ScriptAppearance = oldAppearance;
+            string json = System.Text.Json.JsonSerializer.Serialize(settings);
+            File.WriteAllText(store.FilePath, json);
+            var loaded = store.LoadOrCreate();
+            Assert(loaded.ScriptAppearance == expected);
+            Assert(File.ReadAllText(store.FilePath) == json);
+            store.Save(loaded);
+            Assert(store.LoadOrCreate().ScriptAppearance == expected);
+        }
+
         foreach (var (size, newSize) in new[] { (14, 17), (15, 17), (16, 17), (17, 17), (18, 18), (19, 19), (20, 20), (22, 20), (24, 20), (26, 20), (28, 20) })
         foreach (var (height, newHeight) in new[] { (1.4, 1.5), (2.0, 1.8) })
         foreach (var (spacing, newSpacing) in new[] { (0, 8), (14, 16), (18, 20), (24, 20) })
         {
-            settings.ScriptAppearance = new ScriptAppearance { Font = "Segoe UI", FontSize = size,
+            CheckMigration(new ScriptAppearance { Font = "Segoe UI", FontSize = size,
                 LineHeight = height, ParagraphAfter = spacing, FirstLineIndent = 3,
-                ScriptColor = "#A33D30", Background = "#FFFFFF" };
-            string json = System.Text.Json.JsonSerializer.Serialize(settings);
-            File.WriteAllText(store.FilePath, json);
-            var loaded = store.LoadOrCreate();
-            Assert(loaded.ScriptAppearance == new ScriptAppearance { Font = "Arial", FontSize = newSize,
-                LineHeight = newHeight, ParagraphAfter = newSpacing, FirstLineIndent = 2 });
-            Assert(File.ReadAllText(store.FilePath) == json);
-            store.Save(loaded);
-            Assert(store.LoadOrCreate().ScriptAppearance == loaded.ScriptAppearance);
+                ScriptColor = "#A33D30", Background = "#FFFFFF" },
+                new ScriptAppearance { Font = "Arial", FontSize = newSize,
+                    LineHeight = newHeight, ParagraphAfter = newSpacing, FirstLineIndent = 2 });
         }
 
         foreach (var (oldColor, newColor) in new[]
@@ -131,14 +137,8 @@ Check("Retired script options normalize only on load without rewriting the file"
             ("#856300", "#8A2BE2"), ("#53713C", "#007D45"), ("#26798A", "#1685B8")
         })
         {
-            settings.ScriptAppearance = new ScriptAppearance { ScriptColor = oldColor };
-            string json = System.Text.Json.JsonSerializer.Serialize(settings);
-            File.WriteAllText(store.FilePath, json);
-            var loaded = store.LoadOrCreate();
-            Assert(loaded.ScriptAppearance == new ScriptAppearance { ScriptColor = newColor });
-            Assert(File.ReadAllText(store.FilePath) == json);
-            store.Save(loaded);
-            Assert(store.LoadOrCreate().ScriptAppearance == loaded.ScriptAppearance);
+            CheckMigration(new ScriptAppearance { ScriptColor = oldColor },
+                new ScriptAppearance { ScriptColor = newColor });
         }
 
         settings.ScriptAppearance = new ScriptAppearance { ScriptColor = "#123456" };

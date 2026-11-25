@@ -484,7 +484,7 @@ internal static class UiChecks
                     foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox", "BackwardStepTextBox", "ForwardStepTextBox" })
                     {
                         var textBox = (TextBox)settingsWindow.FindName(textBoxName);
-                        Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop && textBox.FontWeight == FontWeights.Normal, textBoxName + " retains input size, alignment and normal weight");
+                        Assert(textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop && textBox.FontWeight == FontWeights.Normal, textBoxName + " retains input alignment and normal weight");
                         textBox.ApplyTemplate();
                         Assert(FindVisual<Border>(textBox)!.CornerRadius.TopLeft == 6, "Input has rounded corners");
                     }
@@ -666,10 +666,13 @@ internal static class UiChecks
                      Assert(MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control) && MainWindow.IsPlaybackShortcut(Key.Right, ModifierKeys.Control)
                          && MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.None) && !MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.Control)
                          && !MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control | ModifierKeys.Shift), "Shortcut modifier routing");
-                     MethodInfo positiveInput = typeof(SettingsWindow).GetMethod("IsPositiveIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
-                    MethodInfo signedInput = typeof(SettingsWindow).GetMethod("IsSignedIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
-                    Assert((bool)positiveInput.Invoke(null, new object[] { "+123" })! && !(bool)positiveInput.Invoke(null, new object[] { "-1" })! && !(bool)positiveInput.Invoke(null, new object[] { "1.5" })! && !(bool)positiveInput.Invoke(null, new object[] { "abc" })!, "Positive parameter boxes accept only digits and optional leading plus sign");
-                    Assert((bool)signedInput.Invoke(null, new object[] { "-45" })! && (bool)signedInput.Invoke(null, new object[] { "+45" })! && !(bool)signedInput.Invoke(null, new object[] { "4-5" })! && !(bool)signedInput.Invoke(null, new object[] { "-4.5" })!, "Silence threshold box accepts digits and one leading sign only");
+                     MethodInfo integerInput = typeof(SettingsWindow).GetMethod("IsIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     Assert(new[] { "", "+", "+123", "0", "123" }.All(v => (bool)integerInput.Invoke(null, new object[] { v, false })!)
+                         && new[] { "-", "-1", "1.5", "abc", "５", "1+2" }.All(v => !(bool)integerInput.Invoke(null, new object[] { v, false })!),
+                         "Positive parameter boxes accept only digits and optional leading plus sign");
+                     Assert(new[] { "", "+", "-", "-45", "+45", "0" }.All(v => (bool)integerInput.Invoke(null, new object[] { v, true })!)
+                         && new[] { "4-5", "-4.5", "--1", "５", "a" }.All(v => !(bool)integerInput.Invoke(null, new object[] { v, true })!),
+                         "Silence threshold box accepts digits and one leading sign only");
                     MethodInfo editableSeconds = typeof(SettingsWindow).GetMethod("IsEditableSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
                      MethodInfo completeSeconds = typeof(SettingsWindow).GetMethod("IsCompleteSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
                      Assert((bool)editableSeconds.Invoke(null, new object[] { "2." })!

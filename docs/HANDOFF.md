@@ -1,28 +1,26 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #19 playback palette accepted; settings layout accepted at 98b1b68; dropdown styling visually accepted at c01bad9; code review pending  
+**Updated:** 2026-11-25 — PR #19 settings cleanup pending verification  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Main application baseline:** `21f5f75` (PR #18, squash merged).  
-**Accepted feature head:** `867638d` (application revision `e655cfa`); identical Git tree to `21f5f75`.  
-**Local verification:** full post-merge tests passed at `21f5f75`; the user subsequently synchronized main to documentation revision `593abd6` with a clean working tree. Local and remote `refactor/modular-architecture` branches were deleted. The current feature branch is `feature/playback-colors` (PR #19).
+**Main:** `15e796e` (application baseline `21f5f75`, PR #18).  
+**Feature branch:** `feature/playback-colors` ([PR #19](https://github.com/chenjing2000/audioplayer/pull/19)).  
+**Last verified application:** `c01bad9` before the settings cleanup.
 
 ## Current implementation
 
-AudioPlayer remains a C#/WPF/.NET 10 portable Windows audio player. The seven modules are UI, Application, Playback, Library, Silence, Settings and Script. See [program overview](program-overview.md) for ownership and dependency direction and [project contract](project-contract.md) for unchanged behavior and data safety.
+C#/WPF/.NET 10 portable Windows audio player. Seven modules (UI, Application, Playback, Library, Silence, Settings and Script) remain unchanged. R1–R7 modularization was merged in PR #18; see [program overview](program-overview.md) and [project contract](project-contract.md) for ownership, behavior and data safety.
 
-R1 organized directories and namespaces; R2 extracted Playlist; R3 separated AppSettings and immutable SilenceOptions; R4 extracted SilenceTasks and avoided opening audio without a cache; R5 extracted ScriptWindowHost; R6 extracted PlaybackSession and PlayerController. R7 removes the reverse Script-to-Settings dependency by supplying the cache path at composition, narrows old test-facing UI aliases and clarifies a test success message. No version, package dependency, UI layout, media algorithm, or persisted JSON format change is intended.
+PR #19 replaces the playback palette and normalizes retired values on load without rewriting settings. The settings dialog retains its 480 × 430 DIP size, 30-DIP inputs/selectors, 80-DIP numeric controls, 160-DIP font selector and 43-DIP rows. Subtitle halves are equal, text/playback colors share a row, and dropdown choices have rounded soft highlights. The approved cleanup consolidates existing XAML properties, integer and paste validation, shared parameter range limits and migration-test flows without changing UI or data formats. No new files, classes or dependencies.
 
 ## Verification
 
-R1–R7 passed local Windows automated verification and GitHub CI. At `e655cfa`, the user supplied a complete local sequence: 66 Core, 313 UI, 5 publishing safeguards and 4 published EXE checks = **388 passed, zero failed**; portable publish succeeded. [R7 CI](https://github.com/chenjing2000/audioplayer/actions/runs/45525173631) passed. The user explicitly confirmed all **21 final manual checks** on the published refactor EXE: playlist, playback, silence processing (including listening), Script companion, settings and shutdown. Optional real MP3 playback/metadata/UI cases were skipped in the automated run; mixed DPI and actual device failure remain unverified. Temporary WebView2 test cache remained in use during cleanup. Earlier PR #17's 43 manual checks remain historical evidence. After explicit merge authorization, PR #18 was squash-merged into main at `21f5f75`. Both [final PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45526106161) and [post-merge main CI](https://github.com/chenjing2000/audioplayer/actions/runs/45526540916) passed. A separate full local post-merge run at `21f5f75` passed all 388 executed checks and published a fresh EXE. The 21 manual checks were performed before merge on identical application code. See [Testing](Testing.md) for the detailed results.
-
-## Playback palette update
-
-[PR #19](https://github.com/chenjing2000/audioplayer/pull/19) initially changed the five playback colors, their default, retired-value normalization, and matching reader CSS fallback, with test and documentation updates. Application revision `8379a96` passed both branch and PR CI, all 388 executed local automated checks, portable publish and all seven user-confirmed manual checks. See [Testing](Testing.md) for evidence and remaining verification boundaries, and [Configuration](Configuration.md) for exact values and mappings. The main application baseline remains `21f5f75` until explicit merge authorization.
+- PR #18: 388 automated checks and 21 manual checks passed; post-merge local verification passed. The obsolete refactor branch was removed.
+- PR #19: `c01bad9` passed 424 automated checks (66 Core, 349 UI, 5 publishing safeguards and 4 published EXE), portable publish, branch and PR CI. Earlier palette and layout checks passed and the user accepted the final dropdown appearance. Separate keyboard-dropdown acceptance was not explicitly reported.
+- Current cleanup requires fresh CI, local Full / Publish / Test-PublishedApp and focused settings acceptance. See [Testing](Testing.md) for detailed historical evidence, [Configuration](Configuration.md) for exact settings values, and remaining real MP3, mixed DPI, device failure and nonfatal WebView2 cleanup boundaries.
 
 ## Next action
 
-The equal-halves subtitle layout and two color rows at `992dd59` passed branch and PR CI and 398 local automated checks; the user requested another size adjustment after inspecting the UI. At `2fff393`, the 26-DIP sizing revision passed both CI runs and 401 local automated checks, but the user screenshot revealed clipped audio input text. The follow-up uses 30-DIP controls, reduced internal padding without the duplicated content-host margin, 80-DIP numeric widths, 160-DIP font width and unchanged 43-DIP rows. At final application revision `98b1b68`, both branch and PR CI passed, all 414 executed local automated checks passed (including 13 new text-space checks), portable publish succeeded and the user confirmed all six focused manual checks. Both screenshots show complete text. See Testing for detailed evidence and remaining boundaries. The user then requested softer dropdown option highlighting; the existing local ComboBoxItem style now supplies rounded borderless highlighted and selected states. At `c01bad9`, both CI runs and all 424 executed local automated checks passed, portable publish succeeded, and the user explicitly accepted the dropdown highlight appearance. Separate manual keyboard-navigation verification was not explicitly reported. The user-requested broader code review and simplification analysis remains open; no further code changes or merge are authorized by visual acceptance alone. After merge, synchronize main, verify and clean up the feature branch. No release tag or assets authorized.
+Verify the cleanup and await explicit authorization to merge PR #19. After merge, synchronize main, verify and clean up the feature branch. No release tag or assets authorized.
 
-For future changes, start from synchronized main, follow root AGENTS.md and WindowsAppPlaybook, and preserve existing functionality and user files. Use Full / Publish / Test-PublishedApp for new application revisions; no repeat local test is necessary for a documentation-only update.
+For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.
