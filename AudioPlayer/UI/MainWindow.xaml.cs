@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Text.Json;
@@ -22,16 +21,14 @@ namespace AudioPlayer.UI;
 public partial class MainWindow : Window
 {
     private readonly PlaybackEngine player = new();
-    private readonly ObservableCollection<AudioTrack> tracks = new();
+    internal Playlist Playlist { get; }
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(NormalProgressUpdateMs) };
     private SilenceSettings silenceSettings = new();
     private readonly SettingsStore settingsStore;
-    private readonly PlaylistStore playlistStore;
     private bool settingsFileReady;
     private List<SilenceRange> ranges = new();
     private AudioTrack? loadedTrack;
     private AudioTrack? indicatedTrack;
-    private readonly CancellationTokenSource scanCancellation = new();
     private bool operationBusy;
     private bool analyzing;
     private bool trimming;
@@ -44,7 +41,6 @@ public partial class MainWindow : Window
     private readonly List<Task> runningAnalyses = new();
     private ToastHost.ToastMessage? analysisToast;
     private ToastHost.ToastMessage? trimToast;
-    private string? currentFolder;
     private CancellationTokenSource? trimCancellation;
     private Task? trimTask;
     private bool analysisReady;
@@ -80,8 +76,8 @@ public partial class MainWindow : Window
     {
         this.settingsStore = settingsStore;
         // Test settings paths keep their playlists isolated from the real executable.
-        this.playlistStore = playlistStore ?? new PlaylistStore(
-            settingsStore.FilePath[..^".settings.json".Length] + ".playlist.json");
+        Playlist = new Playlist(playlistStore ?? new PlaylistStore(
+            settingsStore.FilePath[..^".settings.json".Length] + ".playlist.json"));
         InitializeComponent();
         Rect workArea = SystemParameters.WorkArea;
         double desiredWidth = Math.Round(workArea.Width * 0.5);
@@ -92,7 +88,8 @@ public partial class MainWindow : Window
         Top = Math.Round(workArea.Top + (workArea.Height - Height) / 2);
         ProgressSlider.AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(ProgressSlider_MouseDown), true);
         AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler(ProgressSlider_MouseUp), true);
-        TrackList.ItemsSource = tracks;
+        TrackList.ItemsSource = Playlist.Tracks;
+        Playlist.Error += message => { if (!closing) ToastMessages.Show(message, ToastLevel.Error); };
         player.StateChanged += Player_StateChanged;
         player.NaturalPlaybackEnded += Player_NaturalPlaybackEnded;
         timer.Tick += (_, _) => RefreshProgress();
@@ -139,51 +136,8 @@ public partial class MainWindow : Window
 
     private async Task RestorePlaylistAsync()
     {
-        CancellationToken cancellation = scanCancellation.Token;
-        PlaylistSnapshot? snapshot = await Task.Run(playlistStore.Load, cancellation);
-        if (snapshot is null || closing || snapshot.RootFolder is null) return;
-        string root = Path.GetFullPath(snapshot.RootFolder);
-        List<AudioTrack>? files;
-        try
-        {
-            files = await Task.Run(() =>
-            {
-                cancellation.ThrowIfCancellationRequested();
-                try
-                {
-                    if ((File.GetAttributes(root) & FileAttributes.Directory) == 0) return null;
-                }
-                catch (FileNotFoundException) { return null; }
-                catch (DirectoryNotFoundException) { return null; }
-                return AudioLibrary.LoadPaths(root, snapshot.Files, cancellation, restore: true, excludedNames: silenceSettings.GetExcludedFolderNames());
-            }, cancellation);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            if (!closing) ToastMessages.Show("恢复播放列表失败，已保留磁盘上的列表。请检查目录访问权限后重启：" + ex.Message, ToastLevel.Error);
-            return;
-        }
-        if (closing) return;
-        if (files is null)
-        {
-            SavePlaylist();
-            ToastMessages.Show("上次的音频文件夹不存在，已清空播放列表。", ToastLevel.Error);
-            return;
-        }
-        currentFolder = root;
-        foreach (var file in files) tracks.Add(file);
-        if (!snapshot.Files.SequenceEqual(files.Select(file => file.FilePath), StringComparer.Ordinal))
-            SavePlaylist();
-        ReportFolderLoad(files);
-    }
-
-    private void SavePlaylist()
-    {
-        try { playlistStore.Save(currentFolder, tracks.Select(track => track.FilePath)); }
-        catch (Exception ex) when (IsSettingsFileError(ex))
-        {
-            if (!closing) ToastMessages.Show("播放列表保存失败，磁盘上可能仍是旧列表。请刷新或重新打开文件夹重试：" + ex.Message, ToastLevel.Error);
-        }
+        if (await Playlist.RestoreAsync(silenceSettings.GetExcludedFolderNames()) && !closing)
+            ReportFolderLoad();
     }
 
     private static bool IsSettingsFileError(Exception exception)
@@ -206,45 +160,30 @@ public partial class MainWindow : Window
 
     internal async Task LoadFolderAsync(string path)
     {
-        // A scan failure must not keep stale media or a missing folder selected.
+        // Stop playback and old analysis before replacing the playlist.
         CancelAnalysis();
         CancelSelectionCheck();
         await player.CloseAsync();
-        currentFolder = null;
         loadedTrack = null;
-        tracks.Clear();
+        Task<bool> load = Playlist.LoadFolderAsync(path, silenceSettings.GetExcludedFolderNames());
         RefreshProgress();
         UpdateControls();
-
-        List<AudioTrack> files;
-        CancellationToken cancellation = scanCancellation.Token;
-        var excludedNames = silenceSettings.GetExcludedFolderNames();
-        try { files = await Task.Run(() => AudioLibrary.LoadFolder(path, cancellation, excludedNames), cancellation); }
-        catch
-        {
-            // An unfinished scan canceled on exit must not erase the last saved list.
-            if (!closing) SavePlaylist();
-            throw;
-        }
-        if (closing) return;
-        currentFolder = Path.GetFullPath(path);
-        foreach (var file in files) tracks.Add(file);
-        SavePlaylist();
-        ReportFolderLoad(files);
+        if (await load && !closing)
+            ReportFolderLoad();
     }
 
-    private void ReportFolderLoad(List<AudioTrack> files)
+    private void ReportFolderLoad()
     {
-        int errors = files.Count(file => file.LoadError is not null);
+        int errors = Playlist.Tracks.Count(file => file.LoadError is not null);
         if (errors > 0) ToastMessages.Show($"{errors} 个文件的标签读取失败，悬停对应行可查看原因。", ToastLevel.Warning);
-        else if (files.Count == 0) ToastMessages.Show("此文件夹中没有 WAV、MP3 或 M4A 音频文件。", ToastLevel.Warning);
+        else if (Playlist.Tracks.Count == 0) ToastMessages.Show("此文件夹中没有 WAV、MP3 或 M4A 音频文件。", ToastLevel.Warning);
         RefreshProgress();
         UpdateControls();
     }
 
     private async void RefreshButton_Click(object sender, RoutedEventArgs e)
     {
-        string? folder = currentFolder;
+        string? folder = Playlist.RootFolder;
         if (folder is null || operationBusy || trimming || closing) return;
         await RunActionAsync(() => LoadFolderAsync(folder));
     }
@@ -532,17 +471,7 @@ public partial class MainWindow : Window
     }
 
     internal void AddTrimmedOutput(string path)
-    {
-        if (currentFolder is not string root || !AudioLibrary.IsPlaylistPath(root, path, silenceSettings.GetExcludedFolderNames())
-            || tracks.Any(track => string.Equals(track.FilePath, path, StringComparison.OrdinalIgnoreCase)))
-            return;
-        var added = AudioLibrary.ReadTrack(path);
-        int index = 0;
-        while (index < tracks.Count && AudioLibrary.ComparePaths(root, tracks[index].FilePath, path) < 0)
-            index++;
-        tracks.Insert(index, added);
-        SavePlaylist();
-    }
+        => Playlist.AddFile(path, silenceSettings.GetExcludedFolderNames());
 
     private async Task TogglePlaybackAsync()
     {
@@ -553,7 +482,7 @@ public partial class MainWindow : Window
         }
         else
         {
-            var track = TrackList.SelectedItem as AudioTrack ?? tracks.FirstOrDefault();
+            var track = TrackList.SelectedItem as AudioTrack ?? Playlist.Tracks.FirstOrDefault();
             if (track is not null) await LoadTrackAsync(track);
         }
     }
@@ -630,9 +559,9 @@ public partial class MainWindow : Window
             await RunActionAsync(async () =>
             {
                 if (!player.ConsumeNaturalCompletion(token) || loadedTrack is null) return;
-                int index = NextPlaybackIndex(silenceSettings.PlaybackMode, tracks.IndexOf(loadedTrack), tracks.Count);
+                int index = NextPlaybackIndex(silenceSettings.PlaybackMode, Playlist.Tracks.IndexOf(loadedTrack), Playlist.Tracks.Count);
                 if (index < 0) return;
-                AudioTrack next = tracks[index];
+                AudioTrack next = Playlist.Tracks[index];
                 if (ReferenceEquals(next, loadedTrack))
                 {
                     await player.PlayAsync();
@@ -817,10 +746,10 @@ public partial class MainWindow : Window
         ScriptButton.IsEnabled = available;
         SettingsButton.IsEnabled = available;
         PlaybackModeButton.IsEnabled = available && settingsFileReady;
-        RefreshButton.IsEnabled = available && !trimming && currentFolder is not null;
+        RefreshButton.IsEnabled = available && !trimming && Playlist.RootFolder is not null;
         TrimButton.IsEnabled = !closing && !operationBusy && !analyzing && !trimming && selectedCanTrim;
         TrackList.IsEnabled = available;
-        PlayButton.IsEnabled = available && (player.IsLoaded || tracks.Count > 0);
+        PlayButton.IsEnabled = available && (player.IsLoaded || Playlist.Tracks.Count > 0);
         StopButton.IsEnabled = available && player.IsLoaded;
         ProgressSlider.IsEnabled = available && player.IsLoaded;
         bool playing = player.IsPlaying || scriptSeek?.Resume == true;
@@ -1117,7 +1046,7 @@ public partial class MainWindow : Window
         closing = true;
         TakeScriptSeek();
         CloseScriptWindow();
-        scanCancellation.Cancel();
+        Playlist.CancelPending();
         CancelAnalysis();
         CancelSelectionCheck();
         trimCancellation?.Cancel();
@@ -1144,7 +1073,7 @@ public partial class MainWindow : Window
             player.StateChanged -= Player_StateChanged;
             player.NaturalPlaybackEnded -= Player_NaturalPlaybackEnded;
             player.Dispose();
-            scanCancellation.Dispose();
+            Playlist.Dispose();
             allowClose = true;
             Close();
         }

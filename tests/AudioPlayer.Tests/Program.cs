@@ -693,6 +693,88 @@ try
         File.Delete(path);
     });
 
+    Check("Playlist module owns read-only tracks, scan, insertion and saved restoration", () =>
+    {
+        string root = Path.Combine(fixture, "playlist-module");
+        string savedPath = Path.Combine(fixture, "module.playlist.json");
+        var store = new PlaylistStore(savedPath);
+        var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "skip" };
+        Directory.CreateDirectory(Path.Combine(root, "skip"));
+        string original = Path.Combine(root, "10.mp3");
+        string added = Path.Combine(root, "2.mp3");
+        string omitted = Path.Combine(root, "skip", "1.mp3");
+        File.WriteAllText(original, "metadata fixture");
+        File.WriteAllText(omitted, "metadata fixture");
+        try
+        {
+            using var playlist = new Playlist(store);
+            Assert(playlist.LoadFolderAsync(root, excluded).GetAwaiter().GetResult());
+            Assert(playlist.RootFolder == root && playlist.Tracks.Count == 1);
+            Assert(((ICollection<AudioTrack>)playlist.Tracks).IsReadOnly);
+            File.WriteAllText(added, "metadata fixture");
+            playlist.AddFile(added, excluded);
+            playlist.AddFile(added, excluded);
+            playlist.AddFile(omitted, excluded);
+            playlist.AddFile(Path.Combine(fixture, "01.mp3"), excluded);
+            Assert(playlist.Tracks.Select(track => track.FilePath).SequenceEqual(new[] { added, original }));
+            Assert(store.Load()!.Files.SequenceEqual(new[] { added, original }));
+            File.Delete(original);
+            File.WriteAllText(Path.Combine(root, "3.mp3"), "not in saved playlist");
+            using var restored = new Playlist(store);
+            Assert(restored.RestoreAsync(excluded).GetAwaiter().GetResult());
+            Assert(restored.RootFolder == root && restored.Tracks.Single().FilePath == added);
+            Assert(store.Load()!.Files.SequenceEqual(new[] { added }));
+        }
+        finally { Directory.Delete(root, true); File.Delete(savedPath); }
+    });
+
+    Check("Playlist module preserves saved state on cancellation and clears it on scan failure", () =>
+    {
+        string path = Path.Combine(fixture, "module-cancel.playlist.json");
+        var store = new PlaylistStore(path);
+        var excluded = new HashSet<string>();
+        try
+        {
+            using (var playlist = new Playlist(store))
+            {
+                Assert(playlist.LoadFolderAsync(fixture, excluded).GetAwaiter().GetResult());
+                string old = File.ReadAllText(path);
+                playlist.CancelPending();
+                try { playlist.LoadFolderAsync(fixture, excluded).GetAwaiter().GetResult(); }
+                catch (OperationCanceledException) { }
+                Assert(File.ReadAllText(path) == old);
+            }
+            using var next = new Playlist(store);
+            Assert(next.RestoreAsync(excluded).GetAwaiter().GetResult());
+            bool failed = false;
+            try { next.LoadFolderAsync(Path.Combine(fixture, "absent"), excluded).GetAwaiter().GetResult(); }
+            catch (DirectoryNotFoundException) { failed = true; }
+            Assert(failed && next.RootFolder is null && next.Tracks.Count == 0);
+            Assert(store.Load() is { RootFolder: null, Files.Length: 0 });
+        }
+        finally { File.Delete(path); }
+    });
+
+    Check("Playlist module reports save failure without discarding in-memory tracks", () =>
+    {
+        string path = Path.Combine(fixture, "module-locked.playlist.json");
+        var store = new PlaylistStore(path);
+        var excluded = new HashSet<string>();
+        store.Save(null, Array.Empty<string>());
+        string old = File.ReadAllText(path);
+        try
+        {
+            using var playlist = new Playlist(store);
+            var errors = new List<string>();
+            playlist.Error += errors.Add;
+            using (var locked = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+                Assert(playlist.LoadFolderAsync(fixture, excluded).GetAwaiter().GetResult());
+            Assert(playlist.RootFolder == fixture && playlist.Tracks.Count > 0);
+            Assert(errors.Count == 1 && File.ReadAllText(path) == old);
+        }
+        finally { File.Delete(path); }
+    });
+
     Check("Restore skips missing files and directories posing as audio", () =>
     {
         string fake = Path.Combine(fixture, "folder.wav");

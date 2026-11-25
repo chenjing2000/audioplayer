@@ -143,7 +143,7 @@ internal static class UiChecks
                             writer.WriteSamples(new float[44100], 0, 44100);
                         await window.LoadFolderAsync(refreshFolder);
                         Assert(list.Items.Count == 1 && refreshButton.IsEnabled, "Recursive folder load includes nested audio");
-                        var playlistStore = Field<PlaylistStore>(window, "playlistStore")!;
+                        var playlistStore = new PlaylistStore(settingsStore.FilePath[..^".settings.json".Length] + ".playlist.json");
                         Assert(playlistStore.Load()!.Files.SequenceEqual(new[] { original }),
                             "Opening a directory persists the absolute nested path");
                         Assert(((AudioTrack)list.Items[0]).DisplayName == "original" &&
@@ -190,7 +190,7 @@ internal static class UiChecks
                             var restoredList = (DataGrid)reopened.FindName("TrackList");
                             Assert(restoredList.Items.Count == 1 &&
                                 ((AudioTrack)restoredList.Items[0]).FilePath == renamed &&
-                                Field<string>(reopened, "currentFolder") == refreshFolder &&
+                                reopened.Playlist.RootFolder == refreshFolder &&
                                 !Field<PlayerEngine>(reopened, "player")!.IsLoaded,
                                 "Startup restores saved existing files without rescanning or playing");
                             Assert(playlistStore.Load()!.Files.SequenceEqual(new[] { renamed }),
@@ -202,7 +202,7 @@ internal static class UiChecks
                         if (Field<Task>(window, "activeOperation") is Task failedAction) await failedAction;
                         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                         Assert(list.Items.Count == 0 && list.SelectedItem is null &&
-                            Field<string>(window, "currentFolder") is null &&
+                            window.Playlist.RootFolder is null &&
                             !Field<PlayerEngine>(window, "player")!.IsLoaded &&
                             !refreshButton.IsEnabled && !playButton.IsEnabled && !stopButton.IsEnabled,
                             "Missing refresh folder clears playlist, folder path and playback controls");
@@ -212,13 +212,13 @@ internal static class UiChecks
                         // A failed scan from the Open Folder path clears the old state too.
                         await window.LoadFolderAsync(audioFolder);
                         Assert(refreshButton.IsEnabled &&
-                            Field<string>(window, "currentFolder") == Path.GetFullPath(audioFolder),
+                            window.Playlist.RootFolder == Path.GetFullPath(audioFolder),
                             "Valid folder can reopen after failed refresh");
                         bool failedScan = false;
                         try { await window.LoadFolderAsync(refreshFolder); }
                         catch (DirectoryNotFoundException) { failedScan = true; }
                         Assert(failedScan && list.Items.Count == 0 &&
-                            Field<string>(window, "currentFolder") is null &&
+                            window.Playlist.RootFolder is null &&
                             !refreshButton.IsEnabled && !playButton.IsEnabled,
                             "Failed folder load clears previously loaded folder");
                         // A successfully scanned empty folder is not a scan failure.
@@ -228,7 +228,7 @@ internal static class UiChecks
                         {
                             await window.LoadFolderAsync(emptyFolder);
                             Assert(list.Items.Count == 0 &&
-                                Field<string>(window, "currentFolder") == Path.GetFullPath(emptyFolder) &&
+                                window.Playlist.RootFolder == Path.GetFullPath(emptyFolder) &&
                                 refreshButton.IsEnabled,
                                 "Empty valid folder retains folder path and Refresh");
                         }
