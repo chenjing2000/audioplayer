@@ -26,27 +26,27 @@ internal sealed class SettingsStore
     public static string GetFilePath(string executablePath)
         => Path.ChangeExtension(executablePath, ".settings.json");
 
-    public SilenceSettings LoadOrCreate()
+    public AppSettings LoadOrCreate()
     {
         if (!File.Exists(FilePath))
         {
-            var defaults = new SilenceSettings();
+            var defaults = new AppSettings();
             Save(defaults);
             return defaults;
         }
 
         string json = File.ReadAllText(FilePath);
-        var settings = JsonSerializer.Deserialize<SilenceSettings>(json)
+        var settings = JsonSerializer.Deserialize<AppSettings>(json)
             ?? throw new JsonException("配置文件不能为 null。");
         using (var document = JsonDocument.Parse(json))
         {
             foreach (string name in new[]
             {
-                nameof(SilenceSettings.FrameMilliseconds),
-                nameof(SilenceSettings.MinimumSilenceMilliseconds),
-                nameof(SilenceSettings.SilenceThresholdDb),
-                nameof(SilenceSettings.NavigationToleranceMilliseconds),
-                nameof(SilenceSettings.AllowedSilenceSeconds)
+                nameof(AppSettings.FrameMilliseconds),
+                nameof(AppSettings.MinimumSilenceMilliseconds),
+                nameof(AppSettings.SilenceThresholdDb),
+                nameof(AppSettings.NavigationToleranceMilliseconds),
+                nameof(AppSettings.AllowedSilenceSeconds)
             })
             {
                 if (!document.RootElement.TryGetProperty(name, out _))
@@ -59,7 +59,7 @@ internal sealed class SettingsStore
         return settings;
     }
 
-    public void Save(SilenceSettings settings)
+    public void Save(AppSettings settings)
     {
         settings.Validate();
         string temporaryPath = FilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";

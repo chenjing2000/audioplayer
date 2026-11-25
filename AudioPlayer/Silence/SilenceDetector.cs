@@ -1,21 +1,19 @@
 using NAudio.Wave;
 using System.IO;
 
-using AudioPlayer.Settings;
-
 namespace AudioPlayer.Silence;
 
 public static class SilenceDetector
 {
     public static List<SilenceRange> Detect(string filePath)
     {
-        return Detect(filePath, new SilenceSettings());
+        return Detect(filePath, new SilenceOptions());
     }
 
-    public static List<SilenceRange> Detect(string filePath, SilenceSettings settings)
+    public static List<SilenceRange> Detect(string filePath, SilenceOptions settings)
         => Detect(filePath, settings, CancellationToken.None);
 
-    public static List<SilenceRange> Detect(string filePath, SilenceSettings settings, CancellationToken cancellationToken)
+    public static List<SilenceRange> Detect(string filePath, SilenceOptions settings, CancellationToken cancellationToken)
     {
         settings.Validate();
         using var reader = new AudioFileReader(filePath);
@@ -24,13 +22,13 @@ public static class SilenceDetector
 
     internal static List<SilenceRange> DetectSamples(ISampleProvider source)
     {
-        return DetectSamples(source, new SilenceSettings());
+        return DetectSamples(source, new SilenceOptions());
     }
 
-    internal static List<SilenceRange> DetectSamples(ISampleProvider source, SilenceSettings settings)
+    internal static List<SilenceRange> DetectSamples(ISampleProvider source, SilenceOptions settings)
         => DetectSamples(source, settings, CancellationToken.None);
 
-    internal static List<SilenceRange> DetectSamples(ISampleProvider source, SilenceSettings settings, CancellationToken cancellationToken)
+    internal static List<SilenceRange> DetectSamples(ISampleProvider source, SilenceOptions settings, CancellationToken cancellationToken)
     {
         settings.Validate();
         int rate = source.WaveFormat.SampleRate;
@@ -96,13 +94,13 @@ public static class SilenceDetector
 
     public static TimeSpan? FindNext(List<SilenceRange> ranges, TimeSpan currentTime)
     {
-        return FindNext(ranges, currentTime, new SilenceSettings());
+        return FindNext(ranges, currentTime, SilenceOptions.DefaultNavigationToleranceMilliseconds);
     }
 
-    public static TimeSpan? FindNext(List<SilenceRange> ranges, TimeSpan currentTime, SilenceSettings settings)
+    public static TimeSpan? FindNext(List<SilenceRange> ranges, TimeSpan currentTime, int navigationToleranceMilliseconds)
     {
-        settings.Validate();
-        TimeSpan limit = currentTime + TimeSpan.FromMilliseconds(settings.NavigationToleranceMilliseconds);
+        SilenceOptions.ValidateNavigationTolerance(navigationToleranceMilliseconds);
+        TimeSpan limit = currentTime + TimeSpan.FromMilliseconds(navigationToleranceMilliseconds);
         foreach (var range in ranges)
             if (range.Middle > limit) return range.Middle;
         return null;
@@ -110,13 +108,13 @@ public static class SilenceDetector
 
     public static TimeSpan? FindPrevious(List<SilenceRange> ranges, TimeSpan currentTime)
     {
-        return FindPrevious(ranges, currentTime, new SilenceSettings());
+        return FindPrevious(ranges, currentTime, SilenceOptions.DefaultNavigationToleranceMilliseconds);
     }
 
-    public static TimeSpan? FindPrevious(List<SilenceRange> ranges, TimeSpan currentTime, SilenceSettings settings)
+    public static TimeSpan? FindPrevious(List<SilenceRange> ranges, TimeSpan currentTime, int navigationToleranceMilliseconds)
     {
-        settings.Validate();
-        TimeSpan limit = currentTime - TimeSpan.FromMilliseconds(settings.NavigationToleranceMilliseconds);
+        SilenceOptions.ValidateNavigationTolerance(navigationToleranceMilliseconds);
+        TimeSpan limit = currentTime - TimeSpan.FromMilliseconds(navigationToleranceMilliseconds);
         for (int i = ranges.Count - 1; i >= 0; i--)
             if (ranges[i].Middle < limit) return ranges[i].Middle;
         return null;

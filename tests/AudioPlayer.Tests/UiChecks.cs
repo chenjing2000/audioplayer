@@ -300,7 +300,7 @@ internal static class UiChecks
                         Assert(!trimButton.IsEnabled && !File.Exists(SilenceResultStore.GetPath(source)),
                             "Selecting uncached audio does not trigger detection or enable trimming");
 
-                        Assert(SilenceResultStore.LoadOrDetect(source, new SilenceSettings()).Saved,
+                        Assert(SilenceResultStore.LoadOrDetect(source, new SilenceOptions()).Saved,
                             "Synthetic selection fixture can persist results");
                         // M4A decoders can report one PCM sample more than TotalTime at EOF.
                         string resultPath = SilenceResultStore.GetPath(source);
@@ -343,13 +343,13 @@ internal static class UiChecks
                             "Mode cycles, updates icon and persists " + modeOrder[i]);
                     }
                     modeButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    var modeDialog = new SilenceSettingsWindow(settingsStore.LoadOrCreate());
-                    var readModeValues = typeof(SilenceSettingsWindow).GetMethod("TryReadValues", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                    var modeDialog = new SettingsWindow(settingsStore.LoadOrCreate());
+                    var readModeValues = typeof(SettingsWindow).GetMethod("TryReadValues", BindingFlags.Instance | BindingFlags.NonPublic)!;
                     object?[] modeArgs = { null };
-                    Assert((bool)readModeValues.Invoke(modeDialog, modeArgs)! && ((SilenceSettings)modeArgs[0]!).PlaybackMode == PlaybackMode.RepeatOne,
+                    Assert((bool)readModeValues.Invoke(modeDialog, modeArgs)! && ((AppSettings)modeArgs[0]!).PlaybackMode == PlaybackMode.RepeatOne,
                         "Normal settings validation preserves playback mode");
                     ((Button)modeDialog.FindName("RestoreDefaultsButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    Assert((bool)readModeValues.Invoke(modeDialog, modeArgs)! && ((SilenceSettings)modeArgs[0]!).PlaybackMode == PlaybackMode.PlayOne
+                    Assert((bool)readModeValues.Invoke(modeDialog, modeArgs)! && ((AppSettings)modeArgs[0]!).PlaybackMode == PlaybackMode.PlayOne
                         && settingsStore.LoadOrCreate().PlaybackMode == PlaybackMode.RepeatOne,
                         "Restore Defaults stages Play One without saving until confirmation");
                     modeDialog.Close();
@@ -431,7 +431,7 @@ internal static class UiChecks
                         && Math.Abs(stopBounds.Top + stopBounds.Height / 2 - stopCircle.Center.Y) < 0.01,
                         "Stop square is centered and exactly 35% of circle height");
 
-                    var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
+                    var settingsWindow = new SettingsWindow(new AppSettings());
                     var settingsTabs = (TabControl)settingsWindow.FindName("SettingsTabs");
                     Assert(settingsTabs.Items.Count == 2 && (string)((TabItem)settingsTabs.Items[0]).Header == "音频设置" &&
                         (string)((TabItem)settingsTabs.Items[1]).Header == "字幕参数" && settingsTabs.BorderThickness == new Thickness(0),
@@ -514,7 +514,7 @@ internal static class UiChecks
                          colors.SelectedIndex = -1;
                          Assert(colors.SelectedIndex == 2, "A color group cannot become unselected");
                      }
-                     var readAppearance = typeof(SilenceSettingsWindow).GetMethod("ReadAppearance", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                     var readAppearance = typeof(SettingsWindow).GetMethod("ReadAppearance", BindingFlags.Instance | BindingFlags.NonPublic)!;
                      var chosenAppearance = (ScriptAppearance)readAppearance.Invoke(settingsWindow, null)!;
                      Assert(chosenAppearance.Color == (string)colorLists[0].Items[2] &&
                          chosenAppearance.ScriptColor == (string)colorLists[1].Items[2] &&
@@ -530,18 +530,18 @@ internal static class UiChecks
                      var backwardBox = (TextBox)settingsWindow.FindName("BackwardStepTextBox");
                      var forwardBox = (TextBox)settingsWindow.FindName("ForwardStepTextBox");
                      Assert(backwardBox.Text == "5" && forwardBox.Text == "4" && backwardBox.MaxLength == 2 && forwardBox.MaxLength == 2, "Step defaults and length");
-                     MethodInfo stepInput = typeof(SilenceSettingsWindow).GetMethod("IsStepText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     MethodInfo stepInput = typeof(SettingsWindow).GetMethod("IsStepText", BindingFlags.Static | BindingFlags.NonPublic)!;
                      Assert(new[] { "", "0", "99", "05" }.All(v => (bool)stepInput.Invoke(null, new object[] { v })!)
                          && new[] { "+5", "-1", "100", "2.5", "５", "a" }.All(v => !(bool)stepInput.Invoke(null, new object[] { v })!), "Step input is ASCII digits only");
                      Assert(MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control) && MainWindow.IsPlaybackShortcut(Key.Right, ModifierKeys.Control)
                          && MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.None) && !MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.Control)
                          && !MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control | ModifierKeys.Shift), "Shortcut modifier routing");
-                     MethodInfo positiveInput = typeof(SilenceSettingsWindow).GetMethod("IsPositiveIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
-                    MethodInfo signedInput = typeof(SilenceSettingsWindow).GetMethod("IsSignedIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     MethodInfo positiveInput = typeof(SettingsWindow).GetMethod("IsPositiveIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                    MethodInfo signedInput = typeof(SettingsWindow).GetMethod("IsSignedIntegerText", BindingFlags.Static | BindingFlags.NonPublic)!;
                     Assert((bool)positiveInput.Invoke(null, new object[] { "+123" })! && !(bool)positiveInput.Invoke(null, new object[] { "-1" })! && !(bool)positiveInput.Invoke(null, new object[] { "1.5" })! && !(bool)positiveInput.Invoke(null, new object[] { "abc" })!, "Positive parameter boxes accept only digits and optional leading plus sign");
                     Assert((bool)signedInput.Invoke(null, new object[] { "-45" })! && (bool)signedInput.Invoke(null, new object[] { "+45" })! && !(bool)signedInput.Invoke(null, new object[] { "4-5" })! && !(bool)signedInput.Invoke(null, new object[] { "-4.5" })!, "Silence threshold box accepts digits and one leading sign only");
-                    MethodInfo editableSeconds = typeof(SilenceSettingsWindow).GetMethod("IsEditableSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
-                     MethodInfo completeSeconds = typeof(SilenceSettingsWindow).GetMethod("IsCompleteSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
+                    MethodInfo editableSeconds = typeof(SettingsWindow).GetMethod("IsEditableSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     MethodInfo completeSeconds = typeof(SettingsWindow).GetMethod("IsCompleteSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
                      Assert((bool)editableSeconds.Invoke(null, new object[] { "2." })!
                           && (bool)editableSeconds.Invoke(null, new object[] { "" })!
                           && !(bool)editableSeconds.Invoke(null, new object[] { "2.35" })!
@@ -557,7 +557,7 @@ internal static class UiChecks
                      Assert(Math.Abs(restoreButton.Width - 76) < 0.01, "Restore button width is 76");
                      Assert(Math.Abs(cancelButton.Width - 54) < 0.01 && Math.Abs(okButton.Width - 54) < 0.01, "Dialog button widths are 54");
                      var allowedBox = (TextBox)settingsWindow.FindName("AllowedSilenceTextBox");
-                     MethodInfo readValues = typeof(SilenceSettingsWindow).GetMethod("TryReadValues",
+                     MethodInfo readValues = typeof(SettingsWindow).GetMethod("TryReadValues",
                          BindingFlags.Instance | BindingFlags.NonPublic)!;
                      excludedBox.Text = " audio , video; AUDIO；中文 文件夹，";
                      Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })! && excludedBox.Text == "audio, video, 中文 文件夹", "Folder names normalize on validation");
@@ -662,7 +662,7 @@ internal static class UiChecks
                     Assert(list.ColumnHeaderHeight == 32, "List header height is 32");
                     _ = window.Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        var editWindow = app.Windows.OfType<SilenceSettingsWindow>().Single(w => w.IsVisible);
+                        var editWindow = app.Windows.OfType<SettingsWindow>().Single(w => w.IsVisible);
                         ((TextBox)editWindow.FindName("FrameMillisecondsTextBox")).Text = "25";
                         ((TextBox)editWindow.FindName("MinimumSilenceTextBox")).Text = "600";
                         ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 19;
@@ -673,23 +673,23 @@ internal static class UiChecks
                     var saved = settingsStore.LoadOrCreate();
                     Assert(saved.FrameMilliseconds == 25 && saved.MinimumSilenceMilliseconds == 600
                         && saved.ScriptAppearance.FontSize == 19 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
-                        && Field<SilenceSettings>(window, "silenceSettings")!.ScriptAppearance == saved.ScriptAppearance
-                        && Field<SilenceSettings>(window, "silenceSettings")!.FrameMilliseconds == 25,
+                        && Field<AppSettings>(window, "appSettings")!.ScriptAppearance == saved.ScriptAppearance
+                        && Field<AppSettings>(window, "appSettings")!.FrameMilliseconds == 25,
                         "Settings dialog saves confirmed values before applying them");
                     string savedBeforeCancel = File.ReadAllText(settingsStore.FilePath);
                     _ = window.Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        var editWindow = app.Windows.OfType<SilenceSettingsWindow>().Single(w => w.IsVisible);
+                        var editWindow = app.Windows.OfType<SettingsWindow>().Single(w => w.IsVisible);
                         ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 18;
                         ((ListBox)editWindow.FindName("BackgroundColorBox")).SelectedIndex = 3;
                         editWindow.DialogResult = false;
                     }));
                     settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     Assert(File.ReadAllText(settingsStore.FilePath) == savedBeforeCancel &&
-                        Field<SilenceSettings>(window, "silenceSettings")!.ScriptAppearance == saved.ScriptAppearance,
+                        Field<AppSettings>(window, "appSettings")!.ScriptAppearance == saved.ScriptAppearance,
                         "Cancel leaves persisted and active subtitle settings unchanged");
                     var restoredWindow = new MainWindow(settingsStore);
-                    Assert(Field<SilenceSettings>(restoredWindow, "silenceSettings")!.FrameMilliseconds == 25,
+                    Assert(Field<AppSettings>(restoredWindow, "appSettings")!.FrameMilliseconds == 25,
                         "Window restores saved settings on next launch");
                     restoredWindow.Close();
                     string invalidConfiguration = "{broken";
@@ -1134,7 +1134,7 @@ internal static class UiChecks
                     var closeSettingsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
                     closeSettingsTimer.Tick += (_, _) =>
                     {
-                        var activeDialog = app.Windows.OfType<SilenceSettingsWindow>().SingleOrDefault(w => w.IsVisible);
+                        var activeDialog = app.Windows.OfType<SettingsWindow>().SingleOrDefault(w => w.IsVisible);
                         if (activeDialog is null) return;
                         closeSettingsTimer.Stop();
                         activeDialog.Close();

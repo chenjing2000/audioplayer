@@ -2,8 +2,6 @@ using NAudio.Wave;
 using System.IO;
 using System.Text.Json;
 
-using AudioPlayer.Settings;
-
 namespace AudioPlayer.Silence;
 
 internal sealed record AudioFingerprint(
@@ -78,12 +76,12 @@ internal static class SilenceResultStore
         return endTicks - fingerprint.DurationTicks <= oneSampleTicks ? fingerprint.DurationTicks : endTicks;
     }
 
-    public static IReadOnlyList<SilenceRange>? TryLoad(string audioPath, SilenceSettings settings,
+    public static IReadOnlyList<SilenceRange>? TryLoad(string audioPath, SilenceOptions settings,
         CancellationToken cancellation = default)
         => TryLoadVerified(audioPath, settings, cancellation)?.Ranges;
 
     // Return the already-validated fingerprint to callers that need the sample rate.
-    internal static SilenceAnalysis? TryLoadVerified(string audioPath, SilenceSettings settings,
+    internal static SilenceAnalysis? TryLoadVerified(string audioPath, SilenceOptions settings,
         CancellationToken cancellation = default)
     {
         AudioFingerprint fingerprint = Capture(audioPath, cancellation);
@@ -91,7 +89,7 @@ internal static class SilenceResultStore
         return ranges is null ? null : new SilenceAnalysis(ranges, true, true, fingerprint);
     }
 
-    private static IReadOnlyList<SilenceRange>? TryLoad(string audioPath, SilenceSettings settings,
+    private static IReadOnlyList<SilenceRange>? TryLoad(string audioPath, SilenceOptions settings,
         AudioFingerprint fingerprint, CancellationToken cancellation)
     {
         cancellation.ThrowIfCancellationRequested();
@@ -137,7 +135,7 @@ internal static class SilenceResultStore
         return result;
     }
 
-    public static SilenceAnalysis LoadOrDetect(string audioPath, SilenceSettings settings,
+    public static SilenceAnalysis LoadOrDetect(string audioPath, SilenceOptions settings,
         CancellationToken cancellation = default)
     {
         settings.Validate();
@@ -153,7 +151,7 @@ internal static class SilenceResultStore
         return new SilenceAnalysis(detected, false, saved, before);
     }
 
-    private static bool TrySave(string audioPath, AudioFingerprint fingerprint, SilenceSettings settings,
+    private static bool TrySave(string audioPath, AudioFingerprint fingerprint, SilenceOptions settings,
         IReadOnlyList<SilenceRange> ranges, CancellationToken cancellation)
     {
         string path = GetPath(audioPath);

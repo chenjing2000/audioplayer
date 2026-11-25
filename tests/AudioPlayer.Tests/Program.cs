@@ -20,10 +20,10 @@ void Assert(bool value, string message = "Assertion failed")
 {
     if (!value) throw new Exception(message);
 }
-List<SilenceRange> Detect(float[] samples, int rate = 1000, int channels = 1, int maxRead = int.MaxValue, SilenceSettings? settings = null)
+List<SilenceRange> Detect(float[] samples, int rate = 1000, int channels = 1, int maxRead = int.MaxValue, AppSettings? settings = null)
 {
     var source = new Samples(samples, rate, channels, maxRead);
-    return settings is null ? SilenceDetector.DetectSamples(source) : SilenceDetector.DetectSamples(source, settings);
+    return settings is null ? SilenceDetector.DetectSamples(source) : SilenceDetector.DetectSamples(source, settings.GetSilenceOptions());
 }
 float[] Signal(int soundBefore, int silence, int soundAfter)
     => Enumerable.Repeat(0.5f, soundBefore).Concat(new float[silence]).Concat(Enumerable.Repeat(0.5f, soundAfter)).ToArray();
@@ -101,7 +101,7 @@ Check("Retired script options normalize only on load without rewriting the file"
     try
     {
         var store = new SettingsStore(Path.Combine(folder, "player.settings.json"));
-        var settings = new SilenceSettings();
+        var settings = new AppSettings();
         foreach (var (size, newSize) in new[] { (14, 17), (15, 17), (16, 17), (17, 17), (18, 18), (19, 19), (20, 20), (22, 20), (24, 20), (26, 20), (28, 20) })
         foreach (var (height, newHeight) in new[] { (1.4, 1.5), (2.0, 1.8) })
         foreach (var (spacing, newSpacing) in new[] { (0, 8), (14, 16), (18, 20), (24, 20) })
@@ -164,16 +164,16 @@ Check("Settings initialize beside executable, persist and preserve invalid files
         Assert(loaded.BackwardStepSeconds == 0 && loaded.ForwardStepSeconds == 99 && loaded.ExcludedFolderNames == "audio, 视频" && loaded.PlaybackMode == PlaybackMode.RepeatAll);
         Assert(File.ReadAllText(store.FilePath).Contains("\"PlaybackMode\": \"RepeatAll\""));
         string previous = File.ReadAllText(store.FilePath);
-        try { store.Save(new SilenceSettings { PlaybackMode = (PlaybackMode)99 }); throw new Exception("Invalid mode accepted"); }
+        try { store.Save(new AppSettings { PlaybackMode = (PlaybackMode)99 }); throw new Exception("Invalid mode accepted"); }
         catch (ArgumentOutOfRangeException) { }
         Assert(File.ReadAllText(store.FilePath) == previous);
         foreach (string invalidName in new[] { "audio*", "a/b", "CON", "NUL.txt", "folder.", ".." })
         {
-            try { store.Save(new SilenceSettings { ExcludedFolderNames = invalidName }); throw new Exception("Invalid folder accepted"); }
+            try { store.Save(new AppSettings { ExcludedFolderNames = invalidName }); throw new Exception("Invalid folder accepted"); }
             catch (ArgumentOutOfRangeException) { }
             Assert(File.ReadAllText(store.FilePath) == previous);
         }
-        foreach (var invalidStep in new[] { new SilenceSettings { BackwardStepSeconds = -1 }, new SilenceSettings { ForwardStepSeconds = 100 } })
+        foreach (var invalidStep in new[] { new AppSettings { BackwardStepSeconds = -1 }, new AppSettings { ForwardStepSeconds = 100 } })
         {
             try { store.Save(invalidStep); throw new Exception("Invalid step accepted"); }
             catch (ArgumentOutOfRangeException) { }
@@ -209,7 +209,7 @@ Check("Settings save failure preserves original configuration", () =>
         string original = File.ReadAllText(path);
         File.SetAttributes(path, FileAttributes.ReadOnly);
         bool rejected = false;
-        try { store.Save(new SilenceSettings { FrameMilliseconds = 30 }); }
+        try { store.Save(new AppSettings { FrameMilliseconds = 30 }); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { rejected = true; }
         Assert(rejected && File.ReadAllText(path) == original);
         Assert(Directory.GetFiles(folder).Length == 1);
@@ -234,9 +234,26 @@ Check("Playback mode completion policy", () =>
         Assert(MainWindow.NextPlaybackIndex(mode, -1, 3) == -1 && MainWindow.NextPlaybackIndex(mode, 0, 0) == -1);
 });
 
+Check("Silence operation options are isolated from mutable application settings", () =>
+{
+    var settings = new AppSettings();
+    var snapshot = settings.GetSilenceOptions();
+    settings.FrameMilliseconds = 20;
+    settings.AllowedSilenceSeconds = 3.0m;
+    settings.BackwardStepSeconds = 99;
+    Assert(snapshot.FrameMilliseconds == 10 && snapshot.AllowedSilenceSeconds == 2.0m);
+    Assert(settings.GetSilenceOptions() == new SilenceOptions(FrameMilliseconds: 20, AllowedSilenceSeconds: 3.0m));
+    using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(settings));
+    Assert(json.RootElement.EnumerateObject().Select(property => property.Name).ToHashSet().SetEquals(new[]
+    {
+        "FrameMilliseconds", "MinimumSilenceMilliseconds", "SilenceThresholdDb",
+        "NavigationToleranceMilliseconds", "AllowedSilenceSeconds", "BackwardStepSeconds",
+        "ForwardStepSeconds", "ExcludedFolderNames", "PlaybackMode", "ScriptAppearance"
+    }), "Application settings retain the exact existing JSON field set");
+});
 Check("Silence settings defaults", () =>
 {
-    var settings = new SilenceSettings();
+    var settings = new AppSettings();
     Assert(settings.FrameMilliseconds == 10);
     Assert(settings.MinimumSilenceMilliseconds == 300);
     Assert(settings.SilenceThresholdDb == -45);
@@ -244,17 +261,17 @@ Check("Silence settings defaults", () =>
 });
 Check("Custom minimum silence is used", () =>
 {
-    var settings = new SilenceSettings { MinimumSilenceMilliseconds = 100 };
+    var settings = new AppSettings { MinimumSilenceMilliseconds = 100 };
     Assert(Detect(new float[100], settings: settings).Count == 1);
 });
 Check("Custom silence threshold is used", () =>
 {
-    var settings = new SilenceSettings { SilenceThresholdDb = -50 };
+    var settings = new AppSettings { SilenceThresholdDb = -50 };
     Assert(Detect(Enumerable.Repeat(0.005f, 400).ToArray(), settings: settings).Count == 0);
 });
 Check("Minimum threshold detects digital silence and very quiet samples", () =>
 {
-    var settings = new SilenceSettings { SilenceThresholdDb = -100 };
+    var settings = new AppSettings { SilenceThresholdDb = -100 };
     Assert(Detect(new float[400], settings: settings).Count == 1);
     Assert(Detect(Enumerable.Repeat(1e-8f, 400).ToArray(), settings: settings).Count == 1);
     Assert(Detect(Enumerable.Repeat(0.0001f, 400).ToArray(), settings: settings).Count == 0);
@@ -267,7 +284,7 @@ Check("Cancel PCM silence scan", () =>
     try
     {
         SilenceDetector.DetectSamples(new Samples(new float[1000], 1000, 1, 1000),
-            new SilenceSettings(), cancellation.Token);
+            new SilenceOptions(), cancellation.Token);
     }
     catch (OperationCanceledException) { cancelled = true; }
     Assert(cancelled);
@@ -287,7 +304,7 @@ Check("Low energy below threshold", () => Assert(Detect(Enumerable.Repeat(0.005f
 Check("Energy above threshold", () => Assert(Detect(Enumerable.Repeat(0.006f, 400).ToArray()).Count == 0));
 Check("Allowed silence default and linked minimum", () =>
 {
-    var settings = new SilenceSettings();
+    var settings = new AppSettings();
     Assert(settings.AllowedSilenceSeconds == 2.0m);
     settings.MinimumSilenceMilliseconds = 5000;
     bool rejected = false;
@@ -333,25 +350,25 @@ Check("Silence results reuse verified metadata and ignore navigation and trim pa
     try
     {
         WaveFileWriter.CreateWaveFile16(source, new Samples(Signal(100, 4500, 100), 1000, 1, int.MaxValue));
-        var settings = new SilenceSettings();
+        var settings = new AppSettings();
         string path = SilenceResultStore.GetPath(source);
         Assert(path == Path.Combine(folder, "results", "lesson (1).wav.silent_segments.json"));
         // Old nested results are not imported or changed by the new flat result store.
         string legacy = Path.Combine(folder, "results", "lesson (1).wav", "silence.json");
         Directory.CreateDirectory(Path.GetDirectoryName(legacy)!);
         File.WriteAllText(legacy, "{old-cache}");
-        var first = SilenceResultStore.LoadOrDetect(source, settings);
+        var first = SilenceResultStore.LoadOrDetect(source, settings.GetSilenceOptions());
         Assert(File.ReadAllText(legacy) == "{old-cache}", "Legacy result remains untouched");
         Assert(!first.FromCache && first.Saved && first.Ranges.Count == 1 && File.Exists(path));
         string original = File.ReadAllText(path);
         Assert(!original.Contains("sha256", StringComparison.OrdinalIgnoreCase), "No content hashing");
 
-        var reused = SilenceResultStore.LoadOrDetect(source, new SilenceSettings
+        var reused = SilenceResultStore.LoadOrDetect(source, (new AppSettings
         {
             NavigationToleranceMilliseconds = 500, AllowedSilenceSeconds = 3.0m
-        });
+        }).GetSilenceOptions());
         Assert(reused.FromCache && reused.Ranges.Count == 1);
-        var verified = SilenceResultStore.TryLoadVerified(source, settings);
+        var verified = SilenceResultStore.TryLoadVerified(source, settings.GetSilenceOptions());
         Assert(verified is not null && verified.FromCache && verified.Saved
             && verified.Fingerprint.SampleRate == 1000
             && verified.Ranges.Count == 1,
@@ -359,20 +376,20 @@ Check("Silence results reuse verified metadata and ignore navigation and trim pa
         Assert(File.ReadAllText(path) == original, "Cache hit did not rewrite JSON");
 
         settings.FrameMilliseconds = 20;
-        Assert(!SilenceResultStore.LoadOrDetect(source, settings).FromCache, "Detection parameters invalidate cache");
+        Assert(!SilenceResultStore.LoadOrDetect(source, settings.GetSilenceOptions()).FromCache, "Detection parameters invalidate cache");
         string newJson = File.ReadAllText(path);
         Assert(newJson != original && Directory.GetFiles(Path.GetDirectoryName(path)!).Length == 1);
 
         File.WriteAllText(path, "{broken");
-        Assert(!SilenceResultStore.LoadOrDetect(source, settings).FromCache, "Corrupt cache regenerates");
+        Assert(!SilenceResultStore.LoadOrDetect(source, settings.GetSilenceOptions()).FromCache, "Corrupt cache regenerates");
         var node = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
         node["ranges"]![0]!["endTicks"] = node["durationTicks"]!.GetValue<long>() + 10001;
         File.WriteAllText(path, node.ToJsonString());
-        Assert(!SilenceResultStore.LoadOrDetect(source, settings).FromCache, "Out-of-bounds range regenerates");
+        Assert(!SilenceResultStore.LoadOrDetect(source, settings.GetSilenceOptions()).FromCache, "Out-of-bounds range regenerates");
 
         File.SetLastWriteTimeUtc(source, File.GetLastWriteTimeUtc(source).AddSeconds(4));
-        Assert(!SilenceResultStore.LoadOrDetect(source, settings).FromCache, "Metadata change invalidates");
-        Assert(SilenceResultStore.LoadOrDetect(source, settings).FromCache, "New result is reusable");
+        Assert(!SilenceResultStore.LoadOrDetect(source, settings.GetSilenceOptions()).FromCache, "Metadata change invalidates");
+        Assert(SilenceResultStore.LoadOrDetect(source, settings.GetSilenceOptions()).FromCache, "New result is reusable");
         Assert(!Directory.Exists(Path.Combine(folder, "cache")), "No legacy cache directory created");
     }
     finally { Directory.Delete(folder, true); }
@@ -391,8 +408,8 @@ Check("One PCM sample of decoder duration rounding keeps cached silence usable",
             writer.WriteSamples(audio, 0, audio.Length);
         }
 
-        var settings = new SilenceSettings();
-        var detected = SilenceResultStore.LoadOrDetect(source, settings);
+        var settings = new AppSettings();
+        var detected = SilenceResultStore.LoadOrDetect(source, settings.GetSilenceOptions());
         Assert(detected.Saved && detected.Ranges.Count == 1, "End-of-file silence was detected");
 
         string path = SilenceResultStore.GetPath(source);
@@ -404,14 +421,14 @@ Check("One PCM sample of decoder duration rounding keeps cached silence usable",
         // Reproduce the supplied 48-kHz M4A result: last end 208 ticks past duration.
         node["ranges"]![0]!["endTicks"] = durationTicks + 208;
         File.WriteAllText(path, node.ToJsonString());
-        var reused = SilenceResultStore.LoadOrDetect(source, settings);
+        var reused = SilenceResultStore.LoadOrDetect(source, settings.GetSilenceOptions());
         Assert(reused.FromCache && reused.Ranges.Count == 1
             && reused.Ranges[0].End.Ticks == durationTicks,
             "A 208-tick EOF rounding difference must not trigger re-detection");
 
         node["ranges"]![0]!["endTicks"] = durationTicks + 210;
         File.WriteAllText(path, node.ToJsonString());
-        Assert(SilenceResultStore.TryLoad(source, settings) is null,
+        Assert(SilenceResultStore.TryLoad(source, settings.GetSilenceOptions()) is null,
             "More than one sample beyond duration must remain invalid");
     }
     finally { Directory.Delete(folder, true); }
@@ -426,7 +443,7 @@ Check("Uncompressible silence does not create an output file", () =>
     {
         WaveFileWriter.CreateWaveFile16(path, new Samples(Signal(100, 700, 100), 1000, 1, int.MaxValue));
         bool rejected = false;
-        try { SilenceTrimmer.TrimAsync(path, new SilenceSettings()).GetAwaiter().GetResult(); }
+        try { SilenceTrimmer.TrimAsync(path, new SilenceOptions()).GetAwaiter().GetResult(); }
         catch (InvalidOperationException) { rejected = true; }
         Assert(rejected && Directory.GetFiles(folder).Length == 1);
     }
@@ -443,7 +460,7 @@ Check("Trim WAV output is separately saved, validated, and never overwritten", (
         float[] input = Signal(100, 7000, 100);
         WaveFileWriter.CreateWaveFile16(source, new Samples(input, 1000, 1, int.MaxValue));
         long originalLength = new FileInfo(source).Length;
-        SilenceTrimResult trimmed = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
+        SilenceTrimResult trimmed = SilenceTrimmer.TrimAsync(source, new SilenceOptions()).GetAwaiter().GetResult();
         Assert(trimmed.TrimmedRangeCount == 1 && Math.Abs(trimmed.RemovedDuration.TotalSeconds - 5) < 0.01);
         Assert(trimmed.OutputPath == Path.Combine(folder, "sample.new.wav"));
         Assert(new FileInfo(source).Length == originalLength, "Original source modified");
@@ -452,14 +469,14 @@ Check("Trim WAV output is separately saved, validated, and never overwritten", (
         Assert(trimmed.OutputSilenceSaved, "Re-encoded output must have its own silence result");
         Assert(File.Exists(SilenceResultStore.GetPath(source)), "Source has independent silent_segments.json");
         Assert(File.Exists(SilenceResultStore.GetPath(trimmed.OutputPath)), "Output has independent silent_segments.json");
-        var second = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
-        var third = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
+        var second = SilenceTrimmer.TrimAsync(source, new SilenceOptions()).GetAwaiter().GetResult();
+        var third = SilenceTrimmer.TrimAsync(source, new SilenceOptions()).GetAwaiter().GetResult();
         Assert(second.OutputPath == Path.Combine(folder, "sample.new (1).wav"));
         Assert(third.OutputPath == Path.Combine(folder, "sample.new (2).wav"));
         Assert(second.OutputSilenceSaved && third.OutputSilenceSaved && Directory.GetFiles(folder).Length == 4,
             "Numbered files coexist with independent results");
         File.Delete(second.OutputPath);
-        var reusedSlot = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
+        var reusedSlot = SilenceTrimmer.TrimAsync(source, new SilenceOptions()).GetAwaiter().GetResult();
         Assert(reusedSlot.OutputPath == second.OutputPath && reusedSlot.OutputSilenceSaved,
             "Smallest available numbered slot is used without preserving stale coordinates");
     }
@@ -552,15 +569,19 @@ Check("Previous outside tolerance", () => Assert(SilenceDetector.FindPrevious(ra
 
 Check("Custom navigation tolerance is used", () =>
 {
-    var settings = new SilenceSettings { NavigationToleranceMilliseconds = 1 };
-    Assert(SilenceDetector.FindNext(ranges, TimeSpan.FromMilliseconds(1300), settings) == TimeSpan.FromMilliseconds(1500));
-    Assert(SilenceDetector.FindPrevious(ranges, TimeSpan.FromMilliseconds(1700), settings) == TimeSpan.FromMilliseconds(1500));
+    var settings = new AppSettings { NavigationToleranceMilliseconds = 1 };
+    Assert(SilenceDetector.FindNext(ranges, TimeSpan.FromMilliseconds(1300), settings.NavigationToleranceMilliseconds) == TimeSpan.FromMilliseconds(1500));
+    Assert(SilenceDetector.FindPrevious(ranges, TimeSpan.FromMilliseconds(1700), settings.NavigationToleranceMilliseconds) == TimeSpan.FromMilliseconds(1500));
 });
 Check("Navigation tolerance must be positive", () =>
 {
-    var settings = new SilenceSettings { NavigationToleranceMilliseconds = 0 };
+    var settings = new AppSettings { NavigationToleranceMilliseconds = 0 };
     bool failed = false;
     try { settings.Validate(); }
+    catch (ArgumentOutOfRangeException) { failed = true; }
+    Assert(failed);
+    failed = false;
+    try { SilenceDetector.FindNext(ranges, TimeSpan.Zero, 0); }
     catch (ArgumentOutOfRangeException) { failed = true; }
     Assert(failed);
 });
@@ -624,10 +645,10 @@ try
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 File.WriteAllText(path, "metadata fixture");
             }
-            var settings = new SilenceSettings { ExcludedFolderNames = " audio , video; AUDIO；中文 文件夹， " };
+            var settings = new AppSettings { ExcludedFolderNames = " audio , video; AUDIO；中文 文件夹， " };
             var names = settings.GetExcludedFolderNames();
             Assert(names.Count == 3 && names.Contains("Audio") && names.Contains("中文 文件夹"));
-            Assert(new SilenceSettings().GetExcludedFolderNames().Count == 0);
+            Assert(new AppSettings().GetExcludedFolderNames().Count == 0);
             Assert(AudioLibrary.LoadFolder(root).Count == included.Length + excluded.Length);
             var expected = included.ToHashSet(StringComparer.OrdinalIgnoreCase);
             Assert(AudioLibrary.LoadFolder(root, excludedNames: names).Select(t => t.FilePath).ToHashSet().SetEquals(expected));
@@ -920,9 +941,9 @@ else if (args.Contains("--report"))
 {
     string reportFolder = Path.GetFullPath("docs/test-results");
     Directory.CreateDirectory(reportFolder);
-    var report = new System.Text.StringBuilder($"# 真实音频检测结果\n\n参数：{SilenceSettings.DefaultFrameMilliseconds} ms / "
-        + $"{SilenceSettings.DefaultMinimumSilenceMilliseconds} ms / {SilenceSettings.DefaultSilenceThresholdDb} dBFS；"
-        + $"导航容差 {SilenceSettings.DefaultNavigationToleranceMilliseconds} ms。\n\n"
+    var report = new System.Text.StringBuilder($"# 真实音频检测结果\n\n参数：{SilenceOptions.DefaultFrameMilliseconds} ms / "
+        + $"{SilenceOptions.DefaultMinimumSilenceMilliseconds} ms / {SilenceOptions.DefaultSilenceThresholdDb} dBFS；"
+        + $"导航容差 {SilenceOptions.DefaultNavigationToleranceMilliseconds} ms。\n\n"
         + "区间仅经自动数值检查，尚未经人工试听确认。\n\n");
     foreach (var track in AudioLibrary.LoadFolder(audioFolder))
     {
@@ -933,7 +954,7 @@ else if (args.Contains("--report"))
             watch.Stop();
             using (var reader = new AudioFileReader(track.FilePath))
             {
-                foreach (var r in found) Assert(r.Start >= TimeSpan.Zero && r.End <= reader.TotalTime + TimeSpan.FromMilliseconds(1) && r.End - r.Start >= TimeSpan.FromMilliseconds(SilenceSettings.DefaultMinimumSilenceMilliseconds));
+                foreach (var r in found) Assert(r.Start >= TimeSpan.Zero && r.End <= reader.TotalTime + TimeSpan.FromMilliseconds(1) && r.End - r.Start >= TimeSpan.FromMilliseconds(SilenceOptions.DefaultMinimumSilenceMilliseconds));
                 Assert(found.Count > 0);
             }
             using (var file = new FileStream(track.FilePath, FileMode.Open, FileAccess.Read, FileShare.None)) Assert(file.Length > 0);
@@ -953,7 +974,7 @@ if (!string.IsNullOrWhiteSpace(realTrimInput))
     {
         string source = Path.GetFullPath(realTrimInput);
         long initialLength = new FileInfo(source).Length;
-        SilenceTrimResult trim = SilenceTrimmer.TrimAsync(source, new SilenceSettings()).GetAwaiter().GetResult();
+        SilenceTrimResult trim = SilenceTrimmer.TrimAsync(source, new SilenceOptions()).GetAwaiter().GetResult();
         Assert(File.Exists(source) && File.Exists(trim.OutputPath));
         Assert(new FileInfo(source).Length == initialLength, "Original test input was changed");
         Assert(Path.GetExtension(trim.OutputPath).Equals(Path.GetExtension(source), StringComparison.OrdinalIgnoreCase));

@@ -1,8 +1,6 @@
 using NAudio.Wave;
 using System.IO;
 
-using AudioPlayer.Settings;
-
 namespace AudioPlayer.Silence;
 
 public sealed record SilenceTrimResult(
@@ -17,11 +15,11 @@ internal readonly record struct SilenceCut(long SilenceStart, long CutStart, lon
 
 public static class SilenceTrimmer
 {
-    public static Task<SilenceTrimResult> TrimAsync(string sourcePath, SilenceSettings settings,
+    public static Task<SilenceTrimResult> TrimAsync(string sourcePath, SilenceOptions settings,
         CancellationToken cancellationToken = default)
         => Task.Run(() => Trim(sourcePath, settings, cancellationToken), cancellationToken);
 
-    private static SilenceTrimResult Trim(string sourcePath, SilenceSettings settings, CancellationToken cancellationToken)
+    private static SilenceTrimResult Trim(string sourcePath, SilenceOptions settings, CancellationToken cancellationToken)
     {
         settings.Validate();
         string extension = Path.GetExtension(sourcePath);

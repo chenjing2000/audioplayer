@@ -23,7 +23,7 @@ public partial class MainWindow : Window
     private readonly PlaybackEngine player = new();
     internal Playlist Playlist { get; }
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(NormalProgressUpdateMs) };
-    private SilenceSettings silenceSettings = new();
+    private AppSettings appSettings = new();
     private readonly SettingsStore settingsStore;
     private bool settingsFileReady;
     private List<SilenceRange> ranges = new();
@@ -97,7 +97,7 @@ public partial class MainWindow : Window
         scriptSeekTimer.Tick += async (_, _) => await CommitScriptSeekAsync();
         try
         {
-            silenceSettings = settingsStore.LoadOrCreate();
+            appSettings = settingsStore.LoadOrCreate();
             settingsFileReady = true;
         }
         catch (Exception ex) when (IsSettingsFileError(ex))
@@ -136,7 +136,7 @@ public partial class MainWindow : Window
 
     private async Task RestorePlaylistAsync()
     {
-        if (await Playlist.RestoreAsync(silenceSettings.GetExcludedFolderNames()) && !closing)
+        if (await Playlist.RestoreAsync(appSettings.GetExcludedFolderNames()) && !closing)
             ReportFolderLoad();
     }
 
@@ -165,7 +165,7 @@ public partial class MainWindow : Window
         CancelSelectionCheck();
         await player.CloseAsync();
         loadedTrack = null;
-        Task<bool> load = Playlist.LoadFolderAsync(path, silenceSettings.GetExcludedFolderNames());
+        Task<bool> load = Playlist.LoadFolderAsync(path, appSettings.GetExcludedFolderNames());
         RefreshProgress();
         UpdateControls();
         if (await load && !closing)
@@ -244,15 +244,6 @@ public partial class MainWindow : Window
         if (!trimming) StartAnalysis(track);
     }
 
-    private static SilenceSettings SnapshotSettings(SilenceSettings source) => new()
-    {
-        FrameMilliseconds = source.FrameMilliseconds,
-        MinimumSilenceMilliseconds = source.MinimumSilenceMilliseconds,
-        SilenceThresholdDb = source.SilenceThresholdDb,
-        NavigationToleranceMilliseconds = source.NavigationToleranceMilliseconds,
-        AllowedSilenceSeconds = source.AllowedSilenceSeconds
-    };
-
     private void CancelAnalysis()
     {
         analysisGeneration++;
@@ -272,7 +263,7 @@ public partial class MainWindow : Window
         int generation = analysisGeneration;
         analyzing = true;
         UpdateControls();
-        Task work = AnalyzeAsync(track, SnapshotSettings(silenceSettings), generation, cancellation);
+        Task work = AnalyzeAsync(track, appSettings.GetSilenceOptions(), generation, cancellation);
         analysisTask = work;
         runningAnalyses.RemoveAll(t => t.IsCompleted);
         runningAnalyses.Add(work);
@@ -282,7 +273,7 @@ public partial class MainWindow : Window
         => !closing && !cancellation.IsCancellationRequested && generation == analysisGeneration
            && ReferenceEquals(track, loadedTrack);
 
-    private async Task AnalyzeAsync(AudioTrack track, SilenceSettings settings, int generation,
+    private async Task AnalyzeAsync(AudioTrack track, SilenceOptions settings, int generation,
         CancellationTokenSource cancellation)
     {
         ToastHost.ToastMessage? toast = null;
@@ -370,13 +361,13 @@ public partial class MainWindow : Window
         var cancellation = new CancellationTokenSource();
         selectionCancellation = cancellation;
         int generation = selectionGeneration;
-        Task work = CheckSelectedCacheAsync(track, SnapshotSettings(silenceSettings), generation, cancellation);
+        Task work = CheckSelectedCacheAsync(track, appSettings.GetSilenceOptions(), generation, cancellation);
         selectionTask = work;
         runningSelectionChecks.RemoveAll(task => task.IsCompleted);
         runningSelectionChecks.Add(work);
     }
 
-    private async Task CheckSelectedCacheAsync(AudioTrack track, SilenceSettings settings, int generation,
+    private async Task CheckSelectedCacheAsync(AudioTrack track, SilenceOptions settings, int generation,
         CancellationTokenSource cancellation)
     {
         try
@@ -412,7 +403,7 @@ public partial class MainWindow : Window
         if (trimming || analyzing || closing || !selectedCanTrim) return;
         if (TrackList.SelectedItem is not AudioTrack track) return;
 
-        SilenceSettings settings = SnapshotSettings(silenceSettings);
+        SilenceOptions settings = appSettings.GetSilenceOptions();
         string source = track.FilePath;
         trimming = true;
         trimCancellation = new CancellationTokenSource();
@@ -471,7 +462,7 @@ public partial class MainWindow : Window
     }
 
     internal void AddTrimmedOutput(string path)
-        => Playlist.AddFile(path, silenceSettings.GetExcludedFolderNames());
+        => Playlist.AddFile(path, appSettings.GetExcludedFolderNames());
 
     private async Task TogglePlaybackAsync()
     {
@@ -506,7 +497,7 @@ public partial class MainWindow : Window
 
     private void UpdatePlaybackModeButton()
     {
-        PlaybackMode mode = silenceSettings.PlaybackMode;
+        PlaybackMode mode = appSettings.PlaybackMode;
         string name = mode switch
         {
             PlaybackMode.RepeatOne => "单曲循环",
@@ -522,12 +513,12 @@ public partial class MainWindow : Window
     private void PlaybackModeButton_Click(object sender, RoutedEventArgs e)
     {
         if (operationBusy || closing || modalDialogOpen || !settingsFileReady) return;
-        PlaybackMode previous = silenceSettings.PlaybackMode;
-        silenceSettings.PlaybackMode = (PlaybackMode)(((int)previous + 1) % 4);
-        try { settingsStore.Save(silenceSettings); }
+        PlaybackMode previous = appSettings.PlaybackMode;
+        appSettings.PlaybackMode = (PlaybackMode)(((int)previous + 1) % 4);
+        try { settingsStore.Save(appSettings); }
         catch (Exception ex) when (IsSettingsFileError(ex))
         {
-            silenceSettings.PlaybackMode = previous;
+            appSettings.PlaybackMode = previous;
             ToastMessages.Show($"配置保存失败，播放模式未更改：{ex.Message}", ToastLevel.Error);
             return;
         }
@@ -559,7 +550,7 @@ public partial class MainWindow : Window
             await RunActionAsync(async () =>
             {
                 if (!player.ConsumeNaturalCompletion(token) || loadedTrack is null) return;
-                int index = NextPlaybackIndex(silenceSettings.PlaybackMode, Playlist.Tracks.IndexOf(loadedTrack), Playlist.Tracks.Count);
+                int index = NextPlaybackIndex(appSettings.PlaybackMode, Playlist.Tracks.IndexOf(loadedTrack), Playlist.Tracks.Count);
                 if (index < 0) return;
                 AudioTrack next = Playlist.Tracks[index];
                 if (ReferenceEquals(next, loadedTrack))
@@ -584,7 +575,7 @@ public partial class MainWindow : Window
             ToastMessages.Show("配置文件不可用，请修复文件或目录权限后重新启动程序。", ToastLevel.Error);
             return;
         }
-        var dialog = new SilenceSettingsWindow(silenceSettings) { Owner = this };
+        var dialog = new SettingsWindow(appSettings) { Owner = this };
         bool? confirmed;
         modalDialogOpen = true;
         try
@@ -602,11 +593,11 @@ public partial class MainWindow : Window
             ToastMessages.Show($"配置保存失败，参数未更改：{ex.Message}", ToastLevel.Error);
             return;
         }
-        bool detectionChanged = silenceSettings.FrameMilliseconds != dialog.Settings.FrameMilliseconds
-            || silenceSettings.MinimumSilenceMilliseconds != dialog.Settings.MinimumSilenceMilliseconds
-            || silenceSettings.SilenceThresholdDb != dialog.Settings.SilenceThresholdDb;
-        silenceSettings = dialog.Settings;
-        scriptWindow?.SetAppearance(silenceSettings.ScriptAppearance);
+        bool detectionChanged = appSettings.FrameMilliseconds != dialog.Settings.FrameMilliseconds
+            || appSettings.MinimumSilenceMilliseconds != dialog.Settings.MinimumSilenceMilliseconds
+            || appSettings.SilenceThresholdDb != dialog.Settings.SilenceThresholdDb;
+        appSettings = dialog.Settings;
+        scriptWindow?.SetAppearance(appSettings.ScriptAppearance);
         UpdatePlaybackModeButton();
         if (detectionChanged && loadedTrack is not null)
         {
@@ -641,7 +632,7 @@ public partial class MainWindow : Window
         bool timed = modifiers == ModifierKeys.Control;
         if (closing || dragging || !player.IsLoaded || (operationBusy && !navigating)
             || (!timed && (analyzing || !analysisReady))) return Task.CompletedTask;
-        if (timed && (key == Key.Left ? silenceSettings.BackwardStepSeconds : silenceSettings.ForwardStepSeconds) == 0)
+        if (timed && (key == Key.Left ? appSettings.BackwardStepSeconds : appSettings.ForwardStepSeconds) == 0)
             return Task.CompletedTask;
         navigationKeys.Enqueue((key, timed));
         if (!navigating)
@@ -663,10 +654,10 @@ public partial class MainWindow : Window
                 {
                     TimeSpan current = player.GetCurrentTime();
                     TimeSpan? target = timed
-                        ? current + TimeSpan.FromSeconds(key == Key.Left ? -silenceSettings.BackwardStepSeconds : silenceSettings.ForwardStepSeconds)
+                        ? current + TimeSpan.FromSeconds(key == Key.Left ? -appSettings.BackwardStepSeconds : appSettings.ForwardStepSeconds)
                         : key == Key.Left
-                        ? SilenceDetector.FindPrevious(ranges, current, silenceSettings)
-                        : SilenceDetector.FindNext(ranges, current, silenceSettings);
+                        ? SilenceDetector.FindPrevious(ranges, current, appSettings.NavigationToleranceMilliseconds)
+                        : SilenceDetector.FindNext(ranges, current, appSettings.NavigationToleranceMilliseconds);
                     // An actual user seek supersedes any pending natural continuation.
                     if (target.HasValue) await player.SeekAsync(target.Value);
                 }, ReaderAction.PreservePlayback);
@@ -851,7 +842,7 @@ public partial class MainWindow : Window
         {
             var reader = new ScriptWindow { Owner = this, Height = Math.Max(300, ActualHeight) };
             scriptWindow = reader;
-            reader.SetAppearance(silenceSettings.ScriptAppearance);
+            reader.SetAppearance(appSettings.ScriptAppearance);
             reader.NavigationPreview += seconds =>
             {
                 if (ReferenceEquals(scriptWindow, reader)) PreviewScriptSeek(seconds);
