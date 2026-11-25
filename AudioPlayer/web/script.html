@@ -46,14 +46,6 @@ function detectExternalScroll(){
   return previewScroll();
 }
 window.addEventListener('scroll',detectExternalScroll,{passive:true});
-window.addEventListener('wheel',event=>{
-  event.preventDefault();
-  cancelAnimation();
-  const before=window.scrollY;
-  const delta=event.deltaY*(event.deltaMode===1?parseFloat(getComputedStyle(document.documentElement).lineHeight):event.deltaMode===2?window.innerHeight:1);
-  scrollProgrammatically(before+delta*0.25);
-  if(Math.abs(window.scrollY-before)>=0.01)previewScroll();
-},{passive:false});
 window.addEventListener('keydown',event=>{
   if(event.altKey||event.metaKey||event.shiftKey||
      !(['ArrowLeft','ArrowRight'].includes(event.key)||(event.key===' '&&!event.ctrlKey)))return;

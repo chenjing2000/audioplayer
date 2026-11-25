@@ -1,10 +1,10 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #20 merged and post-merge application verification passed  
+**Updated:** 2026-11-25 — native script scroll implemented; verification pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `d8458d6` (PR #20 squash merge).  
-**Merged feature:** `feature/playback-background` ([PR #20](https://github.com/chenjing2000/audioplayer/pull/20)); branch cleanup pending local confirmation.  
+**Merged feature:** `feature/playback-background` ([PR #20](https://github.com/chenjing2000/audioplayer/pull/20)); local and remote branch cleanup confirmed.  
 **Last verified main application:** `d8458d6`; identical tree to accepted feature head `6bb4683` (`a90c392b8e15b0d48a8647f375960f1c0636de0b`).
 
 ## Current implementation
@@ -14,6 +14,8 @@ C#/WPF/.NET 10 portable Windows audio player. Seven modules (UI, Application, Pl
 PR #19 replaces the playback palette and normalizes retired values on load without rewriting settings. The settings dialog retains its 480 × 430 DIP size, 30-DIP inputs/selectors, 80-DIP numeric controls, 160-DIP font selector and 43-DIP rows. Subtitle halves are equal, text/playback colors share a row, and dropdown choices have rounded soft highlights. The approved cleanup consolidates existing XAML properties, integer and paste validation, shared parameter range limits and migration-test flows without changing UI or data formats. No new files, classes or dependencies.
 
 PR #20 (from main `0e79b0d`) is merged: the reader keeps one text layer and draws cumulative SVG background rectangles beneath it instead of duplicating/clipping text. The five playback colors become light backgrounds, default #F6EDC2; existing ScriptColor values migrate directly without new fields. The dialog keeps its layout and uses dark playback-swatch checks. Timing, scrolling and playback logic are preserved. The follow-up refinement extends the existing final rectangle of each completed timed unit across pure whitespace to the next timed unit on the same visual line; no extra rectangles or changes to word timing, colors or settings. SVG crispEdges reduces fractional-pixel seams.
+
+On `feature/native-script-scroll` from main `275e9bf`, remove the dedicated JavaScript wheel handler and its 25% displacement multiplier. Native WebView2 wheel scrolling and scrollbar drag/click use the existing external-scroll detection and 150 ms seek transaction. Preserve middle-button press/autoscroll suppression, keyboard shortcuts, automatic follow, playback background and settings. No new application code.
 
 ## Verification
 
@@ -28,6 +30,6 @@ PR #20 (from main `0e79b0d`) is merged: the reader keeps one text layer and draw
 
 ## Next action
 
-Synchronize this final documentation-only main commit, verify its CI and confirm the application/test files are unchanged from `d8458d6`. Remove the merged local and remote `feature/playback-background` branch after checking its accepted head. No repeat local application run is required for documentation-only changes. No release tag or assets authorized.
+Verify feature and PR CI, local Full / Publish / Test-PublishedApp, and focused native-wheel/scrollbar checks while playing and paused, including automatic follow competition and boundary behavior. Obtain explicit authorization before merging. No release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.

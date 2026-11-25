@@ -1034,28 +1034,26 @@ internal static class UiChecks
                                 """);
                             Assert(followFrames == "true", "Reader frame clock advances continuously, is bounded and cancels on pause");
 
-                            string wheelSensitivity = await reader.CoreWebView2.ExecuteScriptAsync(
+                            string nativeWheel = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """
                                 (() => {
-                                  const originalScroll=window.scrollTo;
-                                  const before=window.scrollY;
-                                  let target;
+                                  const originalScroll=window.scrollTo, originalPreview=preview, originalCancel=cancelAnimation;
+                                  let calls=0;
                                   try {
-                                    // Intercept the actual wheel handler's requested displacement,
-                                    // avoiding document-boundary clamping and host seek side effects.
-                                    window.scrollTo=(_,y)=>{target=y;};
-                                    const lineHeight=parseFloat(getComputedStyle(document.documentElement).lineHeight);
-                                    const cases=[[120,0,30],[-120,0,-30],[2,1,lineHeight/2],[-2,1,-lineHeight/2],[1,2,window.innerHeight/4]];
-                                    return cases.every(([deltaY,deltaMode,expected])=>{
-                                      target=undefined;
-                                      const event=new WheelEvent('wheel',{deltaY,deltaMode,cancelable:true});
-                                      window.dispatchEvent(event);
-                                      return event.defaultPrevented && Math.abs(target-before-expected)<0.001;
-                                    });
-                                  } finally {window.scrollTo=originalScroll;}
+                                    // Synthetic wheel events have no native scroll default action.
+                                    // Verify the application does not intercept them or issue its own commands.
+                                    window.scrollTo=preview=cancelAnimation=()=>{calls++;};
+                                    return [0,1,2].every(deltaMode=>[120,-120].every(deltaY=>{
+                                      const event=new WheelEvent('wheel',{deltaY,deltaMode,bubbles:true,cancelable:true});
+                                      return body.querySelector('.sentence').dispatchEvent(event) &&
+                                        !event.defaultPrevented && calls===0;
+                                    }));
+                                  } finally {
+                                    window.scrollTo=originalScroll;preview=originalPreview;cancelAnimation=originalCancel;
+                                  }
                                 })()
                                 """);
-                            Assert(wheelSensitivity == "true", "Reader wheel displacement is quartered for pixel, line and page deltas");
+                            Assert(nativeWheel == "true", "Reader leaves wheel input native without direct scroll or playback commands");
 
                             string scrollBarNavigation = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """
@@ -1201,7 +1199,7 @@ internal static class UiChecks
                     }
                     if (WaveOut.DeviceCount == 0)
                     {
-                        Console.WriteLine("SKIP UI script wheel playback checks (7 assertions plus Settings restoration): no waveOut device is available.");
+                        Console.WriteLine("SKIP UI script scroll playback checks (7 assertions plus Settings restoration): no waveOut device is available.");
                         Console.WriteLine("SKIP UI audio-device playback checks: no waveOut device is available.");
                         return;
                     }
@@ -1354,20 +1352,20 @@ internal static class UiChecks
                     window.Controller.Session.BeginPreview(4);
                     Assert(scriptPlayer.IsPaused && slider.Value == 4 &&
                         window.Controller.Session.PreviewDebounce == TimeSpan.FromMilliseconds(150),
-                        "Wheel preview pauses audio, updates slider and retains latest target");
+                        "Scroll preview pauses audio, updates slider and retains latest target");
                     await window.Controller.Session.CommitPreviewAsync();
                     Assert(scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime().TotalSeconds >= 3.9,
-                        "Committed wheel seek resumes playing audio at latest target");
+                        "Committed scroll seek resumes playing audio at latest target");
                     scriptPlayer.Pause();
                     window.Controller.Session.BeginPreview(2);
                     await window.Controller.Session.CommitPreviewAsync();
                     Assert(scriptPlayer.IsPaused && Math.Abs(scriptPlayer.GetCurrentTime().TotalSeconds - 2) < 0.1,
-                        "Committed wheel seek preserves explicit pause");
+                        "Committed scroll seek preserves explicit pause");
                     await scriptPlayer.PlayAsync();
                     window.Controller.Session.BeginPreview(6);
                     await window.Controller.Session.CancelPreviewAsync();
                     Assert(scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime().TotalSeconds < 5,
-                        "Cancel pending wheel navigation restores playback without seeking");
+                        "Cancel pending scroll navigation restores playback without seeking");
                     window.Controller.Session.BeginPreview(6);
                     var settingsClosed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     var closeSettingsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
@@ -1387,11 +1385,11 @@ internal static class UiChecks
                     }
                     finally { closeSettingsTimer.Stop(); }
                     Assert(scriptPlayer.IsPlaying && window.Controller.Session.PreviewPosition is null,
-                        "Opening and canceling Settings restores pending wheel playback intent");
+                        "Opening and canceling Settings restores pending scroll playback intent");
                     window.Controller.Session.BeginPreview(6);
                     await window.HandleShortcutAsync(Key.Space);
                     Assert(scriptPlayer.IsPaused && window.Controller.Session.PreviewPosition is null,
-                        "Space cancels wheel preview and honors intended pause");
+                        "Space cancels scroll preview and honors intended pause");
                     window.Controller.Session.BeginPreview(6);
                     await window.HandleShortcutAsync(Key.Space);
                     Assert(scriptPlayer.IsPlaying, "Space from explicitly paused preview resumes playback");
@@ -1409,7 +1407,7 @@ internal static class UiChecks
                     if (window.Controller.Session.ActiveOperation is Task stoppingScript) await stoppingScript;
                     Assert(!scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime() == TimeSpan.Zero &&
                         !window.Controller.Session.PreviewTimerEnabled,
-                        "Stop cancels pending wheel seek without restarting");
+                        "Stop cancels pending scroll seek without restarting");
                     if (window.Controller.Silence.AnalysisTask is Task seekAnalysis) await seekAnalysis;
                     await scriptPlayer.CloseAsync();
                     File.Delete(seekPath);
