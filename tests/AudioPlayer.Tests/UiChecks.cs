@@ -637,7 +637,8 @@ internal static class UiChecks
                              Assert(item.Width == 28 && item.Height == 28 && swatch.Width == 24 && swatch.Height == 24 && swatch.StrokeThickness == 0 &&
                                  Bounds(swatch).Right <= Bounds(colors).Right + 0.5 &&
                                  ColorOf(swatch.Fill) == "#FF" + ((string)colors.Items[i])[1..] &&
-                                 (tick.Visibility == Visibility.Visible) == (i == colors.SelectedIndex),
+                                 (tick.Visibility == Visibility.Visible) == (i == colors.SelectedIndex) &&
+                                 (colors != colorLists[1] || ColorOf(tick.Stroke) == "#FF283747"),
                                  "Color swatch is borderless and only the selected item shows a check");
                          }
                          colors.SelectedIndex = 2;
@@ -878,16 +879,100 @@ internal static class UiChecks
                                 if (renderedScriptText.Contains("Hello, world.")) break;
                                 await Task.Delay(100);
                             }
-                            Assert(renderedScriptText.Contains("Hello, world."), "Embedded WebView2 reader renders discovered Script JSON");
+                            Assert(renderedScriptText == "\"Hello, world.\"", "Embedded WebView2 reader renders Script JSON once without duplicate text");
                             string measured = await reader.CoreWebView2.ExecuteScriptAsync(
                                 "measure(); update({position:1.5,playing:false,reset:false},true); geometry.length===2 && geometry[0].last===0.75 && geometry[1].last===0.25");
                             Assert(measured == "true", "Reader paints overlapping out-of-order intervals");
+                            string backgroundPaint = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const p=body.querySelector('p'), layer=p.querySelector('svg.paint'), timed=p.querySelector('.timed');
+                                  return p.textContent==='Hello, world.' && !p.querySelector('clipPath') &&
+                                    getComputedStyle(p).isolation==='isolate' && getComputedStyle(layer).zIndex==='-1' &&
+                                    getComputedStyle(layer).pointerEvents==='none' &&
+                                    getComputedStyle(timed).color===getComputedStyle(p).color &&
+                                    getComputedStyle(layer.querySelector('rect')).fill==='rgb(246, 237, 194)' &&
+                                    getComputedStyle(layer.querySelector('rect')).shapeRendering.toLowerCase()==='crispedges' &&
+                                    geometry.every(u=>u.segments.every(s=>Math.abs(s.element.width.baseVal.value-s.painted)<0.01));
+                                })()
+                                """);
+                            Assert(backgroundPaint == "true", "Reader paints background rectangles beneath a single unchanged text layer");
                             string rewind = await reader.CoreWebView2.ExecuteScriptAsync(
                                 "update({position:2.5,playing:false,reset:false},true); update({position:0.5,playing:false,reset:false},true); geometry[0].last===0.25 && geometry[1].segments.every(s=>s.painted===0)");
                             Assert(rewind == "true", "Reader rewinds previously painted intervals");
                             string cleared = await reader.CoreWebView2.ExecuteScriptAsync(
                                 "update({position:0,playing:false,reset:true},true); geometry.every(u=>u.segments.every(s=>s.painted===0))");
                             Assert(cleared == "true", "Reader reset clears painted intervals");
+
+                            string joinedBackground = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const saved=[...body.childNodes], savedPlayback=playback;
+                                  const p=document.createElement('p'), wrap=document.createElement('p');
+                                  const word=(text,start)=>'<span class="timed" data-start="'+start+'" data-end="'+(start+1)+'">'+text+'</span>';
+                                  const sentence=text=>'<span class="sentence">'+text+'</span>';
+                                  p.style.cssText='width:1000px;white-space:nowrap;text-indent:0';
+                                  wrap.style.cssText='width:4em;text-indent:0';
+                                  p.innerHTML=sentence(word('Alpha',0)+' '+word('beta',1))+' '+
+                                    sentence(word('gamma',2)+' untimed '+word('delta',3)+', '+word('epsilon',4));
+                                  wrap.innerHTML=sentence(word('Alpha',5)+' '+word('Beta',6));
+                                  const layer=()=>{const svg=document.createElementNS(ns,'svg');svg.setAttribute('class','paint');return svg;};
+                                  p.append(layer());wrap.append(layer());
+                                  const near=(a,b)=>Math.abs(a-b)<0.02;
+                                  try {
+                                    body.replaceChildren(p,wrap);measure();
+                                    if(geometry.length!==7 || geometry.some(u=>u.segments.length!==1))return false;
+                                    const [a,b,c,d,e,f,g]=geometry.map(u=>u.segments[0]);
+                                    const x=s=>s.element.x.baseVal.value;
+                                    if(a.trailingGap<=0 || b.trailingGap<=0 ||
+                                      !near(x(a)+a.width+a.trailingGap,x(b)) ||
+                                      !near(x(b)+b.width+b.trailingGap,x(c)) ||
+                                      [c,d,e,f,g].some(s=>s.trailingGap!==0) ||
+                                      near(f.element.y.baseVal.value,g.element.y.baseVal.value))return false;
+                                    paintAt(0.5,false);
+                                    if(!near(a.painted,a.width/2) || b.painted!==0)return false;
+                                    paintAt(1,false);
+                                    if(!near(a.painted,a.width+a.trailingGap) || b.painted!==0)return false;
+                                    paintAt(2.5,false);
+                                    if(!near(b.painted,b.width+b.trailingGap) || !near(c.painted,c.width/2))return false;
+                                    paintAt(7,false);
+                                    if(body.querySelectorAll('svg.paint rect').length!==7 ||
+                                      !near(c.painted,c.width) || !near(d.painted,d.width) ||
+                                      !near(f.painted,f.width))return false;
+                                    paintAt(0.5,false);
+                                    if(!near(a.painted,a.width/2) || geometry.slice(1).some(u=>u.segments.some(s=>s.painted!==0)))return false;
+                                    // Reflow the same words onto one line and recompute the bridge.
+                                    wrap.style.width='1000px';measure();
+                                    const [left,right]=geometry.slice(5).map(u=>u.segments[0]);
+                                    if(left.trailingGap<=0 || !near(x(left)+left.width+left.trailingGap,x(right)))return false;
+                                    // A single long timed unit wraps; only its last segment joins the next word.
+                                    wrap.style.cssText='font-family:monospace;width:8ch;text-indent:0';
+                                    wrap.innerHTML=sentence(word('ABCDEFGHIJK',5)+' '+word('xy',6));
+                                    wrap.append(layer());measure();
+                                    const unit=geometry[5], next=geometry[6].segments[0];
+                                    if(unit.segments.length!==2 || geometry[6].segments.length!==1)return false;
+                                    const [first,last]=unit.segments;
+                                    if(first.trailingGap!==0 || last.trailingGap<=0 ||
+                                      near(first.element.y.baseVal.value,last.element.y.baseVal.value) ||
+                                      !near(last.element.y.baseVal.value,next.element.y.baseVal.value) ||
+                                      !near(x(last)+last.width+last.trailingGap,x(next)))return false;
+                                    paintAt(5+first.width/(2*unit.total),false);
+                                    if(!near(first.painted,first.width/2) || last.painted!==0)return false;
+                                    paintAt(5+(first.width+last.width/2)/unit.total,false);
+                                    if(!near(first.painted,first.width) || !near(last.painted,last.width/2))return false;
+                                    paintAt(6,false);
+                                    if(!near(first.painted,first.width) || !near(last.painted,last.width+last.trailingGap) ||
+                                      next.painted!==0 || body.querySelectorAll('svg.paint rect').length!==8)return false;
+                                    paintAt(5.5,false);
+                                    if(!near(first.painted,unit.total/2) || last.painted!==0 || next.painted!==0)return false;
+                                    paintAt(7,false);paintAt(0,true);
+                                    return geometry.every(u=>u.segments.every(s=>s.painted===0));
+                                  } finally {
+                                    body.replaceChildren(...saved);playback=savedPlayback;measure();
+                                  }
+                                })()
+                                """);
+                            Assert(joinedBackground == "true", "Reader joins same-line whitespace only, preserves word timing across wraps, leaves untimed text and punctuation gaps, and recomputes after reflow");
 
                             string continuousFollow = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """

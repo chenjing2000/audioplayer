@@ -1,10 +1,9 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"><style>
 html{background:#F8F8F6;color:#283747;font:18px/1.7 Georgia,"Segoe UI",serif;scroll-behavior:auto;overflow-anchor:none}
-body{margin:16px;overflow-wrap:break-word}h1{font-size:1.2em;text-align:center}p{margin:0 0 var(--paragraph-after,16px);text-indent:var(--indent,0em);position:relative}
+body{margin:16px;overflow-wrap:break-word}h1{font-size:1.2em;text-align:center}p{margin:0 0 var(--paragraph-after,16px);text-indent:var(--indent,0em);position:relative;isolation:isolate}
 #status{color:#687783;font:14px "Segoe UI",sans-serif}
-.paint{position:absolute;inset:0;color:var(--playback-color,#D71920);pointer-events:none;user-select:none}
-.clips{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
+.paint{position:absolute;inset:0;width:100%;height:100%;z-index:-1;fill:var(--playback-color,#F6EDC2);pointer-events:none;overflow:visible;shape-rendering:crispEdges}
 </style></head><body><div id="status"></div><h1 id="title" hidden></h1><main id="text"></main><script>
 "use strict";
 const title=document.getElementById('title'), body=document.getElementById('text'), status=document.getElementById('status');
@@ -144,7 +143,7 @@ function render(data){
   playback={position:0,playing:false,reset:true};
   title.textContent=data.article?.title??'';title.hidden=!title.textContent;
   status.textContent=data.message??'';body.replaceChildren();scrollProgrammatically(0);
-  for(const [pi,paragraph] of (data.article?.paragraphs??[]).entries()){
+  for(const paragraph of data.article?.paragraphs??[]){
     const p=document.createElement('p');
     for(const [i,sentence] of paragraph.sentences.entries()){
       const raw=sentence.text;
@@ -161,12 +160,8 @@ function render(data){
       }
       span.append(raw.slice(cursor));p.append(span);
     }
-    const paint=document.createElement('span');paint.className='paint';paint.setAttribute('aria-hidden','true');
-    for(const child of [...p.childNodes])paint.append(child.cloneNode(true));
-    const svg=document.createElementNS(ns,'svg');svg.setAttribute('class','clips');svg.setAttribute('aria-hidden','true');
-    const clip=document.createElementNS(ns,'clipPath');clip.id='clip-'+pi;clip.setAttribute('clipPathUnits','userSpaceOnUse');
-    svg.append(clip);paint.style.clipPath='url(#'+clip.id+')';
-    p.append(paint,svg);body.append(p);
+    const paint=document.createElementNS(ns,'svg');paint.setAttribute('class','paint');paint.setAttribute('aria-hidden','true');
+    p.append(paint);body.append(p);
   }
   scheduleMeasure();
 }
@@ -190,13 +185,22 @@ function measure(){
     return line;
   }
   for(const p of body.querySelectorAll('p')){
-    const paint=p.querySelector(':scope > .paint'),clip=p.querySelector('clipPath');
-    clip.replaceChildren();const base=paint.getBoundingClientRect();
+    const paint=p.querySelector(':scope > .paint');
+    paint.replaceChildren();const base=paint.getBoundingClientRect();
+    let previous=null;
     for(const span of p.querySelectorAll(':scope > .sentence .timed')){
       const start=Number(span.dataset.start),end=Number(span.dataset.end);
       const range=document.createRange();range.selectNodeContents(span);
       const rects=[...range.getClientRects()].filter(r=>r.width>0.25&&r.height>0.25).sort((a,b)=>a.top-b.top||a.left-b.left);
-      if(!rects.length)continue;
+      if(!rects.length){previous=null;continue;}
+      // Join only whitespace between adjacent timed units on the same visual line.
+      if(previous && Math.abs(previous.rect.top-rects[0].top)<2){
+        const gap=rects[0].left-previous.rect.right;
+        if(gap>0){
+          range.setStartAfter(previous.span);range.setEndBefore(span);
+          if(/^\s+$/u.test(range.toString()))previous.segment.trailingGap=gap;
+        }
+      }
       const total=rects.reduce((sum,r)=>sum+r.width,0);
       let consumed=0;
       const segments=rects.map(r=>{
@@ -207,10 +211,11 @@ function measure(){
         consumed+=r.width;
         const element=document.createElementNS(ns,'rect');
         element.setAttribute('x',r.left-base.left);element.setAttribute('y',r.top-base.top-1);
-        element.setAttribute('width','0');element.setAttribute('height',r.height+2);clip.append(element);
-        return {element,width:r.width,painted:0};
+        element.setAttribute('width','0');element.setAttribute('height',r.height+2);paint.append(element);
+        return {element,width:r.width,trailingGap:0,painted:0};
       });
       geometry.push({start,end,segments,total,last:NaN});
+      previous={span,rect:rects.at(-1),segment:segments.at(-1)};
     }
   }
   lines.sort((a,b)=>a.y-b.y);
@@ -224,7 +229,7 @@ function paintUnit(unit,fraction){
   if(unit.last===fraction)return;
   unit.last=fraction;let remaining=fraction*unit.total;
   for(const seg of unit.segments){
-    const width=clamp(remaining,0,seg.width);
+    const width=clamp(remaining,0,seg.width)+(fraction===1?seg.trailingGap:0);
     if(width!==seg.painted){seg.element.setAttribute('width',width);seg.painted=width;}
     remaining-=seg.width;
   }

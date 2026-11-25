@@ -1,11 +1,11 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #19 merged and post-merge application verification passed  
+**Updated:** 2026-11-25 — pre-merge review R1–R4 accepted; final documentation CI pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `d2b69d7` (PR #19 squash merge).  
-**Merged feature:** `feature/playback-colors` ([PR #19](https://github.com/chenjing2000/audioplayer/pull/19)); branch cleanup remains to be performed from the local Git checkout.  
-**Last verified application:** `d2b69d7` on main; identical tree to accepted feature head `3257d74`.
+**Merged feature:** `feature/playback-colors` ([PR #19](https://github.com/chenjing2000/audioplayer/pull/19)); branch cleanup completed per user report and remote branch listing.  
+**Last verified main application:** `d2b69d7`; identical tree to accepted feature head `3257d74`.
 
 ## Current implementation
 
@@ -13,13 +13,19 @@ C#/WPF/.NET 10 portable Windows audio player. Seven modules (UI, Application, Pl
 
 PR #19 replaces the playback palette and normalizes retired values on load without rewriting settings. The settings dialog retains its 480 × 430 DIP size, 30-DIP inputs/selectors, 80-DIP numeric controls, 160-DIP font selector and 43-DIP rows. Subtitle halves are equal, text/playback colors share a row, and dropdown choices have rounded soft highlights. The approved cleanup consolidates existing XAML properties, integer and paste validation, shared parameter range limits and migration-test flows without changing UI or data formats. No new files, classes or dependencies.
 
+On `feature/playback-background` (from main `0e79b0d`), the reader keeps one text layer and draws cumulative SVG background rectangles beneath it instead of duplicating/clipping text. The five playback colors become light backgrounds, default #F6EDC2; existing ScriptColor values migrate directly without new fields. The dialog keeps its layout and uses dark playback-swatch checks. Timing, scrolling and playback logic are preserved. The follow-up refinement extends the existing final rectangle of each completed timed unit across pure whitespace to the next timed unit on the same visual line; no extra rectangles or changes to word timing, colors or settings.
+
 ## Verification
 
 - PR #18: 388 automated checks and 21 manual checks passed; post-merge local verification passed. The obsolete refactor branch was removed.
 - PR #19: final cleanup `d831725` passed 424 automated checks (66 Core, 349 UI, 5 publishing safeguards and 4 published EXE), both CI runs and seven user-confirmed manual checks, including keyboard dropdown navigation. Final documentation head `3257d74` passed both CI runs and was squash-merged with explicit user authorization. Main `d2b69d7` has the identical Git tree and passed post-merge main CI and all 424 executed local automated checks. First publish was blocked by an occupied destination EXE; retry and subsequent four published EXE checks succeeded. See [Testing](Testing.md) for detailed historical evidence, [Configuration](Configuration.md) for exact settings values, and remaining real MP3, mixed DPI, device failure and nonfatal WebView2 cleanup boundaries.
 
+- PR #20: first palette `90c179f` passed both CI runs and all 425 executed local checks, with nine of ten manual checks passed; user requested softer colors. Softer palette application `1c62c19` passed both CI runs and all 425 executed local checks again; publish succeeded. User accepted the final visual effect, satisfying the remaining palette item. Continuity revision `32d237d` adds same-line whitespace continuity, passed both CI runs, all 426 final executed local automated checks and all eight focused manual checks. Publish retry and subsequent EXE verification succeeded. Application source net +5 lines relative to main; no new files, classes, methods, fields or dependencies. See Testing for evidence and validation boundaries.
+
+- PR #20 pre-merge review: user authorized R1–R4; add SVG crispEdges to reduce fractional-pixel seams, extend existing integration assertions for a single timed unit wrapped across lines, synchronize Getting-Started and program overview, and remove an overwritten test initializer. No timing or geometry changes. Final application `c55ef2b` passed PR CI on its first attempt and branch CI on its second attempt without changes after a WebView2 ready timeout. Local Full / Publish / Test-PublishedApp passed all 426 executed checks and all six focused manual checks were accepted. See Testing for evidence, the initial CI failure and remaining validation boundaries.
+
 ## Next action
 
-Synchronize the final documentation-only main commit and remove the merged local and remote feature branch after verifying its tree matches `d2b69d7`. No additional application regression is required for this documentation-only commit. No release tag or assets authorized.
+Confirm final documentation-only head CI and squash-merge PR #20 after explicit user authorization. Verify the merged tree matches the accepted feature head, then verify main and clean up the development branch. No repeat local application run is required for the documentation-only commit itself. No release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.

@@ -303,7 +303,7 @@
                        Foreground="White" AutomationProperties.Name="正文颜色"/>
               <TextBlock Grid.Row="4" Grid.Column="3" Text="播放颜色" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,0"/>
               <ListBox x:Name="PlaybackColorBox" Grid.Row="4" Grid.Column="3" Grid.ColumnSpan="2" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
-                       Foreground="White" AutomationProperties.Name="播放颜色"/>
+                       Foreground="#283747" AutomationProperties.Name="播放颜色"/>
               <TextBlock Grid.Row="5" Text="背景颜色" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,0"/>
               <ListBox x:Name="BackgroundColorBox" Grid.Row="5" Grid.ColumnSpan="2" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
                        Background="#E2E6EB" Foreground="#283747" AutomationProperties.Name="背景颜色"/>
