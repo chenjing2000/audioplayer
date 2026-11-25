@@ -1,5 +1,6 @@
 using AudioPlayer;
 using AudioPlayer.Playback;
+using AudioPlayer.Application;
 using AudioPlayer.Library;
 using AudioPlayer.Silence;
 using AudioPlayer.Script;
@@ -223,15 +224,15 @@ Check("Settings save failure preserves original configuration", () =>
 
 Check("Playback mode completion policy", () =>
 {
-    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.PlayOne, 1, 3) == -1);
-    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.RepeatOne, 1, 3) == 1);
-    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.Sequential, 1, 3) == 2);
-    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.Sequential, 2, 3) == -1);
-    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.RepeatAll, 2, 3) == 0);
-    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.Sequential, 0, 1) == -1);
-    Assert(MainWindow.NextPlaybackIndex(PlaybackMode.RepeatAll, 0, 1) == 0);
+    Assert(PlayerController.NextPlaybackIndex(PlaybackMode.PlayOne, 1, 3) == -1);
+    Assert(PlayerController.NextPlaybackIndex(PlaybackMode.RepeatOne, 1, 3) == 1);
+    Assert(PlayerController.NextPlaybackIndex(PlaybackMode.Sequential, 1, 3) == 2);
+    Assert(PlayerController.NextPlaybackIndex(PlaybackMode.Sequential, 2, 3) == -1);
+    Assert(PlayerController.NextPlaybackIndex(PlaybackMode.RepeatAll, 2, 3) == 0);
+    Assert(PlayerController.NextPlaybackIndex(PlaybackMode.Sequential, 0, 1) == -1);
+    Assert(PlayerController.NextPlaybackIndex(PlaybackMode.RepeatAll, 0, 1) == 0);
     foreach (var mode in Enum.GetValues<PlaybackMode>())
-        Assert(MainWindow.NextPlaybackIndex(mode, -1, 3) == -1 && MainWindow.NextPlaybackIndex(mode, 0, 0) == -1);
+        Assert(PlayerController.NextPlaybackIndex(mode, -1, 3) == -1 && PlayerController.NextPlaybackIndex(mode, 0, 0) == -1);
 });
 
 Check("Silence operation options are isolated from mutable application settings", () =>

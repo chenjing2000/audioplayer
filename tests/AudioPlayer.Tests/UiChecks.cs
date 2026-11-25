@@ -33,7 +33,7 @@ internal static class UiChecks
         var done = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         var thread = new Thread(() =>
         {
-            var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            var app = new System.Windows.Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
             var appXml = System.Xml.Linq.XDocument.Load(Path.GetFullPath("AudioPlayer/App.xaml"));
             var dictionary = appXml.Root!.Elements().Single().Elements().Single();
             dictionary.SetAttributeValue(System.Xml.Linq.XNamespace.Xmlns + "x", "http://schemas.microsoft.com/winfx/2006/xaml");
@@ -61,7 +61,35 @@ internal static class UiChecks
                     Assert(Math.Abs(window.Left - expectedLeft) < 0.01 && Math.Abs(window.Top - expectedTop) < 0.01, "Window starts centered with rounded coordinates");
                     window.ShowInTaskbar = false; window.ShowActivated = false; window.Left = -20000; window.Top = -20000;
                     window.Show();
-                    if (Field<Task>(window, "activeOperation") is Task startupAction) await startupAction;
+                    if (window.Controller.Session.ActiveOperation is Task startupAction) await startupAction;
+                    // Commands share one session gate even when a caller is not a WPF control.
+                    var heldCommand = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var playbackSession = window.Controller.Session;
+                    bool overlappingRan = false;
+                    Task firstCommand = playbackSession.RunActionAsync(() => heldCommand.Task);
+                    try
+                    {
+                        await playbackSession.RunActionAsync(() =>
+                        {
+                            overlappingRan = true;
+                            return Task.CompletedTask;
+                        });
+                        Assert(playbackSession.IsBusy && playbackSession.ActiveOperation is not null && !overlappingRan,
+                            "Playback session rejects overlapping commands through the shared gate");
+                    }
+                    finally
+                    {
+                        heldCommand.TrySetResult();
+                        await firstCommand;
+                    }
+                    bool nextRan = false;
+                    await playbackSession.RunActionAsync(() =>
+                    {
+                        nextRan = true;
+                        return Task.CompletedTask;
+                    });
+                    Assert(nextRan && !playbackSession.IsBusy && playbackSession.ActiveOperation is null,
+                        "Playback session releases the shared gate after command completion");
                     // The native window rounds its dimensions to whole physical pixels.
                     double expectedWidth = Math.Clamp(Math.Round(SystemParameters.WorkArea.Width * 0.5), window.MinWidth, window.MaxWidth);
                     double expectedHeight = Math.Clamp(Math.Round(SystemParameters.WorkArea.Height * 0.6), window.MinHeight, window.MaxHeight);
@@ -118,7 +146,7 @@ internal static class UiChecks
                     Assert(toastStack.Children.Count == 0, "Completed task expires in the same slot");
                     var refreshButton = (Button)window.FindName("RefreshButton");
                     Assert(!refreshButton.IsEnabled, "Refresh is disabled until a folder is opened");
-                    await window.LoadFolderAsync(audioFolder);
+                    await window.Controller.LoadFolderAsync(audioFolder);
                     var list = (DataGrid)window.FindName("TrackList");
                     var slider = (Slider)window.FindName("ProgressSlider");
                     var timeText = (TextBlock)window.FindName("TimeText");
@@ -142,7 +170,7 @@ internal static class UiChecks
                         string added = Path.Combine(refreshFolder, "added.wav");
                         using (var writer = new WaveFileWriter(original, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                             writer.WriteSamples(new float[44100], 0, 44100);
-                        await window.LoadFolderAsync(refreshFolder);
+                        await window.Controller.LoadFolderAsync(refreshFolder);
                         Assert(list.Items.Count == 1 && refreshButton.IsEnabled, "Recursive folder load includes nested audio");
                         var playlistStore = new PlaylistStore(settingsStore.FilePath[..^".settings.json".Length] + ".playlist.json");
                         Assert(playlistStore.Load()!.Files.SequenceEqual(new[] { original }),
@@ -156,17 +184,17 @@ internal static class UiChecks
                         using (var writer = new WaveFileWriter(added, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                             writer.WriteSamples(new float[44100], 0, 44100);
                         refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                        if (Field<Task>(window, "activeOperation") is Task refreshAction) await refreshAction;
+                        if (window.Controller.Session.ActiveOperation is Task refreshAction) await refreshAction;
                         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                         Assert(list.Items.Count == 2 &&
                             list.Items.OfType<AudioTrack>().Select(track => Path.GetFileName(track.FilePath))
                                 .SequenceEqual(new[] { "added.wav", "renamed.wav" }) &&
-                            list.SelectedItem is null && !Field<PlayerEngine>(window, "player")!.IsLoaded,
+                            list.SelectedItem is null && !Field<PlayerEngine>(window.Controller.Session, "player")!.IsLoaded,
                             "Refresh reloads added and renamed files, clears selection and closes playback");
                         Assert(refreshButton.IsEnabled, "Refresh button re-enables after folder load");
                         File.Delete(added);
                         refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                        if (Field<Task>(window, "activeOperation") is Task removedAction) await removedAction;
+                        if (window.Controller.Session.ActiveOperation is Task removedAction) await removedAction;
                         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                         Assert(list.Items.Count == 1 &&
                             Path.GetFileName(((AudioTrack)list.Items[0]).FilePath) == "renamed.wav",
@@ -174,8 +202,8 @@ internal static class UiChecks
 
                         string trimmed = Path.Combine(nested, "renamed.new.wav");
                         File.Copy(renamed, trimmed);
-                        window.AddTrimmedOutput(trimmed);
-                        window.AddTrimmedOutput(trimmed);
+                        window.Controller.AddTrimmedOutput(trimmed);
+                        window.Controller.AddTrimmedOutput(trimmed);
                         Assert(list.Items.Count == 2 && playlistStore.Load()!.Files.Contains(trimmed),
                             "Nested trim output inserts and persists exactly once");
                         string undiscovered = Path.Combine(nested, "new-file.wav");
@@ -184,7 +212,7 @@ internal static class UiChecks
                         var reopened = new MainWindow(settingsStore, playlistStore)
                             { ShowInTaskbar = false, ShowActivated = false, Left = -20000, Top = -20000 };
                         reopened.Show();
-                        if (Field<Task>(reopened, "activeOperation") is Task restoreAction) await restoreAction;
+                        if (reopened.Controller.Session.ActiveOperation is Task restoreAction) await restoreAction;
                         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                         try
                         {
@@ -192,7 +220,7 @@ internal static class UiChecks
                             Assert(restoredList.Items.Count == 1 &&
                                 ((AudioTrack)restoredList.Items[0]).FilePath == renamed &&
                                 reopened.Playlist.RootFolder == refreshFolder &&
-                                !Field<PlayerEngine>(reopened, "player")!.IsLoaded,
+                                !Field<PlayerEngine>(reopened.Controller.Session, "player")!.IsLoaded,
                                 "Startup restores saved existing files without rescanning or playing");
                             Assert(playlistStore.Load()!.Files.SequenceEqual(new[] { renamed }),
                                 "Startup prunes deleted saved paths");
@@ -200,23 +228,23 @@ internal static class UiChecks
                         finally { reopened.Close(); }
                         Directory.Delete(refreshFolder, true);
                         refreshButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                        if (Field<Task>(window, "activeOperation") is Task failedAction) await failedAction;
+                        if (window.Controller.Session.ActiveOperation is Task failedAction) await failedAction;
                         await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                         Assert(list.Items.Count == 0 && list.SelectedItem is null &&
                             window.Playlist.RootFolder is null &&
-                            !Field<PlayerEngine>(window, "player")!.IsLoaded &&
+                            !Field<PlayerEngine>(window.Controller.Session, "player")!.IsLoaded &&
                             !refreshButton.IsEnabled && !playButton.IsEnabled && !stopButton.IsEnabled,
                             "Missing refresh folder clears playlist, folder path and playback controls");
                         Assert(playlistStore.Load() is { RootFolder: null, Files.Length: 0 },
                             "Failed scan persists the empty state");
 
                         // A failed scan from the Open Folder path clears the old state too.
-                        await window.LoadFolderAsync(audioFolder);
+                        await window.Controller.LoadFolderAsync(audioFolder);
                         Assert(refreshButton.IsEnabled &&
                             window.Playlist.RootFolder == Path.GetFullPath(audioFolder),
                             "Valid folder can reopen after failed refresh");
                         bool failedScan = false;
-                        try { await window.LoadFolderAsync(refreshFolder); }
+                        try { await window.Controller.LoadFolderAsync(refreshFolder); }
                         catch (DirectoryNotFoundException) { failedScan = true; }
                         Assert(failedScan && list.Items.Count == 0 &&
                             window.Playlist.RootFolder is null &&
@@ -227,7 +255,7 @@ internal static class UiChecks
                         Directory.CreateDirectory(emptyFolder);
                         try
                         {
-                            await window.LoadFolderAsync(emptyFolder);
+                            await window.Controller.LoadFolderAsync(emptyFolder);
                             Assert(list.Items.Count == 0 &&
                                 window.Playlist.RootFolder == Path.GetFullPath(emptyFolder) &&
                                 refreshButton.IsEnabled,
@@ -235,7 +263,7 @@ internal static class UiChecks
                         }
                         finally { Directory.Delete(emptyFolder); }
                         toasts.Clear();
-                        await window.LoadFolderAsync(audioFolder);
+                        await window.Controller.LoadFolderAsync(audioFolder);
                     }
                     finally
                     {
@@ -253,7 +281,7 @@ internal static class UiChecks
                             writer.WriteSamples(new float[800], 0, 800);
                         for (int i = 2; i <= 120; i++)
                             File.Copy(sample, Path.Combine(scrollFolder, $"{i:D3}.wav"));
-                        await window.LoadFolderAsync(scrollFolder);
+                        await window.Controller.LoadFolderAsync(scrollFolder);
                         Assert(list.Items.Count == 120 && list.EnableRowVirtualization && list.RowHeaderWidth == 0,
                             "Playlist keeps virtualization and eliminates row header width");
                         Assert(list.HeadersVisibility == DataGridHeadersVisibility.Column,
@@ -283,7 +311,7 @@ internal static class UiChecks
                                         $"Realized adjacent rows {index} and {neighbor} alternate");
                             }
                         }
-                        await window.LoadFolderAsync(audioFolder);
+                        await window.Controller.LoadFolderAsync(audioFolder);
                     }
                     finally { Directory.Delete(scrollFolder, true); }
 
@@ -295,7 +323,7 @@ internal static class UiChecks
                         string source = Path.Combine(resultFolder, "selected.wav");
                         using (var writer = new WaveFileWriter(source, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                             writer.WriteSamples(new float[44100 * 4], 0, 44100 * 4);
-                        await window.LoadFolderAsync(resultFolder);
+                        await window.Controller.LoadFolderAsync(resultFolder);
                         list.SelectedIndex = 0;
                         if (window.Silence.SelectionTask is Task missingCheck) await missingCheck;
                         Assert(!trimButton.IsEnabled && !File.Exists(SilenceResultStore.GetPath(source)),
@@ -326,7 +354,7 @@ internal static class UiChecks
                         }
                         await window.Silence.WaitForPendingAsync();
                         Assert(!trimButton.IsEnabled, "Rapid selection changes leave stale caches disabled");
-                        await window.LoadFolderAsync(audioFolder);
+                        await window.Controller.LoadFolderAsync(audioFolder);
                     }
                     finally { Directory.Delete(resultFolder, true); }
 
@@ -674,8 +702,8 @@ internal static class UiChecks
                     var saved = settingsStore.LoadOrCreate();
                     Assert(saved.FrameMilliseconds == 25 && saved.MinimumSilenceMilliseconds == 600
                         && saved.ScriptAppearance.FontSize == 19 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
-                        && Field<AppSettings>(window, "appSettings")!.ScriptAppearance == saved.ScriptAppearance
-                        && Field<AppSettings>(window, "appSettings")!.FrameMilliseconds == 25,
+                        && window.Controller.Settings.ScriptAppearance == saved.ScriptAppearance
+                        && window.Controller.Settings.FrameMilliseconds == 25,
                         "Settings dialog saves confirmed values before applying them");
                     string savedBeforeCancel = File.ReadAllText(settingsStore.FilePath);
                     _ = window.Dispatcher.BeginInvoke(new Action(() =>
@@ -687,28 +715,28 @@ internal static class UiChecks
                     }));
                     settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     Assert(File.ReadAllText(settingsStore.FilePath) == savedBeforeCancel &&
-                        Field<AppSettings>(window, "appSettings")!.ScriptAppearance == saved.ScriptAppearance,
+                        window.Controller.Settings.ScriptAppearance == saved.ScriptAppearance,
                         "Cancel leaves persisted and active subtitle settings unchanged");
                     var restoredWindow = new MainWindow(settingsStore);
-                    Assert(Field<AppSettings>(restoredWindow, "appSettings")!.FrameMilliseconds == 25,
+                    Assert(restoredWindow.Controller.Settings.FrameMilliseconds == 25,
                         "Window restores saved settings on next launch");
                     restoredWindow.Close();
                     string invalidConfiguration = "{broken";
                     File.WriteAllText(settingsStore.FilePath, invalidConfiguration);
                     var invalidWindow = new MainWindow(settingsStore);
-                    Assert(!FieldValue<bool>(invalidWindow, "settingsFileReady")
+                    Assert(!invalidWindow.Controller.SettingsFileReady
                         && FindVisual<StackPanel>((ToastHost)invalidWindow.FindName("ToastMessages"))!.Children.Count > 0
                         && File.ReadAllText(settingsStore.FilePath) == invalidConfiguration,
                         "Invalid configuration is preserved and reported inline");
                     invalidWindow.Close();
                     settingsStore.Save(saved);
-                    window.BeginScriptSeek(double.NaN);
-                    window.BeginScriptSeek(-1);
-                    Assert(!Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled &&
-                        Field<object>(window, "scriptSeek") is null,
+                    window.Controller.Session.BeginPreview(double.NaN);
+                    window.Controller.Session.BeginPreview(-1);
+                    Assert(!window.Controller.Session.PreviewTimerEnabled &&
+                        window.Controller.Session.PreviewPosition is null,
                         "Invalid script navigation targets do not arm the debounce timer");
-                    await window.CommitScriptSeekAsync();
-                    Assert(!Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled,
+                    await window.Controller.Session.CommitPreviewAsync();
+                    Assert(!window.Controller.Session.PreviewTimerEnabled,
                         "Commit without a pending script target is a no-op");
                     // Real WebView2 integration runs independently of audio hardware.
                     string? runtimeVersion = null;
@@ -996,29 +1024,29 @@ internal static class UiChecks
                         using (var writer = new WaveFileWriter(firstModePath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                             writer.WriteSamples(new float[44100], 0, 44100);
                         File.Copy(firstModePath, secondModePath);
-                        await window.LoadFolderAsync(modeFolder);
-                        var modePlayer = Field<PlayerEngine>(window, "player")!;
-                        var modalField = typeof(MainWindow).GetField("modalDialogOpen", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                        await window.Controller.LoadFolderAsync(modeFolder);
+                        var modePlayer = Field<PlayerEngine>(window.Controller.Session, "player")!;
+                        var session = window.Controller.Session;
                         async Task WaitModeAsync(Func<bool> condition)
                         {
                             var deadline = DateTime.UtcNow.AddSeconds(8);
-                            while ((!condition() || FieldValue<bool>(window, "operationBusy")) && DateTime.UtcNow < deadline) await Task.Delay(25);
-                            Assert(condition() && !FieldValue<bool>(window, "operationBusy"), "Playback mode transition completes");
+                            while ((!condition() || window.Controller.Session.IsBusy) && DateTime.UtcNow < deadline) await Task.Delay(25);
+                            Assert(condition() && !window.Controller.Session.IsBusy, "Playback mode transition completes");
                         }
                         async Task ClickModeStop()
                         {
                             stopButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                            await WaitModeAsync(() => !FieldValue<bool>(window, "operationBusy") && !modePlayer.IsPlaying);
+                            await WaitModeAsync(() => !window.Controller.Session.IsBusy && !modePlayer.IsPlaying);
                         }
                         async Task StartModeTrack(int index)
                         {
                             // Use the normal play shortcut with the selected file on a fresh playlist.
-                            if (modePlayer.IsLoaded && !ReferenceEquals(Field<AudioTrack>(window, "loadedTrack"), list.Items[index]))
-                                await window.LoadFolderAsync(modeFolder);
+                            if (modePlayer.IsLoaded && !ReferenceEquals(window.Controller.Session.LoadedTrack, list.Items[index]))
+                                await window.Controller.LoadFolderAsync(modeFolder);
                             list.SelectedIndex = index;
                             await window.HandleShortcutAsync(Key.Space);
                         }
-                        bool LoadedModeTrack(int index) => ReferenceEquals(Field<AudioTrack>(window, "loadedTrack"), list.Items[index]);
+                        bool LoadedModeTrack(int index) => ReferenceEquals(window.Controller.Session.LoadedTrack, list.Items[index]);
                         await StartModeTrack(0);
                         await WaitModeAsync(() => !modePlayer.IsPlaying && modePlayer.GetCurrentTime() == modePlayer.GetDuration());
                         Assert(LoadedModeTrack(0), "Play One stops on current file");
@@ -1047,7 +1075,7 @@ internal static class UiChecks
                         Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying, "Manual timed seek to end does not advance");
 
                         // Simulate the shared modal guard, then exercise actual Stop/seek routing.
-                        modalField.SetValue(window, true);
+                        session.ModalDialogOpen = true;
                         try
                         {
                             await modePlayer.PlayAsync();
@@ -1055,19 +1083,19 @@ internal static class UiChecks
                             Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying,
                                 "Natural completion is deferred during a modal dialog");
                         }
-                        finally { modalField.SetValue(window, false); }
+                        finally { session.ModalDialogOpen = false; }
                         await ClickModeStop();
                         await Task.Delay(300);
                         Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying && modePlayer.NaturalCompletion is null,
                             "Stop supersedes deferred natural completion");
 
-                        modalField.SetValue(window, true);
+                        session.ModalDialogOpen = true;
                         try
                         {
                             await modePlayer.PlayAsync();
                             await WaitModeAsync(() => modePlayer.NaturalCompletion is not null);
                         }
-                        finally { modalField.SetValue(window, false); }
+                        finally { session.ModalDialogOpen = false; }
                         await window.HandleShortcutAsync(Key.Left, ModifierKeys.Control);
                         await Task.Delay(300);
                         Assert(LoadedModeTrack(0) && !modePlayer.IsPlaying && modePlayer.NaturalCompletion is null
@@ -1077,18 +1105,18 @@ internal static class UiChecks
                         // In Repeat All, an unreadable next track must stop instead of cycling.
                         string brokenModePath = Path.Combine(modeFolder, "03.wav");
                         File.WriteAllText(brokenModePath, "not audio");
-                        await window.LoadFolderAsync(modeFolder);
+                        await window.Controller.LoadFolderAsync(modeFolder);
                         await StartModeTrack(1);
-                        await WaitModeAsync(() => !modePlayer.IsLoaded && !FieldValue<bool>(window, "operationBusy"));
+                        await WaitModeAsync(() => !modePlayer.IsLoaded && !window.Controller.Session.IsBusy);
                         Assert(!modePlayer.IsPlaying && modePlayer.NaturalCompletion is null,
                             "Unreadable automatic next file stops playback");
 
                         File.Delete(brokenModePath);
                         string emptyModePath = Path.Combine(modeFolder, "03.wav");
                         using (var emptyWriter = new WaveFileWriter(emptyModePath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1))) { }
-                        await window.LoadFolderAsync(modeFolder);
+                        await window.Controller.LoadFolderAsync(modeFolder);
                         await StartModeTrack(1);
-                        await WaitModeAsync(() => !modePlayer.IsLoaded && !FieldValue<bool>(window, "operationBusy"));
+                        await WaitModeAsync(() => !modePlayer.IsLoaded && !window.Controller.Session.IsBusy);
                         Assert(!modePlayer.IsPlaying && modePlayer.NaturalCompletion is null,
                             "Zero-duration automatic next file stops playback");
                         File.Delete(emptyModePath);
@@ -1097,7 +1125,7 @@ internal static class UiChecks
                         string shortModePath = Path.Combine(modeFolder, "03.wav");
                         using (var shortWriter = new WaveFileWriter(shortModePath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                             shortWriter.WriteSamples(new float[44], 0, 44);
-                        await window.LoadFolderAsync(modeFolder);
+                        await window.Controller.LoadFolderAsync(modeFolder);
                         for (int attempt = 0; attempt < 4; attempt++)
                         {
                             await StartModeTrack(2);
@@ -1107,7 +1135,7 @@ internal static class UiChecks
                     }
                     finally
                     {
-                        await window.LoadFolderAsync(audioFolder);
+                        await window.Controller.LoadFolderAsync(audioFolder);
                         await window.Silence.WaitForPendingAsync();
                         Directory.Delete(modeFolder, true);
                     }
@@ -1115,43 +1143,42 @@ internal static class UiChecks
                     using (var writer = new WaveFileWriter(recoveryPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                         writer.WriteSamples(new float[44100], 0, 44100);
                     var recoveryTrack = new AudioTrack { FilePath = recoveryPath };
-                    MethodInfo playTrack = typeof(MainWindow).GetMethod("PlayTrackAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
-                    await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
+                    await window.Controller.PlayTrackAsync(recoveryTrack);
                     if (window.Silence.AnalysisTask is Task recoveryAnalysis) await recoveryAnalysis;
-                    await Field<PlayerEngine>(window, "player")!.StopAsync();
+                    await Field<PlayerEngine>(window.Controller.Session, "player")!.StopAsync();
                     string brokenPath = Path.Combine(audioFolder, "broken.wav");
                     File.WriteAllText(brokenPath, "not an audio file");
                     bool failedOpen = false;
-                    try { await (Task)playTrack.Invoke(window, new object[] { new AudioTrack { FilePath = brokenPath } })!; }
+                    try { await window.Controller.PlayTrackAsync(new AudioTrack { FilePath = brokenPath }); }
                     catch (Exception) { failedOpen = true; }
                     Assert(failedOpen, "Broken replacement track is rejected");
-                    await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
-                    Assert(Field<PlayerEngine>(window, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
+                    await window.Controller.PlayTrackAsync(recoveryTrack);
+                    Assert(Field<PlayerEngine>(window.Controller.Session, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
                     if (window.Silence.AnalysisTask is Task recoveredAnalysis) await recoveredAnalysis;
-                    var scriptPlayer = Field<PlayerEngine>(window, "player")!;
+                    var scriptPlayer = Field<PlayerEngine>(window.Controller.Session, "player")!;
                     string seekPath = Path.Combine(audioFolder, "script-seek-test.wav");
                     using (var writer = new WaveFileWriter(seekPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
                         writer.WriteSamples(new float[44100 * 12], 0, 44100 * 12);
-                    await (Task)playTrack.Invoke(window, new object[] { new AudioTrack { FilePath = seekPath } })!;
-                    window.BeginScriptSeek(2);
-                    window.BeginScriptSeek(4);
+                    await window.Controller.PlayTrackAsync(new AudioTrack { FilePath = seekPath });
+                    window.Controller.Session.BeginPreview(2);
+                    window.Controller.Session.BeginPreview(4);
                     Assert(scriptPlayer.IsPaused && slider.Value == 4 &&
-                        Field<DispatcherTimer>(window, "scriptSeekTimer")!.Interval == TimeSpan.FromMilliseconds(150),
+                        window.Controller.Session.PreviewDebounce == TimeSpan.FromMilliseconds(150),
                         "Wheel preview pauses audio, updates slider and retains latest target");
-                    await window.CommitScriptSeekAsync();
+                    await window.Controller.Session.CommitPreviewAsync();
                     Assert(scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime().TotalSeconds >= 3.9,
                         "Committed wheel seek resumes playing audio at latest target");
                     scriptPlayer.Pause();
-                    window.BeginScriptSeek(2);
-                    await window.CommitScriptSeekAsync();
+                    window.Controller.Session.BeginPreview(2);
+                    await window.Controller.Session.CommitPreviewAsync();
                     Assert(scriptPlayer.IsPaused && Math.Abs(scriptPlayer.GetCurrentTime().TotalSeconds - 2) < 0.1,
                         "Committed wheel seek preserves explicit pause");
                     await scriptPlayer.PlayAsync();
-                    window.BeginScriptSeek(6);
-                    await window.RestoreCanceledScriptSeekAsync();
+                    window.Controller.Session.BeginPreview(6);
+                    await window.Controller.Session.CancelPreviewAsync();
                     Assert(scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime().TotalSeconds < 5,
                         "Cancel pending wheel navigation restores playback without seeking");
-                    window.BeginScriptSeek(6);
+                    window.Controller.Session.BeginPreview(6);
                     var settingsClosed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     var closeSettingsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
                     closeSettingsTimer.Tick += (_, _) =>
@@ -1169,29 +1196,29 @@ internal static class UiChecks
                         await settingsClosed.Task.WaitAsync(TimeSpan.FromSeconds(10));
                     }
                     finally { closeSettingsTimer.Stop(); }
-                    Assert(scriptPlayer.IsPlaying && Field<object>(window, "scriptSeek") is null,
+                    Assert(scriptPlayer.IsPlaying && window.Controller.Session.PreviewPosition is null,
                         "Opening and canceling Settings restores pending wheel playback intent");
-                    window.BeginScriptSeek(6);
+                    window.Controller.Session.BeginPreview(6);
                     await window.HandleShortcutAsync(Key.Space);
-                    Assert(scriptPlayer.IsPaused && Field<object>(window, "scriptSeek") is null,
+                    Assert(scriptPlayer.IsPaused && window.Controller.Session.PreviewPosition is null,
                         "Space cancels wheel preview and honors intended pause");
-                    window.BeginScriptSeek(6);
+                    window.Controller.Session.BeginPreview(6);
                     await window.HandleShortcutAsync(Key.Space);
                     Assert(scriptPlayer.IsPlaying, "Space from explicitly paused preview resumes playback");
                     // A consumed transaction cannot replay its old target.
-                    window.BeginScriptSeek(5);
-                    await window.CommitScriptSeekAsync();
+                    window.Controller.Session.BeginPreview(5);
+                    await window.Controller.Session.CommitPreviewAsync();
                     double committedPosition = scriptPlayer.GetCurrentTime().TotalSeconds;
-                    await window.CommitScriptSeekAsync();
+                    await window.Controller.Session.CommitPreviewAsync();
                     Assert(scriptPlayer.IsPlaying && committedPosition >= 4.9 &&
                         scriptPlayer.GetCurrentTime().TotalSeconds >= committedPosition &&
-                        Field<object>(window, "scriptSeek") is null,
+                        window.Controller.Session.PreviewPosition is null,
                         "Completed script navigation is consumed exactly once");
-                    window.BeginScriptSeek(6);
+                    window.Controller.Session.BeginPreview(6);
                     stopButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    if (Field<Task>(window, "activeOperation") is Task stoppingScript) await stoppingScript;
+                    if (window.Controller.Session.ActiveOperation is Task stoppingScript) await stoppingScript;
                     Assert(!scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime() == TimeSpan.Zero &&
-                        !Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled,
+                        !window.Controller.Session.PreviewTimerEnabled,
                         "Stop cancels pending wheel seek without restarting");
                     if (window.Silence.AnalysisTask is Task seekAnalysis) await seekAnalysis;
                     await scriptPlayer.CloseAsync();
@@ -1213,7 +1240,7 @@ internal static class UiChecks
                     await window.HandleShortcutAsync(Key.Space);
                     Task? analysis = window.Silence.AnalysisTask;
                     if (analysis is not null) await analysis;
-                    var player = Field<PlayerEngine>(window, "player")!;
+                    var player = Field<PlayerEngine>(window.Controller.Session, "player")!;
                     Assert(player.PlaybackState == PlaybackState.Playing, "Space opens selected track and plays");
                     playButton.Focus();
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
@@ -1250,7 +1277,7 @@ internal static class UiChecks
                     Assert(player.GetCurrentTime() >= ranges[2].Middle, "Two rapid presses advance two pauses");
                     await window.HandleShortcutAsync(Key.Space);
                     list.SelectedIndex = 1;
-                    var loaded = Field<AudioTrack>(window, "loadedTrack")!;
+                    var loaded = window.Controller.Session.LoadedTrack!;
                     Assert(!ReferenceEquals(list.SelectedItem, loaded), "Selection independent of loaded track");
 
                     playButton.Focus();
@@ -1259,7 +1286,7 @@ internal static class UiChecks
                     var outsideEnter = new KeyEventArgs(Keyboard.PrimaryDevice, sourceOutside, Environment.TickCount, Key.Enter) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
                     playButton.RaiseEvent(outsideEnter);
                     await Dispatcher.Yield(DispatcherPriority.Background);
-                    Assert(ReferenceEquals(Field<AudioTrack>(window, "loadedTrack"), loaded), "Enter outside the focused table row does not play the selected row");
+                    Assert(ReferenceEquals(window.Controller.Session.LoadedTrack, loaded), "Enter outside the focused table row does not play the selected row");
 
                     var row1CellForEnter = FindVisual<DataGridCell>(row1)!;
                     row1CellForEnter.Focus();
@@ -1267,18 +1294,18 @@ internal static class UiChecks
                     var rowEnter = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window)!, Environment.TickCount, Key.Enter) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
                     row1CellForEnter.RaiseEvent(rowEnter);
                     Assert(rowEnter.Handled, "Focused table row consumes Enter");
-                    Task? enterOperation = Field<Task>(window, "activeOperation");
+                    Task? enterOperation = window.Controller.Session.ActiveOperation;
                     if (enterOperation is not null) await enterOperation;
                     Task? enterAnalysis = window.Silence.AnalysisTask;
                     if (enterAnalysis is not null) await enterAnalysis;
                     var row1Track = (AudioTrack)row1.Item;
-                    Assert(ReferenceEquals(Field<AudioTrack>(window, "loadedTrack"), row1Track) && player.PlaybackState == PlaybackState.Playing, "Enter on focused table row plays that row");
+                    Assert(ReferenceEquals(window.Controller.Session.LoadedTrack, row1Track) && player.PlaybackState == PlaybackState.Playing, "Enter on focused table row plays that row");
 
                     await player.SeekAsync(TimeSpan.FromSeconds(2));
                     row1CellForEnter.Focus();
                     var currentRowEnter = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window)!, Environment.TickCount, Key.Enter) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
                     row1CellForEnter.RaiseEvent(currentRowEnter);
-                    Task? currentEnterOperation = Field<Task>(window, "activeOperation");
+                    Task? currentEnterOperation = window.Controller.Session.ActiveOperation;
                     if (currentEnterOperation is not null) await currentEnterOperation;
                     Assert(player.PlaybackState == PlaybackState.Playing && player.GetCurrentTime() > TimeSpan.FromSeconds(1.8), "Enter on the already playing row does not restart it");
 
@@ -1292,9 +1319,9 @@ internal static class UiChecks
                             var down = new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
                             control.RaiseEvent(down);
                             Assert(down.Handled, name + " consumes " + key + " down");
-                            Task? operation = Field<Task>(window, "activeOperation");
+                            Task? operation = window.Controller.Session.ActiveOperation;
                             if (operation is not null) await operation;
-                            Task? navigation = Field<Task>(window, "navigationTask");
+                            Task? navigation = window.Controller.NavigationTask;
                             if (navigation is not null) await navigation;
                             await Dispatcher.Yield(DispatcherPriority.Background);
                             var up = new KeyEventArgs(Keyboard.PrimaryDevice, source, Environment.TickCount, key) { RoutedEvent = Keyboard.PreviewKeyUpEvent };
@@ -1316,14 +1343,14 @@ internal static class UiChecks
                     var click = new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
                     { RoutedEvent = Mouse.PreviewMouseDownEvent };
                     slider.RaiseEvent(click);
-                    Assert(FieldValue<bool>(window, "dragging"), "Track click starts seek interaction even when handled");
+                    Assert(window.Controller.Session.IsDragging, "Track click starts seek interaction even when handled");
                     slider.Value = 5;
                     var release = new MouseButtonEventArgs(Mouse.PrimaryDevice, Environment.TickCount, MouseButton.Left)
                     { RoutedEvent = Mouse.PreviewMouseUpEvent };
                     window.RaiseEvent(release);
-                    Task? seek = Field<Task>(window, "activeOperation");
+                    Task? seek = window.Controller.Session.ActiveOperation;
                     if (seek is not null) await seek;
-                    Assert(Math.Abs(player.GetCurrentTime().TotalSeconds - 5) < 0.15 && !FieldValue<bool>(window, "dragging"), "Track click released outside slider commits seek");
+                    Assert(Math.Abs(player.GetCurrentTime().TotalSeconds - 5) < 0.15 && !window.Controller.Session.IsDragging, "Track click released outside slider commits seek");
                     await player.StopAsync();
                     Assert(player.GetCurrentTime() == TimeSpan.Zero, "Stop resets position");
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
@@ -1356,15 +1383,15 @@ internal static class UiChecks
                     }
                     window = new MainWindow(settingsStore) { ShowInTaskbar = false, ShowActivated = false, Left = -20000, Top = -20000 };
                     window.Show();
-                    if (Field<Task>(window, "activeOperation") is Task restoredStartup) await restoredStartup;
-                    await window.LoadFolderAsync(audioFolder);
+                    if (window.Controller.Session.ActiveOperation is Task restoredStartup) await restoredStartup;
+                    await window.Controller.LoadFolderAsync(audioFolder);
                     await window.HandleShortcutAsync(Key.Space);
                     Assert(window.Silence.IsAnalyzing, "Analysis in progress before close");
                     var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     window.Closed += (_, _) => closed.TrySetResult();
                     window.Close();
                     await closed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-                    Assert(!Field<PlayerEngine>(window, "player")!.IsLoaded, "Close during analysis releases player");
+                    Assert(!Field<PlayerEngine>(window.Controller.Session, "player")!.IsLoaded, "Close during analysis releases player");
                     using (var file = new FileStream(Directory.GetFiles(audioFolder, "*.mp3")[0], FileMode.Open, FileAccess.Read, FileShare.None))
                         Assert(file.Length > 0, "Close during analysis releases analysis reader");
                 }
