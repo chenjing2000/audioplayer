@@ -53,6 +53,8 @@ internal sealed class SettingsStore
                     throw new JsonException("配置文件缺少必填参数：" + name);
             }
         }
+        if (settings.ScriptAppearance is not null)
+            settings.ScriptAppearance = settings.ScriptAppearance.NormalizeRemovedOptions();
         settings.Validate();
         return settings;
     }

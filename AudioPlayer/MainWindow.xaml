@@ -24,6 +24,7 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button x:Name="OpenButton" Style="{StaticResource CircleButtonStyle}" ToolTip="打开文件夹" AutomationProperties.Name="打开文件夹" VerticalAlignment="Center" Click="OpenButton_Click">
                 <Image Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform" Source="{StaticResource OpenFolderIcon}"/>
@@ -63,7 +64,10 @@
                 <Image x:Name="PlaybackModeImage" Width="28" Height="28" HorizontalAlignment="Center"
                        VerticalAlignment="Center" Stretch="Uniform" Source="{StaticResource PlayOneIcon}"/>
             </Button>
-            <Button x:Name="SettingsButton" Grid.Column="8" Style="{StaticResource CircleButtonStyle}"
+            <Button x:Name="ScriptButton" Grid.Column="8" Style="{StaticResource CircleButtonStyle}" ToolTip="显示原文" AutomationProperties.Name="显示原文" VerticalAlignment="Center" Margin="0,0,5,0" Click="ScriptButton_Click">
+                <Image Width="28" Height="28" Source="{StaticResource ScriptIcon}"/>
+            </Button>
+            <Button x:Name="SettingsButton" Grid.Column="9" Style="{StaticResource CircleButtonStyle}"
                     ToolTip="设置" AutomationProperties.Name="设置"
                     HorizontalAlignment="Center" VerticalAlignment="Center" Click="SettingsButton_Click">
                 <Image Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"

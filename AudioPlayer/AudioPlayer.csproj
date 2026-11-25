@@ -11,6 +11,9 @@
   <ItemGroup>
     <Resource Include="ui/main.ico" />
     <Content Include="../docs/FFmpeg-Setup.txt" Link="FFmpeg-Setup.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <None Remove="web/script.html" />
+    <EmbeddedResource Include="web/script.html" />
     <PackageReference Include="NAudio" Version="2.2.1" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
     <InternalsVisibleTo Include="AudioPlayer.Tests" />

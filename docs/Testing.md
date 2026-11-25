@@ -403,3 +403,192 @@ The user explicitly confirmed all 12 focused WindowsAppPlaybook remediation manu
 ### PR #16 final merge and post-merge verification
 
 Final tooltip revision `c3a4c21` removes the visible `播放模式：` prefix while preserving accessible names and updates UI assertions. Both [push CI #45382457033](https://github.com/chenjing2000/audioplayer/actions/runs/45382457033) and [PR CI #45382467366](https://github.com/chenjing2000/audioplayer/actions/runs/45382467366) passed. No separate manual tooltip result was supplied. The user explicitly authorized merging on 2026-11-24; [PR #16](https://github.com/chenjing2000/audioplayer/pull/16) was squash merged into `main@af27658`. [Post-merge Windows CI #45382847185](https://github.com/chenjing2000/audioplayer/actions/runs/45382847185) passed. Remote branch listing verified only `main` remains. Local branch cleanup/synchronization and a new local automated/publishing log for the remediation revision have not been independently confirmed. The 70 user-reported manual checks are cumulative, not a full rerun on the merge commit. Earlier pending/deferred merge statements above describe historical stages. Optional MP3 and previously deferred real-media/failure-path checks remain unverified; no release tag was created.
+
+## PR #17 — Script companion Windows acceptance (pending)
+
+Application revision `14a354a`, 2026-11-24: [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45398456432), [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45398466410), 58 Core + 221 UI + 5 publishing safeguards + 4 published EXE checks passed; zero failures. Workflow smoke also passed. Six script wheel playback assertions explicitly skipped because hosted runner has no WaveOut device; other audio-device and optional MP3 checks also skipped. This is not evidence of real WebView2 interaction. No manual result yet.
+
+On Windows, close running AudioPlayer, switch to the feature branch and pull fast-forward only; do not discard local changes. Run UI, publish and published checks as in HANDOFF. Check the actual log contains the six wheel playback assertions and no WaveOut skip. Use a separate copied media folder with one correctly matched ReadArticles Script JSON, including multiple pages of text, timing gaps and null intervals. Use disposable copies for malformed/missing cases and test configuration; do not modify originals. Record commit, test logs, pass/fail per ID, environment/DPI and any skipped scenarios. Do not merge before separate authorization.
+
+| ID | Windows manual acceptance check |
+| --- | --- |
+| A01 | Icon order, consistent shape, tooltip show/hide, minimum main width without overlap |
+| A02 | Opens right of main, initial 400 DIP width and same height |
+| A03 | Minimum 200 × 300 DIP; independent resize |
+| A04 | Main movement and horizontal resize follow right edge |
+| A05 | Main vertical resize preserves independent script height |
+| A06 | Hide, reopen and close button; native main minimize closes reader first, restore leaves closed, main close |
+| A07 | Main maximize and insufficient space keep reader accessible; reader minimize/maximize disabled, resize remains enabled |
+| A08 | Secondary monitor and mixed DPI; report unavailable hardware as skipped |
+| B01 | Arbitrary JSON filename, only current loaded audio parent searched |
+| B02 | Ignore unrelated JSON and nonmatching selected row |
+| B03 | Missing script message; audio continues |
+| B04 | Recognizable Script with invalid schema/interval shows error; audio continues |
+| B05 | Empty/nonempty title and original punctuation/text |
+| B06 | Null/unmatched units and empty timed_units remain visible without coloring |
+| B07 | Switch tracks/folders without stale original text |
+| B08 | Source JSON unchanged; no auto timestamp repair |
+| C01 | Progressive partial-word color follows actual playback |
+| C02 | Wrapped timed unit retains one interval |
+| C03 | Natural top boundary; continuous follow begins when scroll range permits |
+| C04 | Current visual line near center; interpolated motion between timed visual lines, including gaps |
+| C05 | Bottom natural scroll limit, short document no extra padding |
+| C06 | Continuous automatic scrolling within and across lines, no per-line dwell |
+| C07 | Pause/resume, forward/backward seek, Stop and natural end |
+| C08 | Resize/font changes recalculate layout without audio seek |
+| D01 | Wheel at 25% of original displacement and native scrollbar both directions directly scroll, no auto animation |
+| D02 | Rapid wheel input previews latest continuous target on main slider; small moves within a visual line change target |
+| D03 | One committed seek after approximately 150 ms idle |
+| D04 | Playing resumes, paused/stopped behavior remains consistent |
+| D05 | Top/bottom first/last valid anchor; interpolation across untimed text, no valid anchors/no movement does not seek |
+| D06 | Double-click text does not seek; left selection/copy and middle press behavior |
+| D07 | Hide/close, Stop, Space and main slider/keyboard supersede pending seek correctly |
+| D08 | Switch track, refresh, open/settings dialogs and close app during pending navigation |
+| E01 | Modern borderless audio/subtitle tabs, rounded selectors, original audio controls and footer fit |
+| E02 | All fonts and font sizes, missing font fallback |
+| E03 | Line height, paragraph spacing and first-line indentation |
+| E04 | Five borderless swatches per group; one checkmark, confirmed colors apply to reader, no sample preview |
+| E05 | Cancel leaves saved appearance unchanged; OK persists |
+| E06 | Restart restores settings; Restore Defaults stages values until confirmation |
+| E07 | Older config defaults; invalid config retained and reported |
+| E08 | Appearance edits do not trigger silence reanalysis; shortcuts and copying remain usable |
+| F01 | All four playback modes, repeat reset and next-track script |
+| F02 | Long script performance and responsiveness |
+| F03 | Resize and scroll during playback; no unexpected seek |
+| F04 | Hidden reader and reopen synchronize without stale playback |
+| F05 | WebView2 unavailable/failure does not stop audio (only isolated safe environment) |
+| F06 | Published single EXE opens actual script, runtime cache beside EXE |
+| F07 | Existing settings/playlist/media and trim outputs retained |
+| F08 | Existing playback, silence navigation, scan and trim regression smoke |
+
+No item above is marked passed until user reports actual Windows results. Timing estimates based on observation are qualitative unless instrumented. Real device failure scenarios or mixed-DPI hardware unavailable locally must be marked skipped, not passed.
+
+### Local Windows result at 0ada0d9 (2026-11-24)
+
+User-supplied PowerShell log: 58 Core, 260 UI, 5 publishing safeguards, 4 published EXE checks passed; optional MP3 skipped. All seven wheel-related assertion lines passed (the prior skip label counted six grouped scenarios). Manual launch of the published EXE displayed the companion but reported “原文页面加载失败。”; reader acceptance failed and further manual checks are pending. The navigation implementation is corrected to serve the embedded reader through a fixed local HTTPS resource response, as in ReadArticles, with exact navigation/message source checks and diagnostic errors. A real WebView2 ready/render smoke test now runs before the audio-device gate when the runtime is available. This correction still requires CI and local re-verification.
+
+### Local Windows result at 6789ffd (2026-11-24)
+
+Both [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45402314948) and [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45402326844) passed: 58 Core, 223 UI, 5 publishing safeguards and 4 published EXE checks (290 total, zero failures; workflow smoke also passed). Both real WebView2 handshake/render assertions and stabilized Toast checks ran successfully. Hosted WaveOut-dependent assertions remain skipped.
+
+User-supplied Windows PowerShell log at `6789ffd`: 58 Core, 262 UI, 5 publishing safeguards and 4 published EXE checks (329 total, zero failures). Both actual WebView2 assertions and all seven wheel playback assertion lines passed. Optional MP3-specific cases skipped. Temporary WebView2 test cache was still in use during cleanup (nonfatal); no production data loss reported. Publish and published EXE checks passed. The published EXE screenshot and user report confirm the earlier reader initialization failure is resolved: real Script JSON loads, played/unplayed coloring is visible, direct wheel scrolling and double-click update playback progress.
+
+User explicitly confirmed all 10 focused manual checks on 2026-11-24:
+
+1. Continuous playback with progressive partial-word coloring.
+2. Automatic active visual-line centering.
+3. Smooth automatic line transition (visual assessment, not instrumented timing).
+4. Wheel scrolling during playback pauses, seeks and resumes.
+5. Wheel scrolling while paused seeks without resuming.
+6. Top and bottom scrolling boundaries.
+7. Appearance changes persist after restart.
+8. Switching audio files loads corresponding scripts.
+9. Hide and reopen during playback.
+10. Space, Left/Right and Ctrl+Left/Right in reader.
+
+These results establish core reader acceptance, not completion of the full 48-item matrix above. Remaining compound or unconfirmed cases include exact window geometry and monitor/DPI behavior, missing/invalid and untimed script fixtures, precise debounce/animation timing if required, all cancellation paths, settings option/cancel/default coverage, all playback modes with the reader visible, long-script performance, missing runtime isolation, cache placement and legacy regression/data-protection checks not separately confirmed. Do not infer full passes from partial evidence. No merge or release authorization.
+
+### Post-acceptance source review remediation (pending)
+
+The follow-up code review changes add indexed active-interval painting (including overlaps and rewind/reset), conditional browser resynchronization, modal playback-intent restoration, device-error cancellation, cooperative script loading cancellation and failed-reader recreation. New browser assertions verify overlapping/out-of-order intervals, rewind and reset; a local WAV/UI assertion covers Settings during a pending seek. Test-cache cleanup now retries for a bounded interval, and the skipped wheel assertion label correctly counts seven plus the new Settings check. Earlier user acceptance applies to `6789ffd`, not this new revision. Re-run CI and focused Windows tests; measure audio presentation timing and multi-monitor DPI before any further engine/geometry changes.
+
+### Owner minimize/restore regression (pending)
+
+At `f900adb`, [push CI](https://github.com/chenjing2000/audioplayer/actions/runs/45405767173) and [PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45405781370) passed 58 Core, 226 UI, 5 publishing safeguards and 4 published EXE checks (293 total). Audio-dependent cases skipped on hosted runner. User reported 7/7 focused remediation checks passed: Settings cancellation during wheel preview, rapid wheel synchronization, backward coloring, Stop reset, long Cambridge IELTS responsiveness, rapid track switches, and smooth follow/coloring. A06 remains failed on visual minimization: residual reader shadow in upper-left desktop. Latest local automated log not supplied. Correction explicitly hides the owned reader on minimize and restores only if previously shown, preserving browser instance and dimensions; automated checks verify native visibility, same reader on restore, and hidden-reader preference. Repeat minimize/restore with visible reader while playing and paused, with hidden reader, and check taskbar/desktop for residual shadow; verify no unintended playback change. Visual artifact resolution is not established by native visibility checks alone. No merge authorized.
+
+### Smooth automatic line transition (pending)
+
+Automatic visual-line follow now uses a 180 ms half-cosine animation rather than 50 ms; the existing frame-driven interpolation, progressive coloring and 150 ms wheel-seek debounce remain unchanged. A browser assertion drives synthetic frame timestamps and checks intermediate displacement and the exact final target. That implementation was superseded by continuous time-driven follow below; no visual acceptance was recorded. Recheck C06, C07, D01–D04, F02 and rapid line changes; previous manual passes do not establish acceptance of the new duration. No merge authorized.
+
+### Continuous audio-time-driven scroll (accepted, focused Windows checks)
+
+The user requested continuously moving text rather than per-line animations with dwell. The reader now interpolates document Y between strictly increasing visual-line timestamps and uses requestAnimationFrame with bounded 50 ms clock extrapolation between host samples. Natural scroll boundaries, paused/reset states, direct wheel/150 ms debounced seek, and confirmed-clock coloring are retained. New synthetic WebView2 assertions cover intermediate offsets across line boundaries, irregular timestamps, limits and frame lifecycle. Recheck C03–C08, D01–D07 and F02/F03: uninterrupted in-line motion, speed changes with line duration, pause/resume, seek, resize, wheel interaction and long recordings. The user subsequently confirmed the eight focused Windows checks below; no full-matrix acceptance or merge authorization.
+
+#### User-reported Windows acceptance of continuous scrolling (2026-11-24)
+
+Baseline: continuous-scroll revision `8cc723e` (user did not provide a separate local SHA or automated test log). The user confirmed all eight focused manual checks:
+
+1. Normal playback continuously scrolls upward without obvious per-line dwell.
+2. Scroll speed responds to speech-rate changes.
+3. No obvious jumps across visual lines.
+4. Scrolling remains synchronized with progressive coloring.
+5. Pause stops scrolling immediately; resume continues scrolling.
+6. Manual and automatic scrolling hand off correctly.
+7. Forward/backward seek and Stop behave correctly.
+8. Long IELTS listening material plays smoothly.
+
+The user requested about half the manual wheel navigation span. The subsequent change scales normalized wheel displacement to 50% in both directions, without changing the center-line timestamp selection, 150 ms debounce, or automatic-follow algorithm. Because seek targets are discrete visual lines and speech timing varies, the time span is approximate rather than exactly halved. A synthetic WebView2 assertion checks pixel/line/page wheel modes and direction. Fresh CI and focused Windows wheel sensitivity regression remain pending; prior acceptance does not establish the new wheel behavior. The separate minimize-shadow visual check remains unresolved. No merge authorized.
+
+#### Further reduction of wheel sensitivity (pending)
+
+The user reported the 50% setting at `ba1f351` still moves too far and requested another 50% reduction. The normalized wheel displacement is now 25% of the original (half of the preceding setting). Updated the browser assertion for pixel, line and page wheel modes; continuous follow, visual-line seek selection and 150 ms debounce remain unchanged. Fresh CI and local wheel acceptance pending. No merge authorized.
+
+### Reader controls and close-before-minimize (pending)
+
+User requested no reader minimize/maximize buttons (retain resize/close), native scrollbar movement to preview/seek like wheel, removal of double-click seek, and actual reader close before main minimize. Native SC_MINIMIZE closes/disposes reader synchronously before default minimize; StateChanged closes as fallback for programmatic/shell paths. Restoring owner leaves reader closed until the user opens it. Scroll events distinguish actual external movement from programmatic scrollTo (including clamping/rounding), reuse center-line preview and 150 ms debounce; automatic scroll does not seek. Wheel remains 25%. New WebView2 and native lifecycle assertions are pending CI and Windows visual acceptance, including real scrollbar drag, track clicks, ongoing playback and residual shadow. No merge authorized.
+
+### Reader state and trajectory refactor (implementation and pre-acceptance evidence)
+
+At `6917294`, [Feature validation](https://github.com/chenjing2000/audioplayer/actions/runs/45430367570) completed successfully. This is pre-refactor evidence only; no new Windows manual log was supplied. Source review identified separate quantized manual and continuous automatic mappings, four host navigation-state fields with a separate committing path, browser preview overwriting authoritative playback, cancellation without an actual-state snapshot, and stale-window callbacks. Refactor uses one pending transaction, the existing serialized host command gate, one epoch-tagged playback snapshot protocol, separate preview coloring, matching committed target for offset preservation, and one monotone timeline used in both directions. The reader measures timed rectangles only. Existing wheel scale (0.25), 150 ms debounce, natural bounds, real word timestamps for coloring, no double-click seek and owner-minimize close remain. Manual behavior deliberately changes from line-start quantization to continuous interpolation; untimed text between valid anchors can be traversed without fabricating word timings. No timed anchors means no seek.
+
+The exact revised inline JavaScript was executed in a simulated DOM/clock environment: all 401 forward/inverse round-trip samples, empty-trajectory handling, preview isolation, equal-position cancel, stale epoch rejection, matching commit offset and superseded commit reconciliation passed. This is not WebView2/Windows execution. Updated browser assertions exercise continuous sub-line external scroll, programmatic-scroll exclusion, same-position cancellation, stale messages and committed-target matching. Audio-device integration includes consumed-transaction repeated commit. Fresh CI and local Windows full suite are required. Focus D01–D08, C01–C08, A06–A08, F01–F06; test a real scrollbar drag, rapid interaction with Space/Stop/main slider/Settings, minimize during preview/commit, reopen and track changes, long scripts, untimed text, short document and device failure where feasible. Native scrollbar attribution still uses observed scroll offsets; physical input and resize/DPI behavior must be verified locally. No merge authorized.
+
+### Refactored reader Windows acceptance (2026-11-25)
+
+Verified application revision: `b662cba` (user-provided PowerShell log confirms local HEAD and origin/feature/script-companion-window matched after a fast-forward from `2a22de9`; working tree was clean before pull). [Feature validation CI #45434378532](https://github.com/chenjing2000/audioplayer/actions/runs/45434378532) completed successfully; verify job passed.
+
+User-provided local Windows PowerShell 5.1 results:
+
+| Check | Passed | Failed |
+| --- | ---: | ---: |
+| Core | 58 | 0 |
+| UI (including real WebView2 and WAV navigation) | 276 | 0 |
+| Publishing safeguards | 5 | 0 |
+| Published EXE checks | 4 | 0 |
+| Total | 343 | 0 |
+
+`Test.ps1 -Suite Full` passed (3 top-level groups, 0 failed, 1 skipped). PowerShell source/syntax checks passed. `Publish.ps1` successfully built and published the win-x64 .NET 10 executable to dist; `Test-PublishedApp.ps1` passed 4/4. Optional real MP3 playback, valid-MP3 metadata and MP3-dependent UI checks were skipped because the requisite local MP3 fixture was unavailable. The isolated temporary WebView2 test cache remained in use during cleanup (nonfatal; no claim that cleanup succeeded).
+
+User explicitly confirmed all 22 focused manual regression checks at this revision:
+
+- [x] Continuous smooth scrolling without obvious dwell.
+- [x] Progressive word coloring synchronized to audio.
+- [x] Long IELTS listening material plays smoothly.
+- [x] Pause/resume behaves correctly.
+- [x] Window resizing and font changes do not trigger unintended seeks.
+- [x] Fine-grained wheel navigation.
+- [x] Rapid repeated wheel navigation stays synchronized.
+- [x] Right scrollbar dragging updates playback progress.
+- [x] Clicking the scrollbar track updates playback progress.
+- [x] Manual scrolling pauses and restores prior playback state.
+- [x] Double-click text does not seek.
+- [x] Space during scrolling.
+- [x] Stop during scrolling.
+- [x] Arrow shortcuts during scrolling.
+- [x] Main slider immediately after scrolling.
+- [x] Open and cancel Settings immediately after scrolling.
+- [x] Switch audio immediately after scrolling.
+- [x] Reader cannot minimize/maximize but remains resizable.
+- [x] Minimize owner during playback closes reader with no desktop shadow.
+- [x] Minimize owner during manual navigation.
+- [x] Restore owner and reopen reader with correct synchronization.
+- [x] Repeated reader open/close without errors or stale text.
+
+The previously reported residual reader shadow is resolved in the user's tested Windows environment. The focused regression is accepted; this does not establish every earlier full-matrix case (e.g. mixed-DPI/multiple monitors, missing runtime, actual device failure, and optional MP3 checks). No application source changes, merge, release tag or release authorization in this documentation update.
+
+### Subtitle settings refinement (accepted at 73df725)
+
+At the user's request: preserve the 480 × 420 DIP dialog, audio controls and shared action buttons; modern local tab templates (音频设置/字幕参数), rounded selectors, aligned spacing, delete sample preview, three groups of five borderless color swatches with checkmarks. Defaults 16 DIP, 1.6 line height, 2 em indent; allowed choices and exact retired-value normalization are in Configuration. SettingsStore normalizes only recognized removed options on load, preserves the source file until an explicit save, and still rejects invalid values. Added core coverage for all 40 retired-value combinations, partial settings and invalid values; UI assertions cover tab labels, fit, selector styling, swatch fills/checks/required selection, defaults, confirmation and cancellation. No change to main/reader window, playback engine or script.html. Fresh CI and local visual/functional verification required; prior b662cba reader regression remains historical evidence. No merge authorized.
+
+
+At `73df725`, [Feature validation CI](https://github.com/chenjing2000/audioplayer/actions/runs/45515160423) passed. User-provided Windows log confirms local HEAD at that revision, 59 Core + 307 UI + 5 publishing safeguards + 4 published EXE checks = 375 passed, zero failed; local publish succeeded. Optional real MP3, MP3 metadata and MP3-dependent UI tests skipped; temporary WebView2 test-cache cleanup still reported a nonfatal in-use warning. All 14 focused manual checks passed: modern tabs, consistency with audio page, rounded inputs/alignment/spacing, full font names, correct option ranges, five borderless swatches per group, single selection/checkmark, no text preview, then-current defaults 16/1.6/2, confirmation applies, cancel preserves, restart restores, audio settings work, and reader scrolling/seeking/coloring unchanged. This acceptance applies to 73df725, before the next settings adjustment.
+
+### Subtitle size and input typography follow-up (manual acceptance passed; automated failures)
+
+User requested font sizes 17/18/19/20 DIP, fixed window height 430 (width 480 unchanged), and normal-weight text in edit boxes and combo boxes. With 16 retired, default is 17; former 14/15/16 normalize to 17, former 22/24/26/28 to 20; 17–20 stay valid (20 no longer normalizes). Only known retired values are normalized on load; unknown values (e.g. 21) still fail validation and loading never rewrites the file. Selected tab header alone remains semibold; text boxes, selected combo values and dropdown items explicitly use normal weight. Core and UI assertions updated; CI and focused local checks for this revision pending. Playback/reader source unchanged. No merge authorized.
+
+At `a0f5540` the user confirmed all seven focused manual checks (17/18/19/20 options, default 17, 430 DIP height, normal edit and dropdown text, selected header semibold, persistence/cancel/restart). The supplied local log verifies this HEAD and 59 Core, 307 UI, 5 publishing safeguards passed; publish succeeded; published EXE checks 3 passed, 1 failed (374 automated passes, 1 failure total). The failing isolated renamed-EXE check reported the seeded playlist path missing during the asynchronous restore poll. Optional MP3 checks skipped; temporary WebView2 cache in-use warning repeated. [CI #45516634249](https://github.com/chenjing2000/audioplayer/actions/runs/45516634249) failed in WPF UI at the 25-second WebView2 ready handshake with no ReaderFailure reported; Core and workflow smoke passed, publish steps skipped. These are distinct failures, not proof of a settings regression.
+
+### Test reliability follow-up (pending verification)
+
+Test-only follow-up: the published EXE check now polls for the complete expected restored snapshot for a separate bounded 20-second interval, tolerates transient IO exceptions during file replacement, and still fails on malformed JSON, premature process exit or incorrect/missing persisted state at deadline. The WebView2 cold-start test allows a bounded 60-second ready handshake, still stops on reader-reported error and identifies timeout explicitly. Both suspected timing issues require reruns; neither cause is proven by the previous logs alone. No application source changes, no skipped assertions, no merge authorized.

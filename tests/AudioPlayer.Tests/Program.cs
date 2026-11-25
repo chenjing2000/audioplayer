@@ -23,6 +23,111 @@ float[] Signal(int soundBefore, int silence, int soundAfter)
     => Enumerable.Repeat(0.5f, soundBefore).Concat(new float[silence]).Concat(Enumerable.Repeat(0.5f, soundAfter)).ToArray();
 
 
+Check("Script discovery uses filetype and preserves aligned and untimed text", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "script-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        File.WriteAllText(Path.Combine(folder, "a.json"), "{broken");
+        File.WriteAllText(Path.Combine(folder, "b.json"), """{"filetype":"passage"}""");
+        string path = Path.Combine(folder, "unrelated-name.json");
+        string source = """{"filetype":"script","title":"","paragraphs":[[{"text":"Go go again.","timed_units":[["Go",0,0.5],["go",0.5,1],["again.",null,null],["missing",1,2]]}]]}""";
+        File.WriteAllText(path, source);
+        var article = ScriptContent.Find(Path.Combine(folder, "audio.wav"))!;
+        var sentence = article.Paragraphs[0].Sentences[0];
+        Assert(article.Title == "" && sentence.Text == "Go go again.");
+        Assert(sentence.TimedUnits[0].Offset == 0 && sentence.TimedUnits[1].Offset == 3);
+        Assert(sentence.TimedUnits[0].CanColor && !sentence.TimedUnits[2].CanColor && !sentence.TimedUnits[3].CanColor);
+        Assert(File.ReadAllText(path) == source);
+        File.Delete(path);
+        Assert(ScriptContent.Find(Path.Combine(folder, "audio.wav")) is null);
+    }
+    finally { Directory.Delete(folder, true); }
+});
+Check("Script parser rejects invalid intervals and accepts empty timed units", () =>
+{
+    foreach (string pair in new[] { "null,1", "1,1", "2,1", "-1,1" })
+    {
+        using var invalid = System.Text.Json.JsonDocument.Parse(
+            "{\"filetype\":\"script\",\"title\":\"\",\"paragraphs\":[[{\"text\":\"a\",\"timed_units\":[[\"a\"," + pair + "]]}]]}");
+        try { ScriptContent.Parse(invalid.RootElement); throw new Exception("Invalid interval accepted"); }
+        catch (InvalidDataException) { }
+    }
+    using var valid = System.Text.Json.JsonDocument.Parse("""{"filetype":"script","title":"A","paragraphs":[[{"text":"a","timed_units":[]}]]}""");
+    Assert(ScriptContent.Parse(valid.RootElement).Paragraphs[0].Sentences[0].TimedUnits.Count == 0);
+});
+
+Check("Script appearance defaults, persistence and validation", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "appearance-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        var store = new SettingsStore(Path.Combine(folder, "player.settings.json"));
+        File.WriteAllText(store.FilePath, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0}""");
+        var settings = store.LoadOrCreate();
+        Assert(settings.ScriptAppearance == new ScriptAppearance());
+        Assert(settings.ScriptAppearance.FontSize == 17 && settings.ScriptAppearance.LineHeight == 1.6 &&
+            settings.ScriptAppearance.FirstLineIndent == 2);
+        Assert(ScriptAppearance.Fonts.SequenceEqual(new[] { "Georgia", "Microsoft YaHei UI", "Nunito", "Times New Roman", "Arial" }) &&
+            ScriptAppearance.Sizes.SequenceEqual(new[] { 17, 18, 19, 20 }) &&
+            ScriptAppearance.Heights.SequenceEqual(new[] { 1.5, 1.6, 1.7, 1.8 }) &&
+            ScriptAppearance.Spacings.SequenceEqual(new[] { 8, 12, 16, 20 }) &&
+            ScriptAppearance.Indents.SequenceEqual(new[] { 0, 1, 2 }));
+        Assert(ScriptAppearance.Colors.Length == 5 && ScriptAppearance.PlaybackColors.Length == 5 && ScriptAppearance.Backgrounds.Length == 5);
+        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0", ScriptColor = "#26798A" };
+        store.Save(settings);
+        Assert(store.LoadOrCreate().ScriptAppearance == settings.ScriptAppearance);
+        string original = File.ReadAllText(store.FilePath);
+        settings.ScriptAppearance = settings.ScriptAppearance with { FontSize = 99 };
+        try { store.Save(settings); throw new Exception("Invalid appearance accepted"); }
+        catch (ArgumentOutOfRangeException) { }
+        Assert(File.ReadAllText(store.FilePath) == original);
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
+Check("Retired script options normalize only on load without rewriting the file", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "appearance-legacy-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        var store = new SettingsStore(Path.Combine(folder, "player.settings.json"));
+        var settings = new SilenceSettings();
+        foreach (var (size, newSize) in new[] { (14, 17), (15, 17), (16, 17), (17, 17), (18, 18), (19, 19), (20, 20), (22, 20), (24, 20), (26, 20), (28, 20) })
+        foreach (var (height, newHeight) in new[] { (1.4, 1.5), (2.0, 1.8) })
+        foreach (var (spacing, newSpacing) in new[] { (0, 8), (14, 16), (18, 20), (24, 20) })
+        {
+            settings.ScriptAppearance = new ScriptAppearance { Font = "Segoe UI", FontSize = size,
+                LineHeight = height, ParagraphAfter = spacing, FirstLineIndent = 3,
+                ScriptColor = "#A33D30", Background = "#FFFFFF" };
+            string json = System.Text.Json.JsonSerializer.Serialize(settings);
+            File.WriteAllText(store.FilePath, json);
+            var loaded = store.LoadOrCreate();
+            Assert(loaded.ScriptAppearance == new ScriptAppearance { Font = "Arial", FontSize = newSize,
+                LineHeight = newHeight, ParagraphAfter = newSpacing, FirstLineIndent = 2 });
+            Assert(File.ReadAllText(store.FilePath) == json);
+            store.Save(loaded);
+            Assert(store.LoadOrCreate().ScriptAppearance == loaded.ScriptAppearance);
+        }
+
+        settings.ScriptAppearance = new ScriptAppearance { FontSize = 21 };
+        string invalid = System.Text.Json.JsonSerializer.Serialize(settings);
+        File.WriteAllText(store.FilePath, invalid);
+        try { store.LoadOrCreate(); throw new Exception("Unknown appearance value accepted"); }
+        catch (ArgumentOutOfRangeException) { }
+        Assert(File.ReadAllText(store.FilePath) == invalid);
+
+        string partial = """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0,"ScriptAppearance":{"FontSize":17,"FirstLineIndent":0}}""";
+        File.WriteAllText(store.FilePath, partial);
+        Assert(store.LoadOrCreate().ScriptAppearance == new ScriptAppearance { FontSize = 17, FirstLineIndent = 0 });
+        Assert(File.ReadAllText(store.FilePath) == partial);
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
 Check("Settings initialize beside executable, persist and preserve invalid files", () =>
 {
     string folder = Path.Combine(AppContext.BaseDirectory, "settings-" + Guid.NewGuid().ToString("N"));

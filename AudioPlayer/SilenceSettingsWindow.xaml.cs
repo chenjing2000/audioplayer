@@ -17,6 +17,14 @@ public partial class SilenceSettingsWindow : Window
     {
         InitializeComponent();
         Settings = settings;
+        FontBox.ItemsSource = ScriptAppearance.Fonts;
+        FontSizeBox.ItemsSource = ScriptAppearance.Sizes;
+        LineHeightBox.ItemsSource = ScriptAppearance.Heights;
+        ParagraphAfterBox.ItemsSource = ScriptAppearance.Spacings;
+        IndentBox.ItemsSource = ScriptAppearance.Indents;
+        TextColorBox.ItemsSource = ScriptAppearance.Colors;
+        PlaybackColorBox.ItemsSource = ScriptAppearance.PlaybackColors;
+        BackgroundColorBox.ItemsSource = ScriptAppearance.Backgrounds;
         LoadValues(settings);
 
     }
@@ -38,6 +46,15 @@ public partial class SilenceSettingsWindow : Window
 
     private void LoadValues(SilenceSettings settings)
     {
+        var appearance = settings.ScriptAppearance;
+        FontBox.SelectedItem = appearance.Font;
+        FontSizeBox.SelectedItem = appearance.FontSize;
+        LineHeightBox.SelectedItem = appearance.LineHeight;
+        ParagraphAfterBox.SelectedItem = appearance.ParagraphAfter;
+        IndentBox.SelectedItem = appearance.FirstLineIndent;
+        TextColorBox.SelectedItem = appearance.Color;
+        PlaybackColorBox.SelectedItem = appearance.ScriptColor;
+        BackgroundColorBox.SelectedItem = appearance.Background;
         playbackMode = settings.PlaybackMode;
         ExcludedFolderNamesTextBox.Text = settings.ExcludedFolderNames;
         BackwardStepTextBox.Text = settings.BackwardStepSeconds.ToString(CultureInfo.InvariantCulture);
@@ -51,7 +68,7 @@ public partial class SilenceSettingsWindow : Window
 
     private bool TryReadValues(out SilenceSettings settings)
     {
-        settings = new SilenceSettings { PlaybackMode = playbackMode };
+        settings = new SilenceSettings { PlaybackMode = playbackMode, ScriptAppearance = ReadAppearance() };
 
         if (!int.TryParse(FrameMillisecondsTextBox.Text.Trim(), out int frameMilliseconds))
             return ShowValueError("分析帧长度必须是整数。", FrameMillisecondsTextBox);
@@ -109,6 +126,33 @@ public partial class SilenceSettingsWindow : Window
         ClearValueError();
         return true;
     }
+
+    // WPF single-selection ListBox can also deselect via Ctrl+click/Space.
+    // Restore the removed color without maintaining a second selection state.
+    private void ColorSelection_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ListBox list && list.SelectedIndex < 0 && list.Items.Count > 0)
+        {
+            if (e.RemovedItems.Count > 0 && list.Items.Contains(e.RemovedItems[0]))
+                list.SelectedItem = e.RemovedItems[0];
+            else
+                list.SelectedIndex = 0;
+        }
+    }
+
+    // LoadValues always selects an allowed item. Keep defaults and validation
+    // in ScriptAppearance, not in a second set of UI-specific fallback values.
+    private ScriptAppearance ReadAppearance() => new()
+    {
+        Font = (string)FontBox.SelectedItem,
+        FontSize = (int)FontSizeBox.SelectedItem,
+        LineHeight = (double)LineHeightBox.SelectedItem,
+        ParagraphAfter = (int)ParagraphAfterBox.SelectedItem,
+        FirstLineIndent = (int)IndentBox.SelectedItem,
+        Color = (string)TextColorBox.SelectedItem,
+        ScriptColor = (string)PlaybackColorBox.SelectedItem,
+        Background = (string)BackgroundColorBox.SelectedItem
+    };
 
     private static bool IsStepText(string text) => text.Length <= 2 && text.All(c => c is >= '0' and <= '9');
 
@@ -211,6 +255,10 @@ public partial class SilenceSettingsWindow : Window
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
+        if (FontBox.IsKeyboardFocusWithin || FontSizeBox.IsKeyboardFocusWithin ||
+            LineHeightBox.IsKeyboardFocusWithin || ParagraphAfterBox.IsKeyboardFocusWithin ||
+            IndentBox.IsKeyboardFocusWithin || TextColorBox.IsKeyboardFocusWithin ||
+            PlaybackColorBox.IsKeyboardFocusWithin || BackgroundColorBox.IsKeyboardFocusWithin) return;
         e.Handled = true; // Enter checks values without accepting or closing the dialog.
         TryReadValues(out _);
     }

@@ -40,12 +40,33 @@ try {
         $settings = Join-Path $appDirectory $settingsName
         while (-not (Test-Path -LiteralPath $settings) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 100 }
         Get-Content -LiteralPath $settings -Raw | ConvertFrom-Json | Out-Null
+        # Startup restores the playlist asynchronously and replaces the JSON.
+        # A concurrent read can briefly fail while the file is being replaced.
+        # Wait for the complete expected state, not just the first readable file.
+        $deadline = [DateTime]::UtcNow.AddSeconds(20)
+        $restored = $false
+        $lastReadError = ''
         do {
+            $script:publishedProcess.Refresh()
+            if ($script:publishedProcess.HasExited) { throw 'The application exited during playlist restoration.' }
+            try {
+                $json = [IO.File]::ReadAllText($playlist)
+                $lastReadError = ''
+            }
+            catch [IO.IOException] {
+                $lastReadError = $_.Exception.Message
+                Start-Sleep -Milliseconds 100
+                continue
+            }
+            $saved = ConvertFrom-Json -InputObject $json
+            if ($saved.rootFolder -eq $media -and $saved.files.Count -eq 1 -and $saved.files[0] -eq $existingAudio) {
+                $restored = $true
+                break
+            }
             Start-Sleep -Milliseconds 100
-            $saved = Get-Content -LiteralPath $playlist -Raw | ConvertFrom-Json
-        } while ($saved.files.Count -ne 1 -and [DateTime]::UtcNow -lt $deadline)
-        if ($saved.rootFolder -ne $media -or $saved.files.Count -ne 1 -or $saved.files[0] -ne $existingAudio) {
-            throw 'Renamed EXE did not restore and prune its own playlist.'
+        } while ([DateTime]::UtcNow -lt $deadline)
+        if (-not $restored) {
+            throw "Renamed EXE did not restore and prune its own playlist within 20 seconds. Last read error: $lastReadError"
         }
         if (@(Get-ChildItem -LiteralPath $workingDirectory -File).Count) { throw 'Application files followed the working directory.' }
         $script:publishedProcess.CloseMainWindow() | Out-Null

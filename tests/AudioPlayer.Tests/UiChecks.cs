@@ -15,6 +15,13 @@ internal static class UiChecks
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern int GetWindowLong(IntPtr window, int index);
 
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr window);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern IntPtr SendMessage(IntPtr window, int message, IntPtr wParam, IntPtr lParam);
+
     public static Task<int> RunAsync(string audioFolder)
     {
         var done = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -61,32 +68,46 @@ internal static class UiChecks
                     var toasts = (ToastHost)window.FindName("ToastMessages");
                     var toastStack = FindVisual<StackPanel>(toasts)!;
                     Assert(toastStack.Children.Count == 0, "Toast overlay starts empty");
-                    toasts.Show("测试信息", ToastLevel.Info);
+                    // Give the queue-order test its own lifetime budget, independent of
+                    // the separate expiration assertions and slow hosted rendering.
+                    toasts.Show("测试信息", ToastLevel.Info, TimeSpan.FromSeconds(30));
                     Assert(toastStack.Children.Count == 1 &&
                         FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "普通：测试信息",
                         "Normal toasts use the information prefix");
-                    toasts.Show("测试警告", ToastLevel.Warning);
+                    toasts.Show("测试警告", ToastLevel.Warning, TimeSpan.FromSeconds(30));
                     toasts.Show("测试错误", ToastLevel.Error);
                     Assert(toastStack.Children.Count == 3 &&
                         FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "错误：测试错误",
                         "Newest visible toast is on top");
-                    toasts.Show("排队消息", ToastLevel.Info);
+                    toasts.Show("排队消息", ToastLevel.Info, TimeSpan.FromSeconds(30));
                     Assert(toastStack.Children.Count == 3, "Only three toast slots are shown");
                     FindVisual<Button>((Border)toastStack.Children[2])!
                         .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                    await Task.Delay(350);
-                    Assert(toastStack.Children.Count == 3 &&
-                        FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "普通：排队消息",
-                        "Closing the oldest toast dequeues the next message");
-                    await Task.Delay(5500);
-                    Assert(toastStack.Children.OfType<Border>().Any(x =>
-                        FindVisual<TextBlock>(x)?.Text == "错误：测试错误"), "Error toast persists");
+                    bool QueueAdvanced() => toastStack.Children.Count == 3 &&
+                        FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "普通：排队消息";
+                    var queueDeadline = System.Diagnostics.Stopwatch.StartNew();
+                    while (!QueueAdvanced() && queueDeadline.Elapsed < TimeSpan.FromSeconds(10))
+                        await Task.Delay(50);
+                    Assert(QueueAdvanced(), "Closing the oldest toast dequeues the next message");
+
+                    // Expiration is a separate behavior; use the real default lifetime.
+                    toasts.Clear();
+                    toasts.Show("测试错误", ToastLevel.Error);
+                    toasts.Show("测试信息", ToastLevel.Info);
+                    var expirationDeadline = System.Diagnostics.Stopwatch.StartNew();
+                    while (toastStack.Children.Count > 1 && expirationDeadline.Elapsed < TimeSpan.FromSeconds(15))
+                        await Task.Delay(50);
+                    Assert(toastStack.Children.Count == 1 &&
+                        FindVisual<TextBlock>((Border)toastStack.Children[0])!.Text == "错误：测试错误",
+                        "Normal toast expires while error toast persists");
                     toasts.Clear();
                     var active = toasts.ShowTask("持续检测");
                     await Task.Delay(5300);
                     Assert(toastStack.Children.Count == 1, "Task toast remains visible");
                     toasts.CompleteTask(active, "检测完成", ToastLevel.Info, TimeSpan.FromMilliseconds(150));
-                    await Task.Delay(350);
+                    var completionDeadline = System.Diagnostics.Stopwatch.StartNew();
+                    while (toastStack.Children.Count != 0 && completionDeadline.Elapsed < TimeSpan.FromSeconds(10))
+                        await Task.Delay(50);
                     Assert(toastStack.Children.Count == 0, "Completed task expires in the same slot");
                     var refreshButton = (Button)window.FindName("RefreshButton");
                     Assert(!refreshButton.IsEnabled, "Refresh is disabled until a folder is opened");
@@ -335,12 +356,35 @@ internal static class UiChecks
                     Assert(Math.Abs(settingsImage.Width - 28) < 0.01 && Math.Abs(settingsImage.Height - 28) < 0.01, "Settings icon is 28x28");
                     Assert(settingsBorder.BorderThickness == new Thickness(0) && ColorOf(settingsBorder.Background) == "#00FFFFFF",
                         "Settings button has no border or visible background");
-                    Assert(Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 &&
-                        Grid.GetColumn(refreshButton) == 6 && Grid.GetColumn(modeButton) == 7 && Grid.GetColumn(settingsButton) == 8,
-                        "Playback mode button is placed between refresh and settings");
-                    Assert(new[] { playButton, stopButton, trimButton, refreshButton, modeButton }
-                        .All(button => Math.Abs(button.Margin.Right - 5) < 0.01),
-                        "Six right toolbar buttons use 5-unit gaps");
+                    var scriptButton = (Button)window.FindName("ScriptButton");
+                    Assert(Grid.GetColumn(playButton) == 3 && Grid.GetColumn(stopButton) == 4 && Grid.GetColumn(trimButton) == 5 &&
+                        Grid.GetColumn(refreshButton) == 6 && Grid.GetColumn(modeButton) == 7 &&
+                        Grid.GetColumn(scriptButton) == 8 && Grid.GetColumn(settingsButton) == 9 &&
+                        ((Grid)scriptButton.Parent).ColumnDefinitions.Count == 10,
+                        "Toolbar order is play, stop, trim, refresh, mode, script, settings");
+                    Assert(new[] { playButton, stopButton, trimButton, refreshButton, modeButton, scriptButton }
+                        .All(button => Math.Abs(button.Margin.Right - 5) < 0.01) && settingsButton.Margin.Right == 0,
+                        "Seven right toolbar buttons use 5-DIP gaps");
+                    scriptButton.ApplyTemplate();
+                    var scriptBorder = (Border)scriptButton.Template.FindName("ButtonBorder", scriptButton);
+                    var scriptImage = FindVisual<Image>(scriptButton)!;
+                    Assert(scriptButton.Width == 36 && scriptButton.Height == 36 &&
+                        scriptBorder.CornerRadius.TopLeft == 18 && scriptBorder.BorderThickness == new Thickness(0),
+                        "Script button uses existing circular toolbar style");
+                    Assert(scriptImage.Width == 28 && scriptImage.Height == 28 &&
+                        ReferenceEquals(scriptImage.Source, window.FindResource("ScriptIcon")),
+                        "Script button uses its 28-DIP vector icon");
+                    Assert(scriptButton.ToolTip?.ToString() == "显示原文" &&
+                        System.Windows.Automation.AutomationProperties.GetName(scriptButton) == "显示原文",
+                        "Script button initially offers to show the hidden companion");
+                    var scriptDrawing = (DrawingGroup)((DrawingImage)window.FindResource("ScriptIcon")).Drawing;
+                    var scriptBackground = (GeometryDrawing)scriptDrawing.Children[1];
+                    Assert(scriptBackground.Geometry is EllipseGeometry && ColorOf(scriptBackground.Brush) == "#FF26798A",
+                        "Script icon uses the existing teal circle");
+                    Assert(scriptDrawing.Children.Skip(2).OfType<GeometryDrawing>().Count() == 2 &&
+                        scriptDrawing.Children.Skip(2).OfType<GeometryDrawing>()
+                            .All(part => part.Pen is not null && ColorOf(part.Pen.Brush) == "#FFFFFFFF"),
+                        "Script icon uses white document outline and text lines");
                     Assert(Math.Abs(slider.Height - 36) < 0.01, "Progress slider has the same control height as the buttons");
                     window.UpdateLayout();
                     var sliderTrack = FindVisual<System.Windows.Controls.Primitives.Track>(slider);
@@ -382,18 +426,26 @@ internal static class UiChecks
                         "Stop square is centered and exactly 35% of circle height");
 
                     var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
+                    var settingsTabs = (TabControl)settingsWindow.FindName("SettingsTabs");
+                    Assert(settingsTabs.Items.Count == 2 && (string)((TabItem)settingsTabs.Items[0]).Header == "音频设置" &&
+                        (string)((TabItem)settingsTabs.Items[1]).Header == "字幕参数" && settingsTabs.BorderThickness == new Thickness(0),
+                        "Settings tabs have the agreed names and no outer border");
+                    Assert((int)((ComboBox)settingsWindow.FindName("FontSizeBox")).SelectedItem == 17 &&
+                        (double)((ComboBox)settingsWindow.FindName("LineHeightBox")).SelectedItem == 1.6 &&
+                        (int)((ComboBox)settingsWindow.FindName("IndentBox")).SelectedItem == 2,
+                        "Script font size, line height and indentation default to 17, 1.6 and 2");
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 480) < 0.01, "Settings window width is 480");
-                    Assert(Math.Abs(settingsWindow.Height - 420) < 0.01, "Settings window height is 420");
+                    Assert(Math.Abs(settingsWindow.Height - 430) < 0.01, "Settings window height is 430");
                     foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox", "BackwardStepTextBox", "ForwardStepTextBox" })
                     {
                         var textBox = (TextBox)settingsWindow.FindName(textBoxName);
-                        Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop, textBoxName + " retains input size and alignment");
+                        Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop && textBox.FontWeight == FontWeights.Normal, textBoxName + " retains input size, alignment and normal weight");
                         textBox.ApplyTemplate();
                         Assert(FindVisual<Border>(textBox)!.CornerRadius.TopLeft == 6, "Input has rounded corners");
                     }
                     var excludedBox = (TextBox)settingsWindow.FindName("ExcludedFolderNamesTextBox");
-                     Assert(excludedBox.Text == "" && excludedBox.TextAlignment == TextAlignment.Left && Grid.GetRow(excludedBox) == 6, "Exclusion field defaults empty below explanatory text");
+                     Assert(excludedBox.Text == "" && excludedBox.FontWeight == FontWeights.Normal && excludedBox.TextAlignment == TextAlignment.Left && Grid.GetRow(excludedBox) == 6, "Exclusion field defaults empty below explanatory text");
                      var help = (TextBlock)settingsWindow.FindName("HelpText");
                      var exclusionLabel = (TextBlock)settingsWindow.FindName("ExcludedFolderNamesLabel");
                      Assert(help.Text == "允许静音时长只影响裁剪，不影响左右跳转。", "Only essential help text remains");
@@ -403,8 +455,7 @@ internal static class UiChecks
                      settingsWindow.Top = -20000;
                      settingsWindow.Show();
                      settingsWindow.UpdateLayout();
-                     var layoutRoot = (Grid)excludedBox.Parent;
-                     Rect Bounds(FrameworkElement element) => element.TransformToAncestor(layoutRoot)
+                     Rect Bounds(FrameworkElement element) => element.TransformToAncestor(settingsWindow)
                          .TransformBounds(new Rect(new Point(), element.RenderSize));
                      Rect helpBounds = Bounds(help);
                      Rect exclusionBounds = Bounds(excludedBox);
@@ -414,8 +465,61 @@ internal static class UiChecks
                          && helpBounds.Bottom <= Math.Min(exclusionBounds.Top, labelBounds.Top)
                          && labelBounds.Right <= exclusionBounds.Left
                          && Math.Max(exclusionBounds.Bottom, labelBounds.Bottom) <= buttonsBounds.Top
-                         && buttonsBounds.Bottom <= layoutRoot.ActualHeight + 0.5,
+                         && buttonsBounds.Bottom <= settingsWindow.ActualHeight + 0.5,
                          "Settings help, exclusion controls and buttons do not overlap or overflow");
+                     settingsTabs.SelectedIndex = 1;
+                     settingsWindow.UpdateLayout();
+                     var selectors = new[] { "FontBox", "FontSizeBox", "LineHeightBox", "ParagraphAfterBox", "IndentBox" }
+                         .Select(name => (ComboBox)settingsWindow.FindName(name)).ToArray();
+                     Assert(selectors.Select(box => box.Items.Count).SequenceEqual(new[] { 5, 4, 4, 4, 3 }) &&
+                         selectors[1].Items.Cast<int>().SequenceEqual(new[] { 17, 18, 19, 20 }) &&
+                         selectors.All(box => box.SelectedItem is not null && box.FontWeight == FontWeights.Normal && box.Margin.Bottom == 10 &&
+                             box.HorizontalContentAlignment == HorizontalAlignment.Center &&
+                             box.ActualHeight > 0 && Bounds(box).Bottom <= buttonsBounds.Top),
+                         "Script combo choices are reduced, aligned, and fit above dialog buttons");
+                     foreach (var box in selectors)
+                     {
+                         box.ApplyTemplate();
+                         var toggle = FindVisual<System.Windows.Controls.Primitives.ToggleButton>(box)!;
+                         toggle.ApplyTemplate();
+                         Assert(((Border)toggle.Template.FindName("Outline", toggle)).CornerRadius.TopLeft == 6,
+                             "Script combo box shares rounded input styling");
+                     }
+                     var colorLists = new[] { "TextColorBox", "PlaybackColorBox", "BackgroundColorBox" }
+                         .Select(name => (ListBox)settingsWindow.FindName(name)).ToArray();
+                     Assert(settingsWindow.FindName("AppearancePreview") is null, "Settings text preview removed");
+                     foreach (var colors in colorLists)
+                     {
+                         Assert(colors.Items.Count == 5 && colors.SelectedIndex == 0 &&
+                             colors.SelectionMode == SelectionMode.Single &&
+                             Bounds(colors).Bottom <= buttonsBounds.Top, "Five color choices fit above dialog buttons");
+                         for (int i = 0; i < colors.Items.Count; i++)
+                         {
+                             var item = (ListBoxItem)colors.ItemContainerGenerator.ContainerFromIndex(i);
+                             item.ApplyTemplate();
+                             var swatch = (System.Windows.Shapes.Ellipse)item.Template.FindName("Swatch", item);
+                             var tick = (System.Windows.Shapes.Path)item.Template.FindName("Check", item);
+                             Assert(swatch.Width == 24 && swatch.Height == 24 && swatch.StrokeThickness == 0 &&
+                                 ColorOf(swatch.Fill) == "#FF" + ((string)colors.Items[i])[1..] &&
+                                 (tick.Visibility == Visibility.Visible) == (i == colors.SelectedIndex),
+                                 "Color swatch is borderless and only the selected item shows a check");
+                         }
+                         colors.SelectedIndex = 2;
+                         colors.SelectedIndex = -1;
+                         Assert(colors.SelectedIndex == 2, "A color group cannot become unselected");
+                     }
+                     var readAppearance = typeof(SilenceSettingsWindow).GetMethod("ReadAppearance", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                     var chosenAppearance = (ScriptAppearance)readAppearance.Invoke(settingsWindow, null)!;
+                     Assert(chosenAppearance.Color == (string)colorLists[0].Items[2] &&
+                         chosenAppearance.ScriptColor == (string)colorLists[1].Items[2] &&
+                         chosenAppearance.Background == (string)colorLists[2].Items[2] &&
+                         settingsWindow.Settings.ScriptAppearance == new ScriptAppearance(),
+                         "Color choices remain staged until confirmation");
+                     ((Button)settingsWindow.FindName("RestoreDefaultsButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     Assert((ScriptAppearance)readAppearance.Invoke(settingsWindow, null)! == new ScriptAppearance() &&
+                         colorLists.All(list => list.SelectedIndex == 0), "Restore defaults resets all subtitle controls");
+                     settingsTabs.SelectedIndex = 0;
+                     settingsWindow.UpdateLayout();
                      settingsWindow.Hide();
                      var backwardBox = (TextBox)settingsWindow.FindName("BackwardStepTextBox");
                      var forwardBox = (TextBox)settingsWindow.FindName("ForwardStepTextBox");
@@ -555,13 +659,29 @@ internal static class UiChecks
                         var editWindow = app.Windows.OfType<SilenceSettingsWindow>().Single(w => w.IsVisible);
                         ((TextBox)editWindow.FindName("FrameMillisecondsTextBox")).Text = "25";
                         ((TextBox)editWindow.FindName("MinimumSilenceTextBox")).Text = "600";
+                        ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 19;
+                        ((ListBox)editWindow.FindName("PlaybackColorBox")).SelectedIndex = 2;
                         ((Button)editWindow.FindName("OkButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }));
                     settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     var saved = settingsStore.LoadOrCreate();
                     Assert(saved.FrameMilliseconds == 25 && saved.MinimumSilenceMilliseconds == 600
+                        && saved.ScriptAppearance.FontSize == 19 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
+                        && Field<SilenceSettings>(window, "silenceSettings")!.ScriptAppearance == saved.ScriptAppearance
                         && Field<SilenceSettings>(window, "silenceSettings")!.FrameMilliseconds == 25,
                         "Settings dialog saves confirmed values before applying them");
+                    string savedBeforeCancel = File.ReadAllText(settingsStore.FilePath);
+                    _ = window.Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        var editWindow = app.Windows.OfType<SilenceSettingsWindow>().Single(w => w.IsVisible);
+                        ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 18;
+                        ((ListBox)editWindow.FindName("BackgroundColorBox")).SelectedIndex = 3;
+                        editWindow.DialogResult = false;
+                    }));
+                    settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert(File.ReadAllText(settingsStore.FilePath) == savedBeforeCancel &&
+                        Field<SilenceSettings>(window, "silenceSettings")!.ScriptAppearance == saved.ScriptAppearance,
+                        "Cancel leaves persisted and active subtitle settings unchanged");
                     var restoredWindow = new MainWindow(settingsStore);
                     Assert(Field<SilenceSettings>(restoredWindow, "silenceSettings")!.FrameMilliseconds == 25,
                         "Window restores saved settings on next launch");
@@ -575,8 +695,266 @@ internal static class UiChecks
                         "Invalid configuration is preserved and reported inline");
                     invalidWindow.Close();
                     settingsStore.Save(saved);
+                    window.BeginScriptSeek(double.NaN);
+                    window.BeginScriptSeek(-1);
+                    Assert(!Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled &&
+                        Field<object>(window, "scriptSeek") is null,
+                        "Invalid script navigation targets do not arm the debounce timer");
+                    await window.CommitScriptSeekAsync();
+                    Assert(!Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled,
+                        "Commit without a pending script target is a no-op");
+                    // Real WebView2 integration runs independently of audio hardware.
+                    string? runtimeVersion = null;
+                    try { runtimeVersion = Microsoft.Web.WebView2.Core.CoreWebView2Environment.GetAvailableBrowserVersionString(); }
+                    catch (Microsoft.Web.WebView2.Core.WebView2RuntimeNotFoundException) { }
+                    if (string.IsNullOrWhiteSpace(runtimeVersion))
+                        Console.WriteLine("SKIP UI script reader integration: WebView2 Runtime unavailable.");
+                    else
+                    {
+                        string readerFolder = Path.Combine(Path.GetTempPath(), "script-reader-" + Guid.NewGuid().ToString("N"));
+                        Directory.CreateDirectory(readerFolder);
+                        var readerWindow = new ScriptWindow(Path.Combine(readerFolder, "cache"))
+                            { Owner = window, Height = 400, ShowActivated = false, Left = -10000, Top = -10000 };
+                        try
+                        {
+                            File.WriteAllText(Path.Combine(readerFolder, "arbitrary.script.json"),
+                                """{"filetype":"script","title":"Reader test","paragraphs":[[{"text":"Hello, world.","timed_units":[["Hello",1,3],["world",0,2]]}]]}""");
+                            readerWindow.SetAudio(Path.Combine(readerFolder, "sample.wav"));
+                            readerWindow.Show();
+                            // A cold WebView2 profile on a hosted Windows runner can take
+                            // longer than a local startup. Keep a finite deadline and
+                            // fail immediately when the reader reports an actual error.
+                            var deadline = DateTime.UtcNow.AddSeconds(60);
+                            while (!readerWindow.ReaderReady && readerWindow.ReaderFailure is null && DateTime.UtcNow < deadline)
+                                await Task.Delay(100);
+                            Assert(readerWindow.ReaderReady, "Embedded WebView2 reader completes ready handshake: " +
+                                (readerWindow.ReaderFailure ?? "no ready message within 60 seconds"));
+                            var reader = (Microsoft.Web.WebView2.Wpf.WebView2)readerWindow.FindName("Reader");
+                            string renderedScriptText = "";
+                            deadline = DateTime.UtcNow.AddSeconds(25);
+                            while (DateTime.UtcNow < deadline)
+                            {
+                                renderedScriptText = await reader.CoreWebView2.ExecuteScriptAsync("document.querySelector('#text').textContent");
+                                if (renderedScriptText.Contains("Hello, world.")) break;
+                                await Task.Delay(100);
+                            }
+                            Assert(renderedScriptText.Contains("Hello, world."), "Embedded WebView2 reader renders discovered Script JSON");
+                            string measured = await reader.CoreWebView2.ExecuteScriptAsync(
+                                "measure(); update({position:1.5,playing:false,reset:false},true); geometry.length===2 && geometry[0].last===0.75 && geometry[1].last===0.25");
+                            Assert(measured == "true", "Reader paints overlapping out-of-order intervals");
+                            string rewind = await reader.CoreWebView2.ExecuteScriptAsync(
+                                "update({position:2.5,playing:false,reset:false},true); update({position:0.5,playing:false,reset:false},true); geometry[0].last===0.25 && geometry[1].segments.every(s=>s.painted===0)");
+                            Assert(rewind == "true", "Reader rewinds previously painted intervals");
+                            string cleared = await reader.CoreWebView2.ExecuteScriptAsync(
+                                "update({position:0,playing:false,reset:true},true); geometry.every(u=>u.segments.every(s=>s.painted===0))");
+                            Assert(cleared == "true", "Reader reset clears painted intervals");
+
+                            string continuousFollow = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const saved = followAnchors;
+                                  try {
+                                    followAnchors=buildFollowAnchors([
+                                      {y:150,followStart:0},{y:250,followStart:2},
+                                      {y:275,followStart:2},{y:290,followStart:1},
+                                      {y:300,followStart:null},{y:350,followStart:4}
+                                    ]);
+                                    const offsets=[0,0.5,1,1.5,2,2.5,3,3.5,4]
+                                      .map(t=>followOffset(t,100,1000));
+                                    return followAnchors.length===3 &&
+                                      offsets.every((x,i)=>x===100+25*i) &&
+                                      offsets.every((x,i)=>timeAtOffset(x,100,1000)===i*0.5) &&
+                                      timeAtOffset(126,100,1000)>0.5 &&
+                                      timeAtOffset(0,100,1000)===0 &&
+                                      timeAtOffset(900,100,1000)===4 &&
+                                      timeAtOffset(0,100,80)===null &&
+                                      followOffset(10,100,220)===120 &&
+                                      followOffset(10,100,80)===0;
+                                  } finally {followAnchors=saved;}
+                                })()
+                                """);
+                            Assert(continuousFollow == "true", "Reader forward and inverse trajectories agree, including fine-grained scroll offsets and boundaries");
+                            string followFrames = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const raf=window.requestAnimationFrame,caf=window.cancelAnimationFrame;
+                                  const saved=followAnchors;
+                                  let callback=null;
+                                  try {
+                                    window.requestAnimationFrame=cb=>{callback=cb;return 1;};
+                                    window.cancelAnimationFrame=()=>{callback=null;};
+                                    followAnchors=[{time:0,y:150},{time:2,y:250}];
+                                    update({position:0.5,playing:true,reset:false},true);
+                                    if(!callback || !animation)return false;
+                                    callback(sampleAt+16);
+                                    const a=followTime;
+                                    callback(sampleAt+32);
+                                    const b=followTime;
+                                    callback(sampleAt+500);
+                                    const capped=followTime;
+                                    update({position:0.525,playing:true,reset:false});
+                                    callback(sampleAt+16);
+                                    const monotone=followTime>=capped;
+                                    update({position:0.55,playing:false,reset:false});
+                                    return b>a && Math.abs(capped-0.55)<0.00001 && monotone &&
+                                      !callback && !animation;
+                                  } finally {
+                                    cancelAnimation();
+                                    window.requestAnimationFrame=raf;
+                                    window.cancelAnimationFrame=caf;
+                                    followAnchors=saved;
+                                    update({position:0,playing:false,reset:true},true);
+                                  }
+                                })()
+                                """);
+                            Assert(followFrames == "true", "Reader frame clock advances continuously, is bounded and cancels on pause");
+
+                            string wheelSensitivity = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const originalScroll=window.scrollTo;
+                                  const before=window.scrollY;
+                                  let target;
+                                  try {
+                                    // Intercept the actual wheel handler's requested displacement,
+                                    // avoiding document-boundary clamping and host seek side effects.
+                                    window.scrollTo=(_,y)=>{target=y;};
+                                    const lineHeight=parseFloat(getComputedStyle(document.documentElement).lineHeight);
+                                    const cases=[[120,0,30],[-120,0,-30],[2,1,lineHeight/2],[-2,1,-lineHeight/2],[1,2,window.innerHeight/4]];
+                                    return cases.every(([deltaY,deltaMode,expected])=>{
+                                      target=undefined;
+                                      const event=new WheelEvent('wheel',{deltaY,deltaMode,cancelable:true});
+                                      window.dispatchEvent(event);
+                                      return event.defaultPrevented && Math.abs(target-before-expected)<0.001;
+                                    });
+                                  } finally {window.scrollTo=originalScroll;}
+                                })()
+                                """);
+                            Assert(wheelSensitivity == "true", "Reader wheel displacement is quartered for pixel, line and page deltas");
+
+                            string scrollBarNavigation = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const originalPreview=preview, savedAnchors=followAnchors;
+                                  const spacer=document.createElement('div');
+                                  spacer.style.height='3000px';
+                                  let targets=[];
+                                  try {
+                                    body.append(spacer);
+                                    followAnchors=[{y:window.innerHeight/2+200,time:7},
+                                                   {y:window.innerHeight/2+400,time:9}];
+                                    preview=time=>targets.push(time);
+                                    scrollProgrammatically(200);
+                                    window.dispatchEvent(new Event('scroll'));
+                                    if(targets.length!==0)return false;
+                                    window.scrollTo(0,250);
+                                    window.dispatchEvent(new Event('scroll'));
+                                    if(targets.length!==1 || Math.abs(targets[0]-7.5)>0.02)return false;
+                                    window.dispatchEvent(new Event('scroll'));
+                                    if(targets.length!==1)return false;
+                                    window.scrollTo(0,260);
+                                    window.dispatchEvent(new Event('scroll'));
+                                    if(targets.length!==2 || Math.abs(targets[1]-7.6)>0.02)return false;
+                                    const sentence=body.querySelector('.sentence');
+                                    sentence.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,clientY:window.innerHeight/2}));
+                                    return targets.length===2;
+                                  } finally {
+                                    preview=originalPreview;
+                                    followAnchors=savedAnchors;
+                                    spacer.remove();
+                                    scrollProgrammatically(0);
+                                  }
+                                })()
+                                """);
+                            Assert(scrollBarNavigation == "true", "Reader external scroll previews continuous time; programmatic scroll and double-click do not");
+
+                            string reconciliation = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const savedEpoch=epoch,savedAnchors=followAnchors;
+                                  const spacer=document.createElement('div');
+                                  spacer.style.height='3000px';
+                                  try {
+                                    body.append(spacer);
+                                    followAnchors=[{y:window.innerHeight/2+200,time:1},
+                                                   {y:window.innerHeight/2+400,time:3}];
+                                    receivePlayback({epoch,position:1,playing:false,reset:false});
+                                    pending=2;cancelAnimation();paintAt(2,false);scrollProgrammatically(300);
+                                    if(playback.position!==1)return false;
+                                    receivePlayback({epoch,position:1,playing:false,reset:false});
+                                    if(pending!==2 || Math.abs(window.scrollY-300)>1)return false;
+                                    receivePlayback({epoch:epoch+1,position:1,playing:false,reset:false});
+                                    if(pending!==null || Math.abs(window.scrollY-200)>1 || paintPosition!==1)return false;
+                                    receivePlayback({epoch:epoch-1,position:3,playing:false,reset:false});
+                                    if(playback.position!==1)return false;
+                                    pending=2;paintAt(2,false);scrollProgrammatically(310);
+                                    receivePlayback({epoch:epoch+1,position:2,playing:false,reset:false,committedTarget:2});
+                                    if(pending!==null || Math.abs(window.scrollY-310)>1)return false;
+                                    pending=2.5;paintAt(2.5,false);scrollProgrammatically(350);
+                                    receivePlayback({epoch:epoch+1,position:2,playing:false,reset:false,committedTarget:2});
+                                    return pending===null && Math.abs(window.scrollY-300)<=1 && playback.position===2;
+                                  } finally {
+                                    cancelManual();epoch=savedEpoch;followAnchors=savedAnchors;
+                                    spacer.remove();update({position:0,playing:false,reset:true},true);
+                                  }
+                                })()
+                                """);
+                            Assert(reconciliation == "true", "Reader preview never replaces host clock; reconciliation rejects stale snapshots and restores canceled or superseded offsets");
+
+                            // Keep the synthetic article isolated from MainWindow's playback timer
+                            // until the rendering assertions finish. No real audio is loaded here.
+                            typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
+                                .SetValue(window, readerWindow);
+                            var readerHandle = new System.Windows.Interop.WindowInteropHelper(readerWindow).Handle;
+                            int readerStyle = GetWindowLong(readerHandle, -16);
+                            Assert((readerStyle & 0x00030000) == 0 && (readerStyle & 0x00040000) != 0,
+                                "Reader disables minimize and maximize while retaining resize border");
+                            bool closedBeforeMinimize = false;
+                            readerWindow.Closed += (_, _) => closedBeforeMinimize = window.WindowState != WindowState.Minimized;
+                            SendMessage(new System.Windows.Interop.WindowInteropHelper(window).Handle, 0x0112, new IntPtr(0xf020), IntPtr.Zero);
+                            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                            Assert(closedBeforeMinimize && window.WindowState == WindowState.Minimized && !IsWindow(readerHandle) &&
+                                Field<ScriptWindow>(window, "scriptWindow") is null,
+                                "Native minimize command closes reader before minimizing owner");
+                            window.WindowState = WindowState.Normal;
+                            await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                            Assert(Field<ScriptWindow>(window, "scriptWindow") is null && !IsWindow(readerHandle),
+                                "Restoring owner does not reopen closed reader");
+                            var hiddenReader = new ScriptWindow(Path.Combine(readerFolder, "cache"));
+                            try
+                            {
+                                typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
+                                    .SetValue(window, hiddenReader);
+                                bool hiddenClosed = false;
+                                hiddenReader.Closed += (_, _) => hiddenClosed = true;
+                                window.WindowState = WindowState.Minimized;
+                                await window.Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+                                Assert(hiddenClosed && Field<ScriptWindow>(window, "scriptWindow") is null,
+                                    "Programmatic minimize closes even a hidden reader");
+                                window.WindowState = WindowState.Normal;
+                            }
+                            finally { hiddenReader.CloseForOwner(); }
+                        }
+                        finally
+                        {
+                            typeof(MainWindow).GetField("scriptWindow", BindingFlags.Instance | BindingFlags.NonPublic)!
+                                .SetValue(window, null);
+                            window.WindowState = WindowState.Normal;
+                            readerWindow.CloseForOwner();
+                            for (int attempt = 0; attempt < 20; attempt++)
+                            {
+                                try { Directory.Delete(readerFolder, true); break; }
+                                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                                {
+                                    if (attempt == 19) Console.WriteLine("Temporary WebView2 cache still in use: " + readerFolder);
+                                    else await Task.Delay(250);
+                                }
+                            }
+                        }
+                    }
                     if (WaveOut.DeviceCount == 0)
                     {
+                        Console.WriteLine("SKIP UI script wheel playback checks (7 assertions plus Settings restoration): no waveOut device is available.");
                         Console.WriteLine("SKIP UI audio-device playback checks: no waveOut device is available.");
                         return;
                     }
@@ -722,7 +1100,74 @@ internal static class UiChecks
                     await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
                     Assert(Field<PlayerEngine>(window, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
                     if (Field<Task>(window, "analysisTask") is Task recoveredAnalysis) await recoveredAnalysis;
-                    await Field<PlayerEngine>(window, "player")!.CloseAsync();
+                    var scriptPlayer = Field<PlayerEngine>(window, "player")!;
+                    string seekPath = Path.Combine(audioFolder, "script-seek-test.wav");
+                    using (var writer = new WaveFileWriter(seekPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
+                        writer.WriteSamples(new float[44100 * 12], 0, 44100 * 12);
+                    await (Task)playTrack.Invoke(window, new object[] { new AudioTrack { FilePath = seekPath } })!;
+                    window.BeginScriptSeek(2);
+                    window.BeginScriptSeek(4);
+                    Assert(scriptPlayer.IsPaused && slider.Value == 4 &&
+                        Field<DispatcherTimer>(window, "scriptSeekTimer")!.Interval == TimeSpan.FromMilliseconds(150),
+                        "Wheel preview pauses audio, updates slider and retains latest target");
+                    await window.CommitScriptSeekAsync();
+                    Assert(scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime().TotalSeconds >= 3.9,
+                        "Committed wheel seek resumes playing audio at latest target");
+                    scriptPlayer.Pause();
+                    window.BeginScriptSeek(2);
+                    await window.CommitScriptSeekAsync();
+                    Assert(scriptPlayer.IsPaused && Math.Abs(scriptPlayer.GetCurrentTime().TotalSeconds - 2) < 0.1,
+                        "Committed wheel seek preserves explicit pause");
+                    await scriptPlayer.PlayAsync();
+                    window.BeginScriptSeek(6);
+                    await window.RestoreCanceledScriptSeekAsync();
+                    Assert(scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime().TotalSeconds < 5,
+                        "Cancel pending wheel navigation restores playback without seeking");
+                    window.BeginScriptSeek(6);
+                    var settingsClosed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    var closeSettingsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+                    closeSettingsTimer.Tick += (_, _) =>
+                    {
+                        var activeDialog = app.Windows.OfType<SilenceSettingsWindow>().SingleOrDefault(w => w.IsVisible);
+                        if (activeDialog is null) return;
+                        closeSettingsTimer.Stop();
+                        activeDialog.Close();
+                        settingsClosed.TrySetResult();
+                    };
+                    closeSettingsTimer.Start();
+                    try
+                    {
+                        settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                        await settingsClosed.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                    }
+                    finally { closeSettingsTimer.Stop(); }
+                    Assert(scriptPlayer.IsPlaying && Field<object>(window, "scriptSeek") is null,
+                        "Opening and canceling Settings restores pending wheel playback intent");
+                    window.BeginScriptSeek(6);
+                    await window.HandleShortcutAsync(Key.Space);
+                    Assert(scriptPlayer.IsPaused && Field<object>(window, "scriptSeek") is null,
+                        "Space cancels wheel preview and honors intended pause");
+                    window.BeginScriptSeek(6);
+                    await window.HandleShortcutAsync(Key.Space);
+                    Assert(scriptPlayer.IsPlaying, "Space from explicitly paused preview resumes playback");
+                    // A consumed transaction cannot replay its old target.
+                    window.BeginScriptSeek(5);
+                    await window.CommitScriptSeekAsync();
+                    double committedPosition = scriptPlayer.GetCurrentTime().TotalSeconds;
+                    await window.CommitScriptSeekAsync();
+                    Assert(scriptPlayer.IsPlaying && committedPosition >= 4.9 &&
+                        scriptPlayer.GetCurrentTime().TotalSeconds >= committedPosition &&
+                        Field<object>(window, "scriptSeek") is null,
+                        "Completed script navigation is consumed exactly once");
+                    window.BeginScriptSeek(6);
+                    stopButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    if (Field<Task>(window, "activeOperation") is Task stoppingScript) await stoppingScript;
+                    Assert(!scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime() == TimeSpan.Zero &&
+                        !Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled,
+                        "Stop cancels pending wheel seek without restarting");
+                    if (Field<Task>(window, "analysisTask") is Task seekAnalysis) await seekAnalysis;
+                    await scriptPlayer.CloseAsync();
+                    File.Delete(seekPath);
                     if (Directory.GetFiles(audioFolder, "*.mp3").Length == 0)
                     {
                         Console.WriteLine("SKIP audio-dependent UI checks: no local MP3 available.");
