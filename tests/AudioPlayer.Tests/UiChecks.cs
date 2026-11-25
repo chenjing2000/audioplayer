@@ -430,22 +430,22 @@ internal static class UiChecks
                     Assert(settingsTabs.Items.Count == 2 && (string)((TabItem)settingsTabs.Items[0]).Header == "音频设置" &&
                         (string)((TabItem)settingsTabs.Items[1]).Header == "字幕参数" && settingsTabs.BorderThickness == new Thickness(0),
                         "Settings tabs have the agreed names and no outer border");
-                    Assert((int)((ComboBox)settingsWindow.FindName("FontSizeBox")).SelectedItem == 16 &&
+                    Assert((int)((ComboBox)settingsWindow.FindName("FontSizeBox")).SelectedItem == 17 &&
                         (double)((ComboBox)settingsWindow.FindName("LineHeightBox")).SelectedItem == 1.6 &&
                         (int)((ComboBox)settingsWindow.FindName("IndentBox")).SelectedItem == 2,
-                        "Script font size, line height and indentation default to 16, 1.6 and 2");
+                        "Script font size, line height and indentation default to 17, 1.6 and 2");
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 480) < 0.01, "Settings window width is 480");
-                    Assert(Math.Abs(settingsWindow.Height - 420) < 0.01, "Settings window height is 420");
+                    Assert(Math.Abs(settingsWindow.Height - 430) < 0.01, "Settings window height is 430");
                     foreach (string textBoxName in new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox", "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox", "BackwardStepTextBox", "ForwardStepTextBox" })
                     {
                         var textBox = (TextBox)settingsWindow.FindName(textBoxName);
-                        Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop, textBoxName + " retains input size and alignment");
+                        Assert(Math.Abs(textBox.Width - 80) < 0.01 && textBox.TextAlignment == TextAlignment.Center && textBox.VerticalContentAlignment == VerticalAlignment.Center && !textBox.AllowDrop && textBox.FontWeight == FontWeights.Normal, textBoxName + " retains input size, alignment and normal weight");
                         textBox.ApplyTemplate();
                         Assert(FindVisual<Border>(textBox)!.CornerRadius.TopLeft == 6, "Input has rounded corners");
                     }
                     var excludedBox = (TextBox)settingsWindow.FindName("ExcludedFolderNamesTextBox");
-                     Assert(excludedBox.Text == "" && excludedBox.TextAlignment == TextAlignment.Left && Grid.GetRow(excludedBox) == 6, "Exclusion field defaults empty below explanatory text");
+                     Assert(excludedBox.Text == "" && excludedBox.FontWeight == FontWeights.Normal && excludedBox.TextAlignment == TextAlignment.Left && Grid.GetRow(excludedBox) == 6, "Exclusion field defaults empty below explanatory text");
                      var help = (TextBlock)settingsWindow.FindName("HelpText");
                      var exclusionLabel = (TextBlock)settingsWindow.FindName("ExcludedFolderNamesLabel");
                      Assert(help.Text == "允许静音时长只影响裁剪，不影响左右跳转。", "Only essential help text remains");
@@ -471,8 +471,9 @@ internal static class UiChecks
                      settingsWindow.UpdateLayout();
                      var selectors = new[] { "FontBox", "FontSizeBox", "LineHeightBox", "ParagraphAfterBox", "IndentBox" }
                          .Select(name => (ComboBox)settingsWindow.FindName(name)).ToArray();
-                     Assert(selectors.Select(box => box.Items.Count).SequenceEqual(new[] { 5, 5, 4, 4, 3 }) &&
-                         selectors.All(box => box.SelectedItem is not null && box.Margin.Bottom == 10 &&
+                     Assert(selectors.Select(box => box.Items.Count).SequenceEqual(new[] { 5, 4, 4, 4, 3 }) &&
+                         selectors[1].Items.Cast<int>().SequenceEqual(new[] { 17, 18, 19, 20 }) &&
+                         selectors.All(box => box.SelectedItem is not null && box.FontWeight == FontWeights.Normal && box.Margin.Bottom == 10 &&
                              box.HorizontalContentAlignment == HorizontalAlignment.Center &&
                              box.ActualHeight > 0 && Bounds(box).Bottom <= buttonsBounds.Top),
                          "Script combo choices are reduced, aligned, and fit above dialog buttons");
@@ -658,14 +659,14 @@ internal static class UiChecks
                         var editWindow = app.Windows.OfType<SilenceSettingsWindow>().Single(w => w.IsVisible);
                         ((TextBox)editWindow.FindName("FrameMillisecondsTextBox")).Text = "25";
                         ((TextBox)editWindow.FindName("MinimumSilenceTextBox")).Text = "600";
-                        ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 15;
+                        ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 19;
                         ((ListBox)editWindow.FindName("PlaybackColorBox")).SelectedIndex = 2;
                         ((Button)editWindow.FindName("OkButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }));
                     settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     var saved = settingsStore.LoadOrCreate();
                     Assert(saved.FrameMilliseconds == 25 && saved.MinimumSilenceMilliseconds == 600
-                        && saved.ScriptAppearance.FontSize == 15 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
+                        && saved.ScriptAppearance.FontSize == 19 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
                         && Field<SilenceSettings>(window, "silenceSettings")!.ScriptAppearance == saved.ScriptAppearance
                         && Field<SilenceSettings>(window, "silenceSettings")!.FrameMilliseconds == 25,
                         "Settings dialog saves confirmed values before applying them");

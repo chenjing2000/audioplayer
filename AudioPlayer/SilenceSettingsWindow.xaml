@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AudioPlayer"
         Title="设置" PreviewKeyDown="Window_PreviewKeyDown"
-        Width="480" Height="420"
+        Width="480" Height="430"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
@@ -12,6 +12,7 @@
         FontSize="12">
     <Window.Resources>
         <Style x:Key="RoundedInput" TargetType="TextBox">
+            <Setter Property="FontWeight" Value="Normal"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Template">
@@ -37,7 +38,7 @@
                     <ControlTemplate TargetType="TabItem">
                         <Grid Background="Transparent">
                             <Border x:Name="Hover" Background="Transparent" CornerRadius="6" Margin="2,0,2,4"/>
-                            <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            <ContentPresenter x:Name="HeaderContent" ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center"
                                               Margin="{TemplateBinding Padding}"/>
                             <Border x:Name="Indicator" Width="28" Height="3" CornerRadius="1.5" Background="Transparent"
                                     VerticalAlignment="Bottom" HorizontalAlignment="Center"/>
@@ -46,7 +47,7 @@
                             <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Hover" Property="Background" Value="#E8EDF2"/></Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter Property="Foreground" Value="#26798A"/>
-                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter TargetName="HeaderContent" Property="TextElement.FontWeight" Value="SemiBold"/>
                                 <Setter TargetName="Indicator" Property="Background" Value="#26798A"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Hover" Property="Background" Value="#E2E8EF"/></Trigger>
@@ -57,6 +58,12 @@
             </Setter>
         </Style>
         <Style x:Key="RoundedComboBox" TargetType="ComboBox">
+            <Setter Property="FontWeight" Value="Normal"/>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem"><Setter Property="FontWeight" Value="Normal"/></Style>
+                </Setter.Value>
+            </Setter>
             <Setter Property="Background" Value="White"/>
             <Setter Property="BorderBrush" Value="#CBD5E1"/>
             <Setter Property="BorderThickness" Value="1"/>

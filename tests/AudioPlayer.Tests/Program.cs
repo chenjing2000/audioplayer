@@ -68,10 +68,10 @@ Check("Script appearance defaults, persistence and validation", () =>
         File.WriteAllText(store.FilePath, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0}""");
         var settings = store.LoadOrCreate();
         Assert(settings.ScriptAppearance == new ScriptAppearance());
-        Assert(settings.ScriptAppearance.FontSize == 16 && settings.ScriptAppearance.LineHeight == 1.6 &&
+        Assert(settings.ScriptAppearance.FontSize == 17 && settings.ScriptAppearance.LineHeight == 1.6 &&
             settings.ScriptAppearance.FirstLineIndent == 2);
         Assert(ScriptAppearance.Fonts.SequenceEqual(new[] { "Georgia", "Microsoft YaHei UI", "Nunito", "Times New Roman", "Arial" }) &&
-            ScriptAppearance.Sizes.SequenceEqual(new[] { 14, 15, 16, 17, 18 }) &&
+            ScriptAppearance.Sizes.SequenceEqual(new[] { 17, 18, 19, 20 }) &&
             ScriptAppearance.Heights.SequenceEqual(new[] { 1.5, 1.6, 1.7, 1.8 }) &&
             ScriptAppearance.Spacings.SequenceEqual(new[] { 8, 12, 16, 20 }) &&
             ScriptAppearance.Indents.SequenceEqual(new[] { 0, 1, 2 }));
@@ -96,7 +96,7 @@ Check("Retired script options normalize only on load without rewriting the file"
     {
         var store = new SettingsStore(Path.Combine(folder, "player.settings.json"));
         var settings = new SilenceSettings();
-        foreach (int size in new[] { 20, 22, 24, 26, 28 })
+        foreach (var (size, newSize) in new[] { (14, 17), (15, 17), (16, 17), (17, 17), (18, 18), (19, 19), (20, 20), (22, 20), (24, 20), (26, 20), (28, 20) })
         foreach (var (height, newHeight) in new[] { (1.4, 1.5), (2.0, 1.8) })
         foreach (var (spacing, newSpacing) in new[] { (0, 8), (14, 16), (18, 20), (24, 20) })
         {
@@ -106,14 +106,14 @@ Check("Retired script options normalize only on load without rewriting the file"
             string json = System.Text.Json.JsonSerializer.Serialize(settings);
             File.WriteAllText(store.FilePath, json);
             var loaded = store.LoadOrCreate();
-            Assert(loaded.ScriptAppearance == new ScriptAppearance { Font = "Arial", FontSize = 18,
+            Assert(loaded.ScriptAppearance == new ScriptAppearance { Font = "Arial", FontSize = newSize,
                 LineHeight = newHeight, ParagraphAfter = newSpacing, FirstLineIndent = 2 });
             Assert(File.ReadAllText(store.FilePath) == json);
             store.Save(loaded);
             Assert(store.LoadOrCreate().ScriptAppearance == loaded.ScriptAppearance);
         }
 
-        settings.ScriptAppearance = new ScriptAppearance { FontSize = 19 };
+        settings.ScriptAppearance = new ScriptAppearance { FontSize = 21 };
         string invalid = System.Text.Json.JsonSerializer.Serialize(settings);
         File.WriteAllText(store.FilePath, invalid);
         try { store.LoadOrCreate(); throw new Exception("Unknown appearance value accepted"); }

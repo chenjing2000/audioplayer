@@ -1,10 +1,10 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #17 reader regression passed; subtitle settings refinement pending verification  
+**Updated:** 2026-11-25 — PR #17 subtitle settings accepted at 73df725; size and typography follow-up pending verification  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Merged main baseline:** `52bb0b8` (application from PR #16, `af27658`).  
-**Feature branch:** `feature/script-companion-window`; latest verified application revision `b662cba`; [draft PR #17](https://github.com/chenjing2000/audioplayer/pull/17). Do not merge without separate explicit user authorization. User-provided Windows log verifies local HEAD and origin at that revision; local checkout not independently inspected.
+**Feature branch:** `feature/script-companion-window`; latest verified application revision `73df725`; [draft PR #17](https://github.com/chenjing2000/audioplayer/pull/17). Do not merge without separate explicit user authorization. User-provided Windows log verifies local HEAD and origin at that revision; local checkout not independently inspected.
 
 ## Current feature branch
 
@@ -68,6 +68,13 @@ Reader native minimize/maximize caption buttons removed without changing resizab
 
 Pre-refactor `6917294` feature validation passed; this does not establish local visual acceptance. Replaced four main-window navigation flags/target with one pending transaction and consumed it through the existing operation gate. Removed cancel/commit browser messages in favor of one authoritative epoch-tagged playback snapshot; preview coloring cannot overwrite the host clock, and only a matching confirmed target preserves the user offset. Removed duplicate sent snapshot, previous position and manual boolean; consolidated reader disposal and stale-instance event guards. The scroll-to-time inverse now shares the same continuous trajectory as time-to-scroll; no per-line quantization, no invented word timestamps, no seek when no anchors. Wheel 25%, 150 ms debounce, continuous follow, window behavior and media engine unchanged. Exact revised JS passed isolated simulated checks. At b662cba, CI and local Windows full suite passed; all 22 focused manual checks passed, including the residual-shadow correction (see Testing). No merge authorized.
 
-## Subtitle settings refinement (pending verification)
+## Subtitle settings refinement (accepted at 73df725)
 
 User approved modern local WPF tabs (音频设置/字幕参数), consistent rounded selectors and spacing, removing the sample-text preview, three five-option borderless swatch groups, and narrower typography ranges with defaults 16 DIP / 1.6 / 2 em. Known retired choices normalize only in memory on load; unknown/invalid settings remain errors and reading never overwrites the file. Existing explicit save workflow, audio controls, config schema, playback and subtitle synchronization are preserved. Updated core/UI coverage and configuration documentation. Fresh CI and Windows visual and functional checks pending. Prior b662cba acceptance is unchanged evidence for its reader code. No merge authorized.
+
+
+At `73df725`, [Feature validation CI](https://github.com/chenjing2000/audioplayer/actions/runs/45515160423) passed. User-provided Windows log confirms local HEAD at that revision, 59 Core + 307 UI + 5 publishing safeguards + 4 published EXE checks = 375 passed, zero failed; local publish succeeded. Optional real MP3, MP3 metadata and MP3-dependent UI tests skipped; temporary WebView2 test-cache cleanup still reported a nonfatal in-use warning. All 14 focused manual checks passed: modern tabs, consistency with audio page, rounded inputs/alignment/spacing, full font names, correct option ranges, five borderless swatches per group, single selection/checkmark, no text preview, then-current defaults 16/1.6/2, confirmation applies, cancel preserves, restart restores, audio settings work, and reader scrolling/seeking/coloring unchanged. This acceptance applies to 73df725, before the next settings adjustment.
+
+## Subtitle size and input typography follow-up (pending verification)
+
+User requested font sizes 17/18/19/20 DIP, fixed window height 430 (width 480 unchanged), and normal-weight text in edit boxes and combo boxes. With 16 retired, default is 17; former 14/15/16 normalize to 17, former 22/24/26/28 to 20; 17–20 stay valid (20 no longer normalizes). Only known retired values are normalized on load; unknown values (e.g. 21) still fail validation and loading never rewrites the file. Selected tab header alone remains semibold; text boxes, selected combo values and dropdown items explicitly use normal weight. Core and UI assertions updated; CI and focused local checks for this revision pending. Playback/reader source unchanged. No merge authorized.
