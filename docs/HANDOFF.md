@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — native script scroll accepted; pre-merge review and final CI pending  
+**Updated:** 2026-11-25 — PR #21 review R1–R4 implemented; fresh verification pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `d8458d6` (PR #20 squash merge).  
@@ -15,7 +15,7 @@ PR #19 replaces the playback palette and normalizes retired values on load witho
 
 PR #20 (from main `0e79b0d`) is merged: the reader keeps one text layer and draws cumulative SVG background rectangles beneath it instead of duplicating/clipping text. The five playback colors become light backgrounds, default #F6EDC2; existing ScriptColor values migrate directly without new fields. The dialog keeps its layout and uses dark playback-swatch checks. Timing, scrolling and playback logic are preserved. The follow-up refinement extends the existing final rectangle of each completed timed unit across pure whitespace to the next timed unit on the same visual line; no extra rectangles or changes to word timing, colors or settings. SVG crispEdges reduces fractional-pixel seams.
 
-On `feature/native-script-scroll` from main `275e9bf`, remove the dedicated JavaScript wheel handler and its 25% displacement multiplier. Native WebView2 wheel scrolling and scrollbar drag/click use the existing external-scroll detection and 150 ms seek transaction. Preserve middle-button press/autoscroll suppression, keyboard shortcuts, automatic follow, playback background and settings. No new application code.
+On `feature/native-script-scroll` from main `275e9bf`, remove the dedicated JavaScript wheel handler and its 25% displacement multiplier. Native WebView2 wheel scrolling and scrollbar drag/click use the existing external-scroll detection and 150 ms seek transaction. Preserve middle-button press/autoscroll suppression, keyboard shortcuts, automatic follow, playback background and settings. Review R1–R4 additionally disables browser zoom controls, inlines the single-use previewScroll helper into detectExternalScroll, extends existing UI assertions for external scroll interrupting follow and untimed scroll, and synchronizes release notes.
 
 ## Verification
 
@@ -32,6 +32,6 @@ On `feature/native-script-scroll` from main `275e9bf`, remove the dedicated Java
 
 ## Next action
 
-Complete pre-merge review, confirm final documentation-only head CI, and obtain explicit authorization before squash-merging PR #21. No repeat local application run is necessary for documentation-only changes. No release tag or assets authorized.
+Verify R1–R4 with fresh feature/PR CI, Windows Full / Publish / Test-PublishedApp and focused checks for disabled browser zoom, normal native wheel and scrollbar scrolling, follow interruption and scrollable text without timed anchors. Prior acceptance applies to application revision 7762204. Obtain explicit authorization before squash-merging PR #21. No release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.

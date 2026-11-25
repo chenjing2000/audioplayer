@@ -1053,7 +1053,8 @@ internal static class UiChecks
                                   }
                                 })()
                                 """);
-                            Assert(nativeWheel == "true", "Reader leaves wheel input native without direct scroll or playback commands");
+                            Assert(nativeWheel == "true" && !reader.CoreWebView2.Settings.IsZoomControlEnabled,
+                                "Reader leaves wheel input native without direct scroll or playback commands and disables browser zoom control");
 
                             string scrollBarNavigation = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """
@@ -1080,16 +1081,39 @@ internal static class UiChecks
                                     if(targets.length!==2 || Math.abs(targets[1]-7.6)>0.02)return false;
                                     const sentence=body.querySelector('.sentence');
                                     sentence.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,clientY:window.innerHeight/2}));
-                                    return targets.length===2;
+                                    if(targets.length!==2)return false;
+
+                                    // Scrollable text without timed anchors must not start a seek.
+                                    followAnchors=[];
+                                    scrollProgrammatically(200);
+                                    window.scrollTo(0,300);
+                                    window.dispatchEvent(new Event('scroll'));
+                                    if(targets.length!==2 || pending!==null || Math.abs(window.scrollY-300)>1)return false;
+
+                                    // Exercise the real preview and follow-frame path, before the
+                                    // browser delivers its queued external scroll event.
+                                    preview=originalPreview;
+                                    followAnchors=[{y:window.innerHeight/2+200,time:7},
+                                                   {y:window.innerHeight/2+400,time:9}];
+                                    update({position:7,playing:true,reset:false},true);
+                                    if(!animation || pending!==null || Math.abs(window.scrollY-200)>1)return false;
+                                    window.scrollTo(0,300);
+                                    followFrame(sampleAt+16);
+                                    if(animation || Math.abs((pending??-1)-8)>0.02 ||
+                                       Math.abs(window.scrollY-300)>1 || playback.position!==7)return false;
+                                    window.dispatchEvent(new Event('scroll'));
+                                    return !animation && Math.abs((pending??-1)-8)<0.02 &&
+                                      Math.abs(window.scrollY-300)<=1;
                                   } finally {
                                     preview=originalPreview;
+                                    cancelManual();
                                     followAnchors=savedAnchors;
                                     spacer.remove();
-                                    scrollProgrammatically(0);
+                                    update({position:0,playing:false,reset:true},true);
                                   }
                                 })()
                                 """);
-                            Assert(scrollBarNavigation == "true", "Reader external scroll previews continuous time; programmatic scroll and double-click do not");
+                            Assert(scrollBarNavigation == "true", "Reader external scroll previews continuous time and interrupts follow; programmatic scroll, double-click and untimed scroll do not seek");
 
                             string reconciliation = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """

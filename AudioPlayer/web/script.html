@@ -32,18 +32,15 @@ function preview(time){
 function scrollLimit(){return Math.max(0,document.documentElement.scrollHeight-window.innerHeight);}
 function rememberScroll(){knownScrollY=window.scrollY;knownScrollLimit=scrollLimit();}
 function scrollProgrammatically(y){window.scrollTo(0,y);rememberScroll();}
-function previewScroll(){
-  const time=timeAtOffset(window.scrollY);
-  if(time===null)return false;
-  preview(time);
-  return true;
-}
 function detectExternalScroll(){
   const changed=Math.abs(window.scrollY-knownScrollY)>0.01;
   const layoutChanged=knownScrollLimit!==null && knownScrollLimit!==scrollLimit();
   rememberScroll();
   if(!changed || layoutChanged || measureFrame)return false;
-  return previewScroll();
+  const time=timeAtOffset(window.scrollY);
+  if(time===null)return false;
+  preview(time);
+  return true;
 }
 window.addEventListener('scroll',detectExternalScroll,{passive:true});
 window.addEventListener('keydown',event=>{
