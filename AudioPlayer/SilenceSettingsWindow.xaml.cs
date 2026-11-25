@@ -127,38 +127,32 @@ public partial class SilenceSettingsWindow : Window
         return true;
     }
 
+    // WPF single-selection ListBox can also deselect via Ctrl+click/Space.
+    // Restore the removed color without maintaining a second selection state.
+    private void ColorSelection_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is ListBox list && list.SelectedIndex < 0 && list.Items.Count > 0)
+        {
+            if (e.RemovedItems.Count > 0 && list.Items.Contains(e.RemovedItems[0]))
+                list.SelectedItem = e.RemovedItems[0];
+            else
+                list.SelectedIndex = 0;
+        }
+    }
+
+    // LoadValues always selects an allowed item. Keep defaults and validation
+    // in ScriptAppearance, not in a second set of UI-specific fallback values.
     private ScriptAppearance ReadAppearance() => new()
     {
-        Font = (string?)FontBox?.SelectedItem ?? "Georgia",
-        FontSize = (int?)FontSizeBox?.SelectedItem ?? 18,
-        LineHeight = (double?)LineHeightBox?.SelectedItem ?? 1.7,
-        ParagraphAfter = (int?)ParagraphAfterBox?.SelectedItem ?? 16,
-        FirstLineIndent = (int?)IndentBox?.SelectedItem ?? 0,
-        Color = (string?)TextColorBox?.SelectedItem ?? "#283747",
-        ScriptColor = (string?)PlaybackColorBox?.SelectedItem ?? "#B64550",
-        Background = (string?)BackgroundColorBox?.SelectedItem ?? "#F8F8F6"
+        Font = (string)FontBox.SelectedItem,
+        FontSize = (int)FontSizeBox.SelectedItem,
+        LineHeight = (double)LineHeightBox.SelectedItem,
+        ParagraphAfter = (int)ParagraphAfterBox.SelectedItem,
+        FirstLineIndent = (int)IndentBox.SelectedItem,
+        Color = (string)TextColorBox.SelectedItem,
+        ScriptColor = (string)PlaybackColorBox.SelectedItem,
+        Background = (string)BackgroundColorBox.SelectedItem
     };
-
-    private void Appearance_Changed(object sender, SelectionChangedEventArgs e)
-    {
-        if (PreviewSecond is null || PreviewPlayed is null) return;
-        var a = ReadAppearance();
-        Brush BrushFor(string color) => (Brush)new BrushConverter().ConvertFromString(color)!;
-        AppearancePreview.Background = BrushFor(a.Background);
-        foreach (var block in new[] { PreviewFirst, PreviewSecond })
-        {
-            block.FontFamily = new FontFamily(a.Font + ", Segoe UI");
-            block.FontSize = a.FontSize;
-            block.LineHeight = a.FontSize * a.LineHeight;
-            block.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
-            block.Foreground = BrushFor(a.Color);
-
-        }
-        PreviewPlayed.Text = new string('\u2003', a.FirstLineIndent) + "Learning changes ";
-        PreviewSecond.Text = new string('\u2003', a.FirstLineIndent) + "Each experience shapes our understanding.";
-        PreviewFirst.Margin = new Thickness(0, 0, 0, a.ParagraphAfter);
-        PreviewPlayed.Foreground = BrushFor(a.ScriptColor);
-    }
 
     private static bool IsStepText(string text) => text.Length <= 2 && text.All(c => c is >= '0' and <= '9');
 
@@ -261,6 +255,10 @@ public partial class SilenceSettingsWindow : Window
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
+        if (FontBox.IsKeyboardFocusWithin || FontSizeBox.IsKeyboardFocusWithin ||
+            LineHeightBox.IsKeyboardFocusWithin || ParagraphAfterBox.IsKeyboardFocusWithin ||
+            IndentBox.IsKeyboardFocusWithin || TextColorBox.IsKeyboardFocusWithin ||
+            PlaybackColorBox.IsKeyboardFocusWithin || BackgroundColorBox.IsKeyboardFocusWithin) return;
         e.Handled = true; // Enter checks values without accepting or closing the dialog.
         TryReadValues(out _);
     }

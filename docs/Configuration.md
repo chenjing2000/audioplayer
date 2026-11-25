@@ -24,19 +24,21 @@ AudioPlayer 配置文件存放在实际 EXE 同目录，默认 `AudioPlayer.sett
 
 播放模式对应单曲播放、单曲循环、顺序播放、列表循环。点击模式按钮即时保存；设置确认保留当前模式，恢复默认后确认则重置。保存失败保留旧模式和原文件。
 
-## 原文显示设置（PR #17 功能分支）
+## 字幕参数（PR #17 功能分支）
 
-旧配置缺少 `ScriptAppearance` 时使用以下默认值；已提供字段须为合法选项。显式 null 或非法值按既有配置错误规则处理。原文设置与音频设置共享确认、取消、恢复默认，预览只在设置窗口内更新，保存成功后应用；不触发 PCM 复扫。
+旧配置缺少 `ScriptAppearance` 或其中的字段时使用以下默认值。字幕参数与音频设置共享确认、取消、恢复默认；不提供设置内文字预览，成功保存后应用，不触发 PCM 复扫。三组颜色各五个无边框色球，单选对勾标记，悬停显示 HEX。选项卡无内容外框，选中项有主题色指示线；下拉框与音频输入框统一圆角样式。
 
 | ScriptAppearance 字段 | 默认 | 可选值 |
 | --- | --- | --- |
-| Font | Georgia | Georgia, Segoe UI, Microsoft YaHei UI, Nunito, Times New Roman, Arial |
-| FontSize | 18 | 14, 15, 16, 17, 18, 20, 22, 24, 26, 28 DIP |
-| LineHeight | 1.7 | 1.4, 1.5, 1.6, 1.7, 1.8, 2.0 |
-| ParagraphAfter | 16 | 0, 8, 12, 14, 16, 18, 20, 24 DIP |
-| FirstLineIndent | 0 | 0, 1, 2, 3 em |
+| Font | Georgia | Georgia, Microsoft YaHei UI, Nunito, Times New Roman, Arial |
+| FontSize | 16 | 14, 15, 16, 17, 18 DIP |
+| LineHeight | 1.6 | 1.5, 1.6, 1.7, 1.8 |
+| ParagraphAfter | 16 | 8, 12, 16, 20 DIP |
+| FirstLineIndent | 2 | 0, 1, 2 em |
 | Color | #283747 | #283747, #344054, #3F4750, #315247, #513D4D |
-| ScriptColor | #B64550 | #B64550, #A33D30, #A45A2C, #856300, #53713C, #26798A |
-| Background | #F8F8F6 | #F8F8F6, #F0F3F7, #F7F1E6, #EFF5F0, #F1F0F7, #FFFFFF |
+| ScriptColor | #B64550 | #B64550, #A45A2C, #856300, #53713C, #26798A |
+| Background | #F8F8F6 | #F8F8F6, #F0F3F7, #F7F1E6, #EFF5F0, #F1F0F7 |
+
+读取时仅对本次移除的旧合法值在内存中归一化：Segoe UI → Arial；字号 20/22/24/26/28 → 18；行高 1.4 → 1.5、2.0 → 1.8；段后间距 0 → 8、14 → 16、18/24 → 20；缩进 3 → 2；播放色 #A33D30 → #B64550、背景色 #FFFFFF → #F8F8F6。仍合法的已保存值不变，其他非法值及显式 null 仍按既有错误机制处理。读取不重写原文件；用户执行后续显式保存（例如设置确定或播放模式切换）时按现有原子保存流程写入有效参数。配置结构不变。
 
 字体缺失时由系统/浏览器回退。WebView2 缓存位于实际 EXE 同目录 `cache/webview2`，为可重建的运行时数据，不是原文来源。

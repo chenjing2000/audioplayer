@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #17 refactor, focused Windows regression and CI passed; awaiting merge authorization  
+**Updated:** 2026-11-25 — PR #17 reader regression passed; subtitle settings refinement pending verification  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Merged main baseline:** `52bb0b8` (application from PR #16, `af27658`).  
@@ -67,3 +67,7 @@ Reader native minimize/maximize caption buttons removed without changing resizab
 ## Reader state and trajectory refactor (focused Windows acceptance passed)
 
 Pre-refactor `6917294` feature validation passed; this does not establish local visual acceptance. Replaced four main-window navigation flags/target with one pending transaction and consumed it through the existing operation gate. Removed cancel/commit browser messages in favor of one authoritative epoch-tagged playback snapshot; preview coloring cannot overwrite the host clock, and only a matching confirmed target preserves the user offset. Removed duplicate sent snapshot, previous position and manual boolean; consolidated reader disposal and stale-instance event guards. The scroll-to-time inverse now shares the same continuous trajectory as time-to-scroll; no per-line quantization, no invented word timestamps, no seek when no anchors. Wheel 25%, 150 ms debounce, continuous follow, window behavior and media engine unchanged. Exact revised JS passed isolated simulated checks. At b662cba, CI and local Windows full suite passed; all 22 focused manual checks passed, including the residual-shadow correction (see Testing). No merge authorized.
+
+## Subtitle settings refinement (pending verification)
+
+User approved modern local WPF tabs (音频设置/字幕参数), consistent rounded selectors and spacing, removing the sample-text preview, three five-option borderless swatch groups, and narrower typography ranges with defaults 16 DIP / 1.6 / 2 em. Known retired choices normalize only in memory on load; unknown/invalid settings remain errors and reading never overwrites the file. Existing explicit save workflow, audio controls, config schema, playback and subtitle synchronization are preserved. Updated core/UI coverage and configuration documentation. Fresh CI and Windows visual and functional checks pending. Prior b662cba acceptance is unchanged evidence for its reader code. No merge authorized.

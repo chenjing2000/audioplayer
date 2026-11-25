@@ -79,23 +79,36 @@ public sealed class SilenceSettings
 
 public sealed record ScriptAppearance
 {
-    internal static readonly string[] Fonts = ["Georgia", "Segoe UI", "Microsoft YaHei UI", "Nunito", "Times New Roman", "Arial"];
-    internal static readonly int[] Sizes = [14, 15, 16, 17, 18, 20, 22, 24, 26, 28];
-    internal static readonly double[] Heights = [1.4, 1.5, 1.6, 1.7, 1.8, 2.0];
-    internal static readonly int[] Spacings = [0, 8, 12, 14, 16, 18, 20, 24];
-    internal static readonly int[] Indents = [0, 1, 2, 3];
+    internal static readonly string[] Fonts = ["Georgia", "Microsoft YaHei UI", "Nunito", "Times New Roman", "Arial"];
+    internal static readonly int[] Sizes = [14, 15, 16, 17, 18];
+    internal static readonly double[] Heights = [1.5, 1.6, 1.7, 1.8];
+    internal static readonly int[] Spacings = [8, 12, 16, 20];
+    internal static readonly int[] Indents = [0, 1, 2];
     internal static readonly string[] Colors = ["#283747", "#344054", "#3F4750", "#315247", "#513D4D"];
-    internal static readonly string[] PlaybackColors = ["#B64550", "#A33D30", "#A45A2C", "#856300", "#53713C", "#26798A"];
-    internal static readonly string[] Backgrounds = ["#F8F8F6", "#F0F3F7", "#F7F1E6", "#EFF5F0", "#F1F0F7", "#FFFFFF"];
+    internal static readonly string[] PlaybackColors = ["#B64550", "#A45A2C", "#856300", "#53713C", "#26798A"];
+    internal static readonly string[] Backgrounds = ["#F8F8F6", "#F0F3F7", "#F7F1E6", "#EFF5F0", "#F1F0F7"];
 
     public string Font { get; init; } = "Georgia";
-    public int FontSize { get; init; } = 18;
-    public double LineHeight { get; init; } = 1.7;
+    public int FontSize { get; init; } = 16;
+    public double LineHeight { get; init; } = 1.6;
     public int ParagraphAfter { get; init; } = 16;
-    public int FirstLineIndent { get; init; }
+    public int FirstLineIndent { get; init; } = 2;
     public string Color { get; init; } = "#283747";
     public string ScriptColor { get; init; } = "#B64550";
     public string Background { get; init; } = "#F8F8F6";
+
+    // Only formerly supported values are normalized on load. Unknown values
+    // still fail validation, and loading never writes back to the user's file.
+    internal ScriptAppearance NormalizeRemovedOptions() => this with
+    {
+        Font = Font == "Segoe UI" ? "Arial" : Font,
+        FontSize = FontSize is 20 or 22 or 24 or 26 or 28 ? 18 : FontSize,
+        LineHeight = LineHeight switch { 1.4 => 1.5, 2.0 => 1.8, _ => LineHeight },
+        ParagraphAfter = ParagraphAfter switch { 0 => 8, 14 => 16, 18 or 24 => 20, _ => ParagraphAfter },
+        FirstLineIndent = FirstLineIndent == 3 ? 2 : FirstLineIndent,
+        ScriptColor = ScriptColor == "#A33D30" ? "#B64550" : ScriptColor,
+        Background = Background == "#FFFFFF" ? "#F8F8F6" : Background
+    };
 
     internal void Validate()
     {

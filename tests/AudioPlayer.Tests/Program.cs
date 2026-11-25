@@ -68,7 +68,15 @@ Check("Script appearance defaults, persistence and validation", () =>
         File.WriteAllText(store.FilePath, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0}""");
         var settings = store.LoadOrCreate();
         Assert(settings.ScriptAppearance == new ScriptAppearance());
-        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 22, LineHeight = 1.8, ParagraphAfter = 24, FirstLineIndent = 2, Background = "#FFFFFF", ScriptColor = "#26798A" };
+        Assert(settings.ScriptAppearance.FontSize == 16 && settings.ScriptAppearance.LineHeight == 1.6 &&
+            settings.ScriptAppearance.FirstLineIndent == 2);
+        Assert(ScriptAppearance.Fonts.SequenceEqual(new[] { "Georgia", "Microsoft YaHei UI", "Nunito", "Times New Roman", "Arial" }) &&
+            ScriptAppearance.Sizes.SequenceEqual(new[] { 14, 15, 16, 17, 18 }) &&
+            ScriptAppearance.Heights.SequenceEqual(new[] { 1.5, 1.6, 1.7, 1.8 }) &&
+            ScriptAppearance.Spacings.SequenceEqual(new[] { 8, 12, 16, 20 }) &&
+            ScriptAppearance.Indents.SequenceEqual(new[] { 0, 1, 2 }));
+        Assert(ScriptAppearance.Colors.Length == 5 && ScriptAppearance.PlaybackColors.Length == 5 && ScriptAppearance.Backgrounds.Length == 5);
+        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0", ScriptColor = "#26798A" };
         store.Save(settings);
         Assert(store.LoadOrCreate().ScriptAppearance == settings.ScriptAppearance);
         string original = File.ReadAllText(store.FilePath);
@@ -76,6 +84,46 @@ Check("Script appearance defaults, persistence and validation", () =>
         try { store.Save(settings); throw new Exception("Invalid appearance accepted"); }
         catch (ArgumentOutOfRangeException) { }
         Assert(File.ReadAllText(store.FilePath) == original);
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
+Check("Retired script options normalize only on load without rewriting the file", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "appearance-legacy-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        var store = new SettingsStore(Path.Combine(folder, "player.settings.json"));
+        var settings = new SilenceSettings();
+        foreach (int size in new[] { 20, 22, 24, 26, 28 })
+        foreach (var (height, newHeight) in new[] { (1.4, 1.5), (2.0, 1.8) })
+        foreach (var (spacing, newSpacing) in new[] { (0, 8), (14, 16), (18, 20), (24, 20) })
+        {
+            settings.ScriptAppearance = new ScriptAppearance { Font = "Segoe UI", FontSize = size,
+                LineHeight = height, ParagraphAfter = spacing, FirstLineIndent = 3,
+                ScriptColor = "#A33D30", Background = "#FFFFFF" };
+            string json = System.Text.Json.JsonSerializer.Serialize(settings);
+            File.WriteAllText(store.FilePath, json);
+            var loaded = store.LoadOrCreate();
+            Assert(loaded.ScriptAppearance == new ScriptAppearance { Font = "Arial", FontSize = 18,
+                LineHeight = newHeight, ParagraphAfter = newSpacing, FirstLineIndent = 2 });
+            Assert(File.ReadAllText(store.FilePath) == json);
+            store.Save(loaded);
+            Assert(store.LoadOrCreate().ScriptAppearance == loaded.ScriptAppearance);
+        }
+
+        settings.ScriptAppearance = new ScriptAppearance { FontSize = 19 };
+        string invalid = System.Text.Json.JsonSerializer.Serialize(settings);
+        File.WriteAllText(store.FilePath, invalid);
+        try { store.LoadOrCreate(); throw new Exception("Unknown appearance value accepted"); }
+        catch (ArgumentOutOfRangeException) { }
+        Assert(File.ReadAllText(store.FilePath) == invalid);
+
+        string partial = """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0,"ScriptAppearance":{"FontSize":17,"FirstLineIndent":0}}""";
+        File.WriteAllText(store.FilePath, partial);
+        Assert(store.LoadOrCreate().ScriptAppearance == new ScriptAppearance { FontSize = 17, FirstLineIndent = 0 });
+        Assert(File.ReadAllText(store.FilePath) == partial);
     }
     finally { Directory.Delete(folder, true); }
 });

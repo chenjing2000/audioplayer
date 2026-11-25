@@ -444,10 +444,10 @@ On Windows, close running AudioPlayer, switch to the feature branch and pull fas
 | D06 | Double-click text does not seek; left selection/copy and middle press behavior |
 | D07 | Hide/close, Stop, Space and main slider/keyboard supersede pending seek correctly |
 | D08 | Switch track, refresh, open/settings dialogs and close app during pending navigation |
-| E01 | Two tabs, original audio settings controls and footer fit |
+| E01 | Modern borderless audio/subtitle tabs, rounded selectors, original audio controls and footer fit |
 | E02 | All fonts and font sizes, missing font fallback |
 | E03 | Line height, paragraph spacing and first-line indentation |
-| E04 | Normal, playback and background color changes and preview |
+| E04 | Five borderless swatches per group; one checkmark, confirmed colors apply to reader, no sample preview |
 | E05 | Cancel leaves saved appearance unchanged; OK persists |
 | E06 | Restart restores settings; Restore Defaults stages values until confirmation |
 | E07 | Older config defaults; invalid config retained and reported |
@@ -575,3 +575,7 @@ User explicitly confirmed all 22 focused manual regression checks at this revisi
 - [x] Repeated reader open/close without errors or stale text.
 
 The previously reported residual reader shadow is resolved in the user's tested Windows environment. The focused regression is accepted; this does not establish every earlier full-matrix case (e.g. mixed-DPI/multiple monitors, missing runtime, actual device failure, and optional MP3 checks). No application source changes, merge, release tag or release authorization in this documentation update.
+
+### Subtitle settings refinement (pending verification)
+
+At the user's request: preserve the 480 × 420 DIP dialog, audio controls and shared action buttons; modern local tab templates (音频设置/字幕参数), rounded selectors, aligned spacing, delete sample preview, three groups of five borderless color swatches with checkmarks. Defaults 16 DIP, 1.6 line height, 2 em indent; allowed choices and exact retired-value normalization are in Configuration. SettingsStore normalizes only recognized removed options on load, preserves the source file until an explicit save, and still rejects invalid values. Added core coverage for all 40 retired-value combinations, partial settings and invalid values; UI assertions cover tab labels, fit, selector styling, swatch fills/checks/required selection, defaults, confirmation and cancellation. No change to main/reader window, playback engine or script.html. Fresh CI and local visual/functional verification required; prior b662cba reader regression remains historical evidence. No merge authorized.

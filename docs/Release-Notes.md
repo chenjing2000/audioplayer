@@ -16,6 +16,6 @@ PR #16 was squash merged at `af27658` with successful post-merge Windows CI and 
 ## Pending PR #17 (not merged or released)
 
 - Optional Script companion window with ReadArticles JSON, progressive word coloring, continuous audio-time-driven visual-line scrolling, direct wheel scrolling at one quarter of the original displacement and native scrollbar navigation using the inverse of the continuous follow trajectory with 150 ms debounced seeking; no double-click seek, reader minimize/maximize disabled and reader closes on owner minimize.
-- Persistent typography and color settings, with preview in the existing settings dialog.
+- Persistent typography and color settings in a modernized two-tab dialog with rounded selectors, five borderless swatches per palette and no sample-text preview; defaults 16 DIP / 1.6 line height / 2 em indent. Retired supported options normalize in memory on load without rewriting the file.
 - Microsoft Edge WebView2 Runtime required only for the Script window; not bundled. Portable single EXE remains.
 - CI passed at feature revision `6789ffd`; local Windows automated checks and 10 focused manual reader checks passed. Remaining edge-case acceptance is pending. Do not treat this section as a released feature until authorized merge and release.

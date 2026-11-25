@@ -426,8 +426,14 @@ internal static class UiChecks
                         "Stop square is centered and exactly 35% of circle height");
 
                     var settingsWindow = new SilenceSettingsWindow(new SilenceSettings());
-                    Assert(((TabControl)settingsWindow.FindName("SettingsTabs")).Items.Count == 2, "Settings has audio and script tabs");
-                    Assert((int)((ComboBox)settingsWindow.FindName("FontSizeBox")).SelectedItem == 18, "Script font defaults to 18 DIP");
+                    var settingsTabs = (TabControl)settingsWindow.FindName("SettingsTabs");
+                    Assert(settingsTabs.Items.Count == 2 && (string)((TabItem)settingsTabs.Items[0]).Header == "音频设置" &&
+                        (string)((TabItem)settingsTabs.Items[1]).Header == "字幕参数" && settingsTabs.BorderThickness == new Thickness(0),
+                        "Settings tabs have the agreed names and no outer border");
+                    Assert((int)((ComboBox)settingsWindow.FindName("FontSizeBox")).SelectedItem == 16 &&
+                        (double)((ComboBox)settingsWindow.FindName("LineHeightBox")).SelectedItem == 1.6 &&
+                        (int)((ComboBox)settingsWindow.FindName("IndentBox")).SelectedItem == 2,
+                        "Script font size, line height and indentation default to 16, 1.6 and 2");
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 480) < 0.01, "Settings window width is 480");
                     Assert(Math.Abs(settingsWindow.Height - 420) < 0.01, "Settings window height is 420");
@@ -461,6 +467,58 @@ internal static class UiChecks
                          && Math.Max(exclusionBounds.Bottom, labelBounds.Bottom) <= buttonsBounds.Top
                          && buttonsBounds.Bottom <= settingsWindow.ActualHeight + 0.5,
                          "Settings help, exclusion controls and buttons do not overlap or overflow");
+                     settingsTabs.SelectedIndex = 1;
+                     settingsWindow.UpdateLayout();
+                     var selectors = new[] { "FontBox", "FontSizeBox", "LineHeightBox", "ParagraphAfterBox", "IndentBox" }
+                         .Select(name => (ComboBox)settingsWindow.FindName(name)).ToArray();
+                     Assert(selectors.Select(box => box.Items.Count).SequenceEqual(new[] { 5, 5, 4, 4, 3 }) &&
+                         selectors.All(box => box.SelectedItem is not null && box.Margin.Bottom == 10 &&
+                             box.HorizontalContentAlignment == HorizontalAlignment.Center &&
+                             box.ActualHeight > 0 && Bounds(box).Bottom <= buttonsBounds.Top),
+                         "Script combo choices are reduced, aligned, and fit above dialog buttons");
+                     foreach (var box in selectors)
+                     {
+                         box.ApplyTemplate();
+                         var toggle = FindVisual<System.Windows.Controls.Primitives.ToggleButton>(box)!;
+                         toggle.ApplyTemplate();
+                         Assert(((Border)toggle.Template.FindName("Outline", toggle)).CornerRadius.TopLeft == 6,
+                             "Script combo box shares rounded input styling");
+                     }
+                     var colorLists = new[] { "TextColorBox", "PlaybackColorBox", "BackgroundColorBox" }
+                         .Select(name => (ListBox)settingsWindow.FindName(name)).ToArray();
+                     Assert(settingsWindow.FindName("AppearancePreview") is null, "Settings text preview removed");
+                     foreach (var colors in colorLists)
+                     {
+                         Assert(colors.Items.Count == 5 && colors.SelectedIndex == 0 &&
+                             colors.SelectionMode == SelectionMode.Single &&
+                             Bounds(colors).Bottom <= buttonsBounds.Top, "Five color choices fit above dialog buttons");
+                         for (int i = 0; i < colors.Items.Count; i++)
+                         {
+                             var item = (ListBoxItem)colors.ItemContainerGenerator.ContainerFromIndex(i);
+                             item.ApplyTemplate();
+                             var swatch = (System.Windows.Shapes.Ellipse)item.Template.FindName("Swatch", item);
+                             var tick = (System.Windows.Shapes.Path)item.Template.FindName("Check", item);
+                             Assert(swatch.Width == 24 && swatch.Height == 24 && swatch.StrokeThickness == 0 &&
+                                 ColorOf(swatch.Fill) == "#FF" + ((string)colors.Items[i])[1..] &&
+                                 (tick.Visibility == Visibility.Visible) == (i == colors.SelectedIndex),
+                                 "Color swatch is borderless and only the selected item shows a check");
+                         }
+                         colors.SelectedIndex = 2;
+                         colors.SelectedIndex = -1;
+                         Assert(colors.SelectedIndex == 2, "A color group cannot become unselected");
+                     }
+                     var readAppearance = typeof(SilenceSettingsWindow).GetMethod("ReadAppearance", BindingFlags.Instance | BindingFlags.NonPublic)!;
+                     var chosenAppearance = (ScriptAppearance)readAppearance.Invoke(settingsWindow, null)!;
+                     Assert(chosenAppearance.Color == (string)colorLists[0].Items[2] &&
+                         chosenAppearance.ScriptColor == (string)colorLists[1].Items[2] &&
+                         chosenAppearance.Background == (string)colorLists[2].Items[2] &&
+                         settingsWindow.Settings.ScriptAppearance == new ScriptAppearance(),
+                         "Color choices remain staged until confirmation");
+                     ((Button)settingsWindow.FindName("RestoreDefaultsButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     Assert((ScriptAppearance)readAppearance.Invoke(settingsWindow, null)! == new ScriptAppearance() &&
+                         colorLists.All(list => list.SelectedIndex == 0), "Restore defaults resets all subtitle controls");
+                     settingsTabs.SelectedIndex = 0;
+                     settingsWindow.UpdateLayout();
                      settingsWindow.Hide();
                      var backwardBox = (TextBox)settingsWindow.FindName("BackwardStepTextBox");
                      var forwardBox = (TextBox)settingsWindow.FindName("ForwardStepTextBox");
@@ -600,13 +658,29 @@ internal static class UiChecks
                         var editWindow = app.Windows.OfType<SilenceSettingsWindow>().Single(w => w.IsVisible);
                         ((TextBox)editWindow.FindName("FrameMillisecondsTextBox")).Text = "25";
                         ((TextBox)editWindow.FindName("MinimumSilenceTextBox")).Text = "600";
+                        ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 15;
+                        ((ListBox)editWindow.FindName("PlaybackColorBox")).SelectedIndex = 2;
                         ((Button)editWindow.FindName("OkButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }));
                     settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     var saved = settingsStore.LoadOrCreate();
                     Assert(saved.FrameMilliseconds == 25 && saved.MinimumSilenceMilliseconds == 600
+                        && saved.ScriptAppearance.FontSize == 15 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
+                        && Field<SilenceSettings>(window, "silenceSettings")!.ScriptAppearance == saved.ScriptAppearance
                         && Field<SilenceSettings>(window, "silenceSettings")!.FrameMilliseconds == 25,
                         "Settings dialog saves confirmed values before applying them");
+                    string savedBeforeCancel = File.ReadAllText(settingsStore.FilePath);
+                    _ = window.Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        var editWindow = app.Windows.OfType<SilenceSettingsWindow>().Single(w => w.IsVisible);
+                        ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 18;
+                        ((ListBox)editWindow.FindName("BackgroundColorBox")).SelectedIndex = 3;
+                        editWindow.DialogResult = false;
+                    }));
+                    settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                    Assert(File.ReadAllText(settingsStore.FilePath) == savedBeforeCancel &&
+                        Field<SilenceSettings>(window, "silenceSettings")!.ScriptAppearance == saved.ScriptAppearance,
+                        "Cancel leaves persisted and active subtitle settings unchanged");
                     var restoredWindow = new MainWindow(settingsStore);
                     Assert(Field<SilenceSettings>(restoredWindow, "silenceSettings")!.FrameMilliseconds == 25,
                         "Window restores saved settings on next launch");
