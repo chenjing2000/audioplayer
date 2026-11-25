@@ -891,7 +891,7 @@ internal static class UiChecks
                                     getComputedStyle(p).isolation==='isolate' && getComputedStyle(layer).zIndex==='-1' &&
                                     getComputedStyle(layer).pointerEvents==='none' &&
                                     getComputedStyle(timed).color===getComputedStyle(p).color &&
-                                    getComputedStyle(layer.querySelector('rect')).fill==='rgb(245, 231, 166)' &&
+                                    getComputedStyle(layer.querySelector('rect')).fill==='rgb(246, 237, 194)' &&
                                     geometry.every(u=>u.segments.every(s=>Math.abs(s.element.width.baseVal.value-s.painted)<0.01));
                                 })()
                                 """);

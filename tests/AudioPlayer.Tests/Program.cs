@@ -76,15 +76,15 @@ Check("Script appearance defaults, persistence and validation", () =>
         var settings = store.LoadOrCreate();
         Assert(settings.ScriptAppearance == new ScriptAppearance());
         Assert(settings.ScriptAppearance.FontSize == 17 && settings.ScriptAppearance.LineHeight == 1.6 &&
-            settings.ScriptAppearance.FirstLineIndent == 2 && settings.ScriptAppearance.ScriptColor == "#F5E7A6");
+            settings.ScriptAppearance.FirstLineIndent == 2 && settings.ScriptAppearance.ScriptColor == "#F6EDC2");
         Assert(ScriptAppearance.Fonts.SequenceEqual(new[] { "Georgia", "Microsoft YaHei UI", "Nunito", "Times New Roman", "Arial" }) &&
             ScriptAppearance.Sizes.SequenceEqual(new[] { 17, 18, 19, 20 }) &&
             ScriptAppearance.Heights.SequenceEqual(new[] { 1.5, 1.6, 1.7, 1.8 }) &&
             ScriptAppearance.Spacings.SequenceEqual(new[] { 8, 12, 16, 20 }) &&
             ScriptAppearance.Indents.SequenceEqual(new[] { 0, 1, 2 }));
         Assert(ScriptAppearance.Colors.Length == 5 && ScriptAppearance.Backgrounds.Length == 5 &&
-            ScriptAppearance.PlaybackColors.SequenceEqual(new[] { "#F5E7A6", "#F4D9C4", "#D5E8CC", "#D3E5F3", "#E5DDF2" }));
-        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0", ScriptColor = "#D3E5F3" };
+            ScriptAppearance.PlaybackColors.SequenceEqual(new[] { "#F6EDC2", "#F5E4D6", "#E1EEDB", "#E0ECF4", "#ECE6F3" }));
+        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0", ScriptColor = "#E0ECF4" };
         foreach (string color in ScriptAppearance.PlaybackColors)
         {
             settings.ScriptAppearance = settings.ScriptAppearance with { ScriptColor = color };
@@ -133,10 +133,11 @@ Check("Retired script options normalize only on load without rewriting the file"
 
         foreach (var (oldColor, newColor) in new[]
         {
-            ("#A33D30", "#F5E7A6"), ("#B64550", "#F5E7A6"), ("#A45A2C", "#F4D9C4"),
-            ("#856300", "#E5DDF2"), ("#53713C", "#D5E8CC"), ("#26798A", "#D3E5F3"),
-            ("#D71920", "#F5E7A6"), ("#BC4600", "#F4D9C4"), ("#007D45", "#D5E8CC"),
-            ("#1685B8", "#D3E5F3"), ("#8A2BE2", "#E5DDF2")
+            ("#A33D30", "#F6EDC2"), ("#B64550", "#F6EDC2"), ("#A45A2C", "#F5E4D6"),
+            ("#856300", "#ECE6F3"), ("#53713C", "#E1EEDB"), ("#26798A", "#E0ECF4"),
+            ("#D71920", "#F6EDC2"), ("#BC4600", "#F5E4D6"), ("#007D45", "#E1EEDB"),
+            ("#1685B8", "#E0ECF4"), ("#8A2BE2", "#ECE6F3"),
+            ("#F5E7A6", "#F6EDC2"), ("#F4D9C4", "#F5E4D6"), ("#D5E8CC", "#E1EEDB"), ("#D3E5F3", "#E0ECF4"), ("#E5DDF2", "#ECE6F3")
         })
         {
             CheckMigration(new ScriptAppearance { ScriptColor = oldColor },
