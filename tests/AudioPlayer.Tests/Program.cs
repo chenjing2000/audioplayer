@@ -434,6 +434,34 @@ Check("One PCM sample of decoder duration rounding keeps cached silence usable",
     finally { Directory.Delete(folder, true); }
 });
 
+Check("Absent silence cache does not open the audio file", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "silence-cache-missing-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        string source = Path.Combine(folder, "lesson.wav");
+        WaveFileWriter.CreateWaveFile16(source, new Samples(Signal(100, 4500, 100), 1000, 1, int.MaxValue));
+        var settings = new SilenceOptions();
+        using (var locked = File.Open(source, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            Assert(SilenceResultStore.TryLoadVerified(source, settings) is null,
+                "Missing cache must be detected without opening the exclusively locked audio");
+        }
+        Assert(SilenceResultStore.LoadOrDetect(source, settings).Saved);
+        Assert(SilenceResultStore.TryLoadVerified(source, settings) is { FromCache: true });
+        using (var cancellation = new CancellationTokenSource())
+        {
+            cancellation.Cancel();
+            bool canceled = false;
+            try { SilenceResultStore.TryLoadVerified(source, settings, cancellation.Token); }
+            catch (OperationCanceledException) { canceled = true; }
+            Assert(canceled, "Cache lookup still honors cancellation");
+        }
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
 Check("Silence tasks distinguish playing analysis from selected cache checks", () =>
 {
     string folder = Path.Combine(Path.GetTempPath(), "silence-tasks-" + Guid.NewGuid().ToString("N"));

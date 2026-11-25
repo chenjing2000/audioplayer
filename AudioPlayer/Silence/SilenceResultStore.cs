@@ -84,6 +84,10 @@ internal static class SilenceResultStore
     internal static SilenceAnalysis? TryLoadVerified(string audioPath, SilenceOptions settings,
         CancellationToken cancellation = default)
     {
+        cancellation.ThrowIfCancellationRequested();
+        // An absent cache cannot enable trimming. Do not open or lock the audio
+        // just to discover that there is no result to verify.
+        if (!File.Exists(GetPath(audioPath))) return null;
         AudioFingerprint fingerprint = Capture(audioPath, cancellation);
         IReadOnlyList<SilenceRange>? ranges = TryLoad(audioPath, settings, fingerprint, cancellation);
         return ranges is null ? null : new SilenceAnalysis(ranges, true, true, fingerprint);
