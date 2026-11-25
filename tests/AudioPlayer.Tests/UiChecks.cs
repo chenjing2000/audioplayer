@@ -62,34 +62,43 @@ internal static class UiChecks
                     window.ShowInTaskbar = false; window.ShowActivated = false; window.Left = -20000; window.Top = -20000;
                     window.Show();
                     if (window.Controller.Session.ActiveOperation is Task startupAction) await startupAction;
-                    // Commands share one session gate even when a caller is not a WPF control.
-                    var heldCommand = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                    var playbackSession = window.Controller.Session;
-                    bool overlappingRan = false;
-                    Task firstCommand = playbackSession.RunActionAsync(() => heldCommand.Task);
-                    try
+                    // Exercise the same production gate independently of the window's
+                    // asynchronous startup restoration. Verify the held command itself
+                    // entered the gate, rather than observing an unrelated busy command.
+                    using (var playbackSession = new PlaybackSession(window.Dispatcher))
                     {
+                        var heldCommand = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                        bool firstRan = false, overlappingRan = false;
+                        Task firstCommand = playbackSession.RunActionAsync(() =>
+                        {
+                            firstRan = true;
+                            return heldCommand.Task;
+                        });
+                        try
+                        {
+                            await playbackSession.RunActionAsync(() =>
+                            {
+                                overlappingRan = true;
+                                return Task.CompletedTask;
+                            });
+                            Assert(firstRan && !firstCommand.IsCompleted && playbackSession.IsBusy &&
+                                playbackSession.ActiveOperation is not null && !overlappingRan,
+                                "Playback session rejects overlapping commands through the shared gate");
+                        }
+                        finally
+                        {
+                            heldCommand.TrySetResult();
+                            await firstCommand;
+                        }
+                        bool nextRan = false;
                         await playbackSession.RunActionAsync(() =>
                         {
-                            overlappingRan = true;
+                            nextRan = true;
                             return Task.CompletedTask;
                         });
-                        Assert(playbackSession.IsBusy && playbackSession.ActiveOperation is not null && !overlappingRan,
-                            "Playback session rejects overlapping commands through the shared gate");
+                        Assert(nextRan && !playbackSession.IsBusy && playbackSession.ActiveOperation is null,
+                            "Playback session releases the shared gate after command completion");
                     }
-                    finally
-                    {
-                        heldCommand.TrySetResult();
-                        await firstCommand;
-                    }
-                    bool nextRan = false;
-                    await playbackSession.RunActionAsync(() =>
-                    {
-                        nextRan = true;
-                        return Task.CompletedTask;
-                    });
-                    Assert(nextRan && !playbackSession.IsBusy && playbackSession.ActiveOperation is null,
-                        "Playback session releases the shared gate after command completion");
                     // The native window rounds its dimensions to whole physical pixels.
                     double expectedWidth = Math.Clamp(Math.Round(SystemParameters.WorkArea.Width * 0.5), window.MinWidth, window.MaxWidth);
                     double expectedHeight = Math.Clamp(Math.Round(SystemParameters.WorkArea.Height * 0.6), window.MinHeight, window.MaxHeight);
