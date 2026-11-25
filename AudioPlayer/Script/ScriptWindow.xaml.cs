@@ -70,6 +70,7 @@ public partial class ScriptWindow : Window
             core.Settings.AreHostObjectsAllowed = false;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
+            core.Settings.IsZoomControlEnabled = false;
             core.AddWebResourceRequestedFilter(ReaderOrigin + "/*", CoreWebView2WebResourceContext.All);
             core.WebResourceRequested += (_, args) =>
             {

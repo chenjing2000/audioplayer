@@ -32,28 +32,17 @@ function preview(time){
 function scrollLimit(){return Math.max(0,document.documentElement.scrollHeight-window.innerHeight);}
 function rememberScroll(){knownScrollY=window.scrollY;knownScrollLimit=scrollLimit();}
 function scrollProgrammatically(y){window.scrollTo(0,y);rememberScroll();}
-function previewScroll(){
-  const time=timeAtOffset(window.scrollY);
-  if(time===null)return false;
-  preview(time);
-  return true;
-}
 function detectExternalScroll(){
   const changed=Math.abs(window.scrollY-knownScrollY)>0.01;
   const layoutChanged=knownScrollLimit!==null && knownScrollLimit!==scrollLimit();
   rememberScroll();
   if(!changed || layoutChanged || measureFrame)return false;
-  return previewScroll();
+  const time=timeAtOffset(window.scrollY);
+  if(time===null)return false;
+  preview(time);
+  return true;
 }
 window.addEventListener('scroll',detectExternalScroll,{passive:true});
-window.addEventListener('wheel',event=>{
-  event.preventDefault();
-  cancelAnimation();
-  const before=window.scrollY;
-  const delta=event.deltaY*(event.deltaMode===1?parseFloat(getComputedStyle(document.documentElement).lineHeight):event.deltaMode===2?window.innerHeight:1);
-  scrollProgrammatically(before+delta*0.25);
-  if(Math.abs(window.scrollY-before)>=0.01)previewScroll();
-},{passive:false});
 window.addEventListener('keydown',event=>{
   if(event.altKey||event.metaKey||event.shiftKey||
      !(['ArrowLeft','ArrowRight'].includes(event.key)||(event.key===' '&&!event.ctrlKey)))return;

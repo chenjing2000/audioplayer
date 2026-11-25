@@ -1,10 +1,10 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #20 merged and post-merge application verification passed  
+**Updated:** 2026-11-25 — PR #21 review R1–R4 accepted; final documentation CI pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `d8458d6` (PR #20 squash merge).  
-**Merged feature:** `feature/playback-background` ([PR #20](https://github.com/chenjing2000/audioplayer/pull/20)); branch cleanup pending local confirmation.  
+**Merged feature:** `feature/playback-background` ([PR #20](https://github.com/chenjing2000/audioplayer/pull/20)); local and remote branch cleanup confirmed.  
 **Last verified main application:** `d8458d6`; identical tree to accepted feature head `6bb4683` (`a90c392b8e15b0d48a8647f375960f1c0636de0b`).
 
 ## Current implementation
@@ -14,6 +14,8 @@ C#/WPF/.NET 10 portable Windows audio player. Seven modules (UI, Application, Pl
 PR #19 replaces the playback palette and normalizes retired values on load without rewriting settings. The settings dialog retains its 480 × 430 DIP size, 30-DIP inputs/selectors, 80-DIP numeric controls, 160-DIP font selector and 43-DIP rows. Subtitle halves are equal, text/playback colors share a row, and dropdown choices have rounded soft highlights. The approved cleanup consolidates existing XAML properties, integer and paste validation, shared parameter range limits and migration-test flows without changing UI or data formats. No new files, classes or dependencies.
 
 PR #20 (from main `0e79b0d`) is merged: the reader keeps one text layer and draws cumulative SVG background rectangles beneath it instead of duplicating/clipping text. The five playback colors become light backgrounds, default #F6EDC2; existing ScriptColor values migrate directly without new fields. The dialog keeps its layout and uses dark playback-swatch checks. Timing, scrolling and playback logic are preserved. The follow-up refinement extends the existing final rectangle of each completed timed unit across pure whitespace to the next timed unit on the same visual line; no extra rectangles or changes to word timing, colors or settings. SVG crispEdges reduces fractional-pixel seams.
+
+On `feature/native-script-scroll` from main `275e9bf`, remove the dedicated JavaScript wheel handler and its 25% displacement multiplier. Native WebView2 wheel scrolling and scrollbar drag/click use the existing external-scroll detection and 150 ms seek transaction. Preserve middle-button press/autoscroll suppression, keyboard shortcuts, automatic follow, playback background and settings. Review R1–R4 additionally disables browser zoom controls, inlines the single-use previewScroll helper into detectExternalScroll, extends existing UI assertions for external scroll interrupting follow and untimed scroll, and synchronizes release notes.
 
 ## Verification
 
@@ -26,8 +28,12 @@ PR #20 (from main `0e79b0d`) is merged: the reader keeps one text layer and draw
 
 - PR #20 post-merge: final feature head `6bb4683` passed both CI runs and was squash-merged with user authorization into `d8458d6`. Remote and local Git trees match the accepted feature tree exactly. Main CI passed on its first attempt. Local Full passed 66 Core, 351 UI and 5 publishing safeguards; after an occupied EXE blocked the first publish, retry and subsequent four published EXE checks succeeded (**426 executed checks passed, zero failed**). Prior manual acceptance applies to identical application code. See Testing for exact evidence and limitations.
 
+- PR #21 application `7762204`: both branch and PR CI passed on their first attempt. User's synchronized clean Windows checkout passed Full / Publish / Test-PublishedApp (66 Core, 351 UI, 5 publishing safeguards, 4 published EXE; 426 executed checks, zero failures). Publish succeeded on first attempt. All ten focused native-scroll manual checks accepted, including wheel speed, automatic follow competition and paused seek. See Testing for evidence and limits.
+
+- PR #21 final application `87689a0`: R1–R4 review remediation passed both branch and PR CI on their first attempts. The synchronized clean local Windows checkout passed Full / Publish / Test-PublishedApp (66 Core, 351 UI, 5 publishing safeguards and 4 published EXE checks; 426 executed, zero failures), with first-attempt publishing. All nine focused manual checks passed, including actual Ctrl+wheel/keyboard zoom suppression and scrolling untimed text without seeking. Earlier ten-item acceptance is recorded separately. See Testing for remaining validation boundaries.
+
 ## Next action
 
-Synchronize this final documentation-only main commit, verify its CI and confirm the application/test files are unchanged from `d8458d6`. Remove the merged local and remote `feature/playback-background` branch after checking its accepted head. No repeat local application run is required for documentation-only changes. No release tag or assets authorized.
+Verify final documentation-only head CI and obtain explicit authorization before squash-merging PR #21. Verify identical merged tree, main CI and local post-merge Full / Publish / Test-PublishedApp before cleanup. No repeat local application run is necessary for the documentation-only feature commit itself. No release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.
