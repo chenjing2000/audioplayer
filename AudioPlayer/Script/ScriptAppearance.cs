@@ -8,7 +8,7 @@ public sealed record ScriptAppearance
     internal static readonly int[] Spacings = [8, 12, 16, 20];
     internal static readonly int[] Indents = [0, 1, 2];
     internal static readonly string[] Colors = ["#283747", "#344054", "#3F4750", "#315247", "#513D4D"];
-    internal static readonly string[] PlaybackColors = ["#B64550", "#A45A2C", "#856300", "#53713C", "#26798A"];
+    internal static readonly string[] PlaybackColors = ["#D71920", "#BC4600", "#007D45", "#1685B8", "#8A2BE2"];
     internal static readonly string[] Backgrounds = ["#F8F8F6", "#F0F3F7", "#F7F1E6", "#EFF5F0", "#F1F0F7"];
 
     public string Font { get; init; } = "Georgia";
@@ -17,7 +17,7 @@ public sealed record ScriptAppearance
     public int ParagraphAfter { get; init; } = 16;
     public int FirstLineIndent { get; init; } = 2;
     public string Color { get; init; } = "#283747";
-    public string ScriptColor { get; init; } = "#B64550";
+    public string ScriptColor { get; init; } = "#D71920";
     public string Background { get; init; } = "#F8F8F6";
 
     // Only formerly supported values are normalized on load. Unknown values
@@ -29,7 +29,15 @@ public sealed record ScriptAppearance
         LineHeight = LineHeight switch { 1.4 => 1.5, 2.0 => 1.8, _ => LineHeight },
         ParagraphAfter = ParagraphAfter switch { 0 => 8, 14 => 16, 18 or 24 => 20, _ => ParagraphAfter },
         FirstLineIndent = FirstLineIndent == 3 ? 2 : FirstLineIndent,
-        ScriptColor = ScriptColor == "#A33D30" ? "#B64550" : ScriptColor,
+        ScriptColor = ScriptColor switch
+        {
+            "#A33D30" or "#B64550" => "#D71920",
+            "#A45A2C" => "#BC4600",
+            "#856300" => "#8A2BE2",
+            "#53713C" => "#007D45",
+            "#26798A" => "#1685B8",
+            _ => ScriptColor
+        },
         Background = Background == "#FFFFFF" ? "#F8F8F6" : Background
     };
 

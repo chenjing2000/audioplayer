@@ -76,16 +76,21 @@ Check("Script appearance defaults, persistence and validation", () =>
         var settings = store.LoadOrCreate();
         Assert(settings.ScriptAppearance == new ScriptAppearance());
         Assert(settings.ScriptAppearance.FontSize == 17 && settings.ScriptAppearance.LineHeight == 1.6 &&
-            settings.ScriptAppearance.FirstLineIndent == 2);
+            settings.ScriptAppearance.FirstLineIndent == 2 && settings.ScriptAppearance.ScriptColor == "#D71920");
         Assert(ScriptAppearance.Fonts.SequenceEqual(new[] { "Georgia", "Microsoft YaHei UI", "Nunito", "Times New Roman", "Arial" }) &&
             ScriptAppearance.Sizes.SequenceEqual(new[] { 17, 18, 19, 20 }) &&
             ScriptAppearance.Heights.SequenceEqual(new[] { 1.5, 1.6, 1.7, 1.8 }) &&
             ScriptAppearance.Spacings.SequenceEqual(new[] { 8, 12, 16, 20 }) &&
             ScriptAppearance.Indents.SequenceEqual(new[] { 0, 1, 2 }));
-        Assert(ScriptAppearance.Colors.Length == 5 && ScriptAppearance.PlaybackColors.Length == 5 && ScriptAppearance.Backgrounds.Length == 5);
-        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0", ScriptColor = "#26798A" };
-        store.Save(settings);
-        Assert(store.LoadOrCreate().ScriptAppearance == settings.ScriptAppearance);
+        Assert(ScriptAppearance.Colors.Length == 5 && ScriptAppearance.Backgrounds.Length == 5 &&
+            ScriptAppearance.PlaybackColors.SequenceEqual(new[] { "#D71920", "#BC4600", "#007D45", "#1685B8", "#8A2BE2" }));
+        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0", ScriptColor = "#1685B8" };
+        foreach (string color in ScriptAppearance.PlaybackColors)
+        {
+            settings.ScriptAppearance = settings.ScriptAppearance with { ScriptColor = color };
+            store.Save(settings);
+            Assert(store.LoadOrCreate().ScriptAppearance == settings.ScriptAppearance);
+        }
         string original = File.ReadAllText(store.FilePath);
         settings.ScriptAppearance = settings.ScriptAppearance with { FontSize = 99 };
         try { store.Save(settings); throw new Exception("Invalid appearance accepted"); }
@@ -119,6 +124,29 @@ Check("Retired script options normalize only on load without rewriting the file"
             store.Save(loaded);
             Assert(store.LoadOrCreate().ScriptAppearance == loaded.ScriptAppearance);
         }
+
+        foreach (var (oldColor, newColor) in new[]
+        {
+            ("#A33D30", "#D71920"), ("#B64550", "#D71920"), ("#A45A2C", "#BC4600"),
+            ("#856300", "#8A2BE2"), ("#53713C", "#007D45"), ("#26798A", "#1685B8")
+        })
+        {
+            settings.ScriptAppearance = new ScriptAppearance { ScriptColor = oldColor };
+            string json = System.Text.Json.JsonSerializer.Serialize(settings);
+            File.WriteAllText(store.FilePath, json);
+            var loaded = store.LoadOrCreate();
+            Assert(loaded.ScriptAppearance == new ScriptAppearance { ScriptColor = newColor });
+            Assert(File.ReadAllText(store.FilePath) == json);
+            store.Save(loaded);
+            Assert(store.LoadOrCreate().ScriptAppearance == loaded.ScriptAppearance);
+        }
+
+        settings.ScriptAppearance = new ScriptAppearance { ScriptColor = "#123456" };
+        string invalidColor = System.Text.Json.JsonSerializer.Serialize(settings);
+        File.WriteAllText(store.FilePath, invalidColor);
+        try { store.LoadOrCreate(); throw new Exception("Unknown playback color accepted"); }
+        catch (ArgumentOutOfRangeException) { }
+        Assert(File.ReadAllText(store.FilePath) == invalidColor);
 
         settings.ScriptAppearance = new ScriptAppearance { FontSize = 21 };
         string invalid = System.Text.Json.JsonSerializer.Serialize(settings);
