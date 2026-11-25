@@ -637,7 +637,8 @@ internal static class UiChecks
                              Assert(item.Width == 28 && item.Height == 28 && swatch.Width == 24 && swatch.Height == 24 && swatch.StrokeThickness == 0 &&
                                  Bounds(swatch).Right <= Bounds(colors).Right + 0.5 &&
                                  ColorOf(swatch.Fill) == "#FF" + ((string)colors.Items[i])[1..] &&
-                                 (tick.Visibility == Visibility.Visible) == (i == colors.SelectedIndex),
+                                 (tick.Visibility == Visibility.Visible) == (i == colors.SelectedIndex) &&
+                                 (colors != colorLists[1] || ColorOf(tick.Stroke) == "#FF283747"),
                                  "Color swatch is borderless and only the selected item shows a check");
                          }
                          colors.SelectedIndex = 2;
@@ -878,10 +879,23 @@ internal static class UiChecks
                                 if (renderedScriptText.Contains("Hello, world.")) break;
                                 await Task.Delay(100);
                             }
-                            Assert(renderedScriptText.Contains("Hello, world."), "Embedded WebView2 reader renders discovered Script JSON");
+                            Assert(renderedScriptText == "\"Hello, world.\"", "Embedded WebView2 reader renders Script JSON once without duplicate text");
                             string measured = await reader.CoreWebView2.ExecuteScriptAsync(
                                 "measure(); update({position:1.5,playing:false,reset:false},true); geometry.length===2 && geometry[0].last===0.75 && geometry[1].last===0.25");
                             Assert(measured == "true", "Reader paints overlapping out-of-order intervals");
+                            string backgroundPaint = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const p=body.querySelector('p'), layer=p.querySelector('svg.paint'), timed=p.querySelector('.timed');
+                                  return p.textContent==='Hello, world.' && !p.querySelector('clipPath') &&
+                                    getComputedStyle(p).isolation==='isolate' && getComputedStyle(layer).zIndex==='-1' &&
+                                    getComputedStyle(layer).pointerEvents==='none' &&
+                                    getComputedStyle(timed).color===getComputedStyle(p).color &&
+                                    getComputedStyle(layer.querySelector('rect')).fill==='rgb(245, 231, 166)' &&
+                                    geometry.every(u=>u.segments.every(s=>Math.abs(s.element.width.baseVal.value-s.painted)<0.01));
+                                })()
+                                """);
+                            Assert(backgroundPaint == "true", "Reader paints background rectangles beneath a single unchanged text layer");
                             string rewind = await reader.CoreWebView2.ExecuteScriptAsync(
                                 "update({position:2.5,playing:false,reset:false},true); update({position:0.5,playing:false,reset:false},true); geometry[0].last===0.25 && geometry[1].segments.every(s=>s.painted===0)");
                             Assert(rewind == "true", "Reader rewinds previously painted intervals");
