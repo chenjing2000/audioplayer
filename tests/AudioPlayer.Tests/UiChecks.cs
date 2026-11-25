@@ -903,6 +903,56 @@ internal static class UiChecks
                                 "update({position:0,playing:false,reset:true},true); geometry.every(u=>u.segments.every(s=>s.painted===0))");
                             Assert(cleared == "true", "Reader reset clears painted intervals");
 
+                            string joinedBackground = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const saved=[...body.childNodes], savedPlayback=playback;
+                                  const p=document.createElement('p'), wrap=document.createElement('p');
+                                  const word=(text,start)=>'<span class="timed" data-start="'+start+'" data-end="'+(start+1)+'">'+text+'</span>';
+                                  const sentence=text=>'<span class="sentence">'+text+'</span>';
+                                  p.style.cssText='width:1000px;white-space:nowrap;text-indent:0';
+                                  wrap.style.cssText='width:4em;text-indent:0';
+                                  p.innerHTML=sentence(word('Alpha',0)+' '+word('beta',1))+' '+
+                                    sentence(word('gamma',2)+' untimed '+word('delta',3)+', '+word('epsilon',4));
+                                  wrap.innerHTML=sentence(word('Alpha',5)+' '+word('Beta',6));
+                                  const layer=()=>{const svg=document.createElementNS(ns,'svg');svg.setAttribute('class','paint');return svg;};
+                                  p.append(layer());wrap.append(layer());
+                                  const near=(a,b)=>Math.abs(a-b)<0.02;
+                                  try {
+                                    body.replaceChildren(p,wrap);measure();
+                                    if(geometry.length!==7 || geometry.some(u=>u.segments.length!==1))return false;
+                                    const [a,b,c,d,e,f,g]=geometry.map(u=>u.segments[0]);
+                                    const x=s=>s.element.x.baseVal.value;
+                                    if(a.trailingGap<=0 || b.trailingGap<=0 ||
+                                      !near(x(a)+a.width+a.trailingGap,x(b)) ||
+                                      !near(x(b)+b.width+b.trailingGap,x(c)) ||
+                                      [c,d,e,f,g].some(s=>s.trailingGap!==0) ||
+                                      near(f.element.y.baseVal.value,g.element.y.baseVal.value))return false;
+                                    paintAt(0.5,false);
+                                    if(!near(a.painted,a.width/2) || b.painted!==0)return false;
+                                    paintAt(1,false);
+                                    if(!near(a.painted,a.width+a.trailingGap) || b.painted!==0)return false;
+                                    paintAt(2.5,false);
+                                    if(!near(b.painted,b.width+b.trailingGap) || !near(c.painted,c.width/2))return false;
+                                    paintAt(7,false);
+                                    if(body.querySelectorAll('svg.paint rect').length!==7 ||
+                                      !near(c.painted,c.width) || !near(d.painted,d.width) ||
+                                      !near(f.painted,f.width))return false;
+                                    paintAt(0.5,false);
+                                    if(!near(a.painted,a.width/2) || geometry.slice(1).some(u=>u.segments.some(s=>s.painted!==0)))return false;
+                                    // Reflow the same words onto one line and recompute the bridge.
+                                    wrap.style.width='1000px';measure();
+                                    const [left,right]=geometry.slice(5).map(u=>u.segments[0]);
+                                    if(left.trailingGap<=0 || !near(x(left)+left.width+left.trailingGap,x(right)))return false;
+                                    paintAt(7,false);paintAt(0,true);
+                                    return geometry.every(u=>u.segments.every(s=>s.painted===0));
+                                  } finally {
+                                    body.replaceChildren(...saved);playback=savedPlayback;measure();
+                                  }
+                                })()
+                                """);
+                            Assert(joinedBackground == "true", "Reader joins same-line whitespace only, preserves word timing and gaps at untimed text, punctuation and wraps, and recomputes after reflow");
+
                             string continuousFollow = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """
                                 (() => {

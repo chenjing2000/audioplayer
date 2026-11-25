@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — playback background final application accepted; merge pending  
+**Updated:** 2026-11-25 — continuous background whitespace refinement implemented; validation pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `d2b69d7` (PR #19 squash merge).  
@@ -13,7 +13,7 @@ C#/WPF/.NET 10 portable Windows audio player. Seven modules (UI, Application, Pl
 
 PR #19 replaces the playback palette and normalizes retired values on load without rewriting settings. The settings dialog retains its 480 × 430 DIP size, 30-DIP inputs/selectors, 80-DIP numeric controls, 160-DIP font selector and 43-DIP rows. Subtitle halves are equal, text/playback colors share a row, and dropdown choices have rounded soft highlights. The approved cleanup consolidates existing XAML properties, integer and paste validation, shared parameter range limits and migration-test flows without changing UI or data formats. No new files, classes or dependencies.
 
-On `feature/playback-background` (from main `0e79b0d`), the reader keeps one text layer and draws cumulative SVG background rectangles beneath it instead of duplicating/clipping text. The five playback colors become light backgrounds, default #F6EDC2; existing ScriptColor values migrate directly without new fields. The dialog keeps its layout and uses dark playback-swatch checks. Timing, scrolling and playback logic are preserved.
+On `feature/playback-background` (from main `0e79b0d`), the reader keeps one text layer and draws cumulative SVG background rectangles beneath it instead of duplicating/clipping text. The five playback colors become light backgrounds, default #F6EDC2; existing ScriptColor values migrate directly without new fields. The dialog keeps its layout and uses dark playback-swatch checks. Timing, scrolling and playback logic are preserved. The follow-up refinement extends the existing final rectangle of each completed timed unit across pure whitespace to the next timed unit on the same visual line; no extra rectangles or changes to word timing, colors or settings.
 
 ## Verification
 
@@ -24,6 +24,6 @@ On `feature/playback-background` (from main `0e79b0d`), the reader keeps one tex
 
 ## Next action
 
-Wait for final documentation-only head CI and explicit user authorization before squash-merging PR #20. No repeat local application run is required for documentation-only changes. After merge, verify main and clean up the branch. No merge, release tag or assets authorized.
+Validate the whitespace refinement with feature CI, local Full / Publish / Test-PublishedApp, and focused manual checks for same-line continuity, untimed text, wraps, seek and resize. Earlier palette acceptance remains valid; merge deferred until fresh verification and explicit user authorization.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.

@@ -187,11 +187,20 @@ function measure(){
   for(const p of body.querySelectorAll('p')){
     const paint=p.querySelector(':scope > .paint');
     paint.replaceChildren();const base=paint.getBoundingClientRect();
+    let previous=null;
     for(const span of p.querySelectorAll(':scope > .sentence .timed')){
       const start=Number(span.dataset.start),end=Number(span.dataset.end);
       const range=document.createRange();range.selectNodeContents(span);
       const rects=[...range.getClientRects()].filter(r=>r.width>0.25&&r.height>0.25).sort((a,b)=>a.top-b.top||a.left-b.left);
-      if(!rects.length)continue;
+      if(!rects.length){previous=null;continue;}
+      // Join only whitespace between adjacent timed units on the same visual line.
+      if(previous && Math.abs(previous.rect.top-rects[0].top)<2){
+        const gap=rects[0].left-previous.rect.right;
+        if(gap>0){
+          range.setStartAfter(previous.span);range.setEndBefore(span);
+          if(/^\s+$/u.test(range.toString()))previous.segment.trailingGap=gap;
+        }
+      }
       const total=rects.reduce((sum,r)=>sum+r.width,0);
       let consumed=0;
       const segments=rects.map(r=>{
@@ -203,9 +212,10 @@ function measure(){
         const element=document.createElementNS(ns,'rect');
         element.setAttribute('x',r.left-base.left);element.setAttribute('y',r.top-base.top-1);
         element.setAttribute('width','0');element.setAttribute('height',r.height+2);paint.append(element);
-        return {element,width:r.width,painted:0};
+        return {element,width:r.width,trailingGap:0,painted:0};
       });
       geometry.push({start,end,segments,total,last:NaN});
+      previous={span,rect:rects.at(-1),segment:segments.at(-1)};
     }
   }
   lines.sort((a,b)=>a.y-b.y);
@@ -219,7 +229,7 @@ function paintUnit(unit,fraction){
   if(unit.last===fraction)return;
   unit.last=fraction;let remaining=fraction*unit.total;
   for(const seg of unit.segments){
-    const width=clamp(remaining,0,seg.width);
+    const width=clamp(remaining,0,seg.width)+(fraction===1?seg.trailingGap:0);
     if(width!==seg.painted){seg.element.setAttribute('width',width);seg.painted=width;}
     remaining-=seg.width;
   }
