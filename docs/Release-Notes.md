@@ -13,7 +13,7 @@ Windows x64; requires **.NET 10 Windows Desktop Runtime x64**. Version in the pr
 
 PR #16 was squash merged at `af27658` with successful post-merge Windows CI and 70 cumulative user-reported manual checks across successive revisions. Core/UI/portable checks do not replace manual listening. Real long-pause MP3/WAV testing and selected FFmpeg failure-path tests remain outstanding; see [Testing](Testing.md).
 
-## Pending PR #17 (not merged or released)
+## PR #17 — merged 2026-11-25 (not tagged or released)
 
 - Optional Script companion window with ReadArticles JSON, progressive word coloring, continuous audio-time-driven visual-line scrolling, direct wheel scrolling at one quarter of the original displacement and native scrollbar navigation using the inverse of the continuous follow trajectory with 150 ms debounced seeking; no double-click seek, reader minimize/maximize disabled and reader closes on owner minimize.
 - Persistent typography and color settings in a modernized two-tab dialog with normal-weight rounded inputs and selectors, five borderless swatches per palette and no sample-text preview; font sizes 17/18/19/20 DIP, defaults 17 DIP / 1.6 line height / 2 em indent. Retired supported options normalize in memory on load without rewriting the file.

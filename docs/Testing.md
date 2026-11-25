@@ -589,6 +589,13 @@ User requested font sizes 17/18/19/20 DIP, fixed window height 430 (width 480 un
 
 At `a0f5540` the user confirmed all seven focused manual checks (17/18/19/20 options, default 17, 430 DIP height, normal edit and dropdown text, selected header semibold, persistence/cancel/restart). The supplied local log verifies this HEAD and 59 Core, 307 UI, 5 publishing safeguards passed; publish succeeded; published EXE checks 3 passed, 1 failed (374 automated passes, 1 failure total). The failing isolated renamed-EXE check reported the seeded playlist path missing during the asynchronous restore poll. Optional MP3 checks skipped; temporary WebView2 cache in-use warning repeated. [CI #45516634249](https://github.com/chenjing2000/audioplayer/actions/runs/45516634249) failed in WPF UI at the 25-second WebView2 ready handshake with no ReaderFailure reported; Core and workflow smoke passed, publish steps skipped. These are distinct failures, not proof of a settings regression.
 
-### Test reliability follow-up (pending verification)
+### Test reliability follow-up (verified)
 
 Test-only follow-up: the published EXE check now polls for the complete expected restored snapshot for a separate bounded 20-second interval, tolerates transient IO exceptions during file replacement, and still fails on malformed JSON, premature process exit or incorrect/missing persisted state at deadline. The WebView2 cold-start test allows a bounded 60-second ready handshake, still stops on reader-reported error and identifies timeout explicitly. Both suspected timing issues require reruns; neither cause is proven by the previous logs alone. No application source changes, no skipped assertions, no merge authorized.
+
+
+### PR #17 final acceptance and merge
+
+PR #17 was squash-merged into main at `5b5c428` on 2026-11-25 after explicit user authorization. The accepted feature head `d3920b6` passed [Feature validation #251](https://github.com/chenjing2000/audioplayer/actions/runs/45517740732), including Core, workflow smoke, WPF UI, portable publish and published EXE checks. The user confirmed the local published EXE rerun passed 4/4 at d3920b6 using the unchanged application from a0f5540. Combined final-code local evidence: 59 Core + 307 UI + 5 publishing safeguards + 4 published EXE checks = 375 passed, zero outstanding failures, across two runs (not a single full rerun). The 22 reader, 14 settings and 7 final typography manual checks passed across successive revisions. Optional MP3 checks were skipped; temporary WebView2 test-cache cleanup warning and unverified mixed-DPI/device-failure cases remain recorded. The two earlier automated failures did not recur; their exact original causes were not established. No release tag or release assets were requested.
+
+Post-merge CI is separate; its result was not yet available when this documentation was prepared.
