@@ -26,30 +26,15 @@ public partial class MainWindow : Window
     private AppSettings appSettings = new();
     private readonly SettingsStore settingsStore;
     private bool settingsFileReady;
-    private List<SilenceRange> ranges = new();
+    internal SilenceTasks Silence { get; } = new();
     private AudioTrack? loadedTrack;
     private AudioTrack? indicatedTrack;
     private bool operationBusy;
-    private bool analyzing;
-    private bool trimming;
-    private bool selectedCanTrim;
-    private int analysisGeneration;
-    private int selectionGeneration;
-    private CancellationTokenSource? selectionCancellation;
-    private Task? selectionTask;
-    private readonly List<Task> runningSelectionChecks = new();
-    private readonly List<Task> runningAnalyses = new();
     private ToastHost.ToastMessage? analysisToast;
-    private ToastHost.ToastMessage? trimToast;
-    private CancellationTokenSource? trimCancellation;
-    private Task? trimTask;
-    private bool analysisReady;
     private bool dragging;
     private bool closing;
     private bool allowClose;
     private Task? activeOperation;
-    private Task? analysisTask;
-    private CancellationTokenSource? analysisCancellation;
     private readonly Queue<(Key Key, bool Timed)> navigationKeys = new();
     private bool navigating;
     private Task navigationTask = Task.CompletedTask;
@@ -90,6 +75,13 @@ public partial class MainWindow : Window
         AddHandler(Mouse.PreviewMouseUpEvent, new MouseButtonEventHandler(ProgressSlider_MouseUp), true);
         TrackList.ItemsSource = Playlist.Tracks;
         Playlist.Error += message => { if (!closing) ToastMessages.Show(message, ToastLevel.Error); };
+        Silence.StateChanged += UpdateControls;
+        Silence.AnalysisCanceled += CancelAnalysisToast;
+        Silence.AnalysisStarted += path => analysisToast = ToastMessages.ShowTask(
+            $"正在检测 {Path.GetFileName(path)} 的停顿，请等待检测完成。");
+        Silence.AnalysisCompleted += ReportAnalysis;
+        Silence.AnalysisFailed += ReportAnalysisFailure;
+        Silence.AnalysisFinished += RefreshSelectedCache;
         player.StateChanged += Player_StateChanged;
         player.NaturalPlaybackEnded += Player_NaturalPlaybackEnded;
         timer.Tick += (_, _) => RefreshProgress();
@@ -161,8 +153,8 @@ public partial class MainWindow : Window
     internal async Task LoadFolderAsync(string path)
     {
         // Stop playback and old analysis before replacing the playlist.
-        CancelAnalysis();
-        CancelSelectionCheck();
+        Silence.CancelAnalysis();
+        Silence.CancelSelectionCheck();
         await player.CloseAsync();
         loadedTrack = null;
         Task<bool> load = Playlist.LoadFolderAsync(path, appSettings.GetExcludedFolderNames());
@@ -184,7 +176,7 @@ public partial class MainWindow : Window
     private async void RefreshButton_Click(object sender, RoutedEventArgs e)
     {
         string? folder = Playlist.RootFolder;
-        if (folder is null || operationBusy || trimming || closing) return;
+        if (folder is null || operationBusy || Silence.IsTrimming || closing) return;
         await RunActionAsync(() => LoadFolderAsync(folder));
     }
 
@@ -228,7 +220,7 @@ public partial class MainWindow : Window
 
     private async Task LoadTrackAsync(AudioTrack track)
     {
-        CancelAnalysis();
+        Silence.CancelAnalysis();
         // OpenAsync releases the previous reader even if the replacement cannot open.
         loadedTrack = null;
         await player.OpenAsync(track.FilePath);
@@ -241,219 +233,90 @@ public partial class MainWindow : Window
         loadedTrack = track;
         try { await player.PlayAsync(); }
         catch { loadedTrack = null; await player.CloseAsync(); throw; }
-        if (!trimming) StartAnalysis(track);
-    }
-
-    private void CancelAnalysis()
-    {
-        analysisGeneration++;
-        analysisCancellation?.Cancel();
-        if (analysisToast is not null) ToastMessages.CancelTask(analysisToast);
-        analysisToast = null;
-        analyzing = false;
-        analysisReady = false;
-        ranges.Clear();
+        if (!Silence.IsTrimming) StartAnalysis(track);
     }
 
     private void StartAnalysis(AudioTrack track)
+        => Silence.StartAnalysis(track.FilePath, appSettings.GetSilenceOptions());
+
+    private void CancelAnalysisToast()
     {
-        CancelAnalysis();
-        var cancellation = new CancellationTokenSource();
-        analysisCancellation = cancellation;
-        int generation = analysisGeneration;
-        analyzing = true;
-        UpdateControls();
-        Task work = AnalyzeAsync(track, appSettings.GetSilenceOptions(), generation, cancellation);
-        analysisTask = work;
-        runningAnalyses.RemoveAll(t => t.IsCompleted);
-        runningAnalyses.Add(work);
+        if (analysisToast is not null) ToastMessages.CancelTask(analysisToast);
+        analysisToast = null;
     }
 
-    private bool IsCurrentAnalysis(AudioTrack track, int generation, CancellationTokenSource cancellation)
-        => !closing && !cancellation.IsCancellationRequested && generation == analysisGeneration
-           && ReferenceEquals(track, loadedTrack);
-
-    private async Task AnalyzeAsync(AudioTrack track, SilenceOptions settings, int generation,
-        CancellationTokenSource cancellation)
+    private void ReportAnalysis(SilenceAnalysisSummary result)
     {
-        ToastHost.ToastMessage? toast = null;
-        try
-        {
-            // A hit must not generate an imaginary progress notification or run the PCM detector.
-            SilenceAnalysis? cached = await Task.Run(
-                () => SilenceResultStore.TryLoadVerified(track.FilePath, settings, cancellation.Token),
-                cancellation.Token);
-            if (!IsCurrentAnalysis(track, generation, cancellation)) return;
-            SilenceAnalysis result;
-            if (cached is not null)
-            {
-                result = cached;
-            }
-            else
-            {
-                toast = ToastMessages.ShowTask(
-                    $"正在检测 {Path.GetFileName(track.FilePath)} 的停顿，请等待检测完成。");
-                analysisToast = toast;
-                result = await Task.Run(
-                    () => SilenceResultStore.LoadOrDetect(track.FilePath, settings, cancellation.Token),
-                    cancellation.Token);
-            }
-            if (!IsCurrentAnalysis(track, generation, cancellation)) return;
-            ranges = result.Ranges.ToList();
-            analysisReady = true;
-            if (toast is not null)
-            {
-                if (!result.Saved)
-                    ToastMessages.CompleteTask(toast, "检测完成，但无法保存静音检测结果；本次仍可导航，裁剪不可用。", ToastLevel.Warning);
-                else
-                {
-                    var cuts = SilenceTrimmer.PlanCuts(result.Ranges, result.Fingerprint.SampleRate,
-                        settings.AllowedSilenceSeconds);
-                    double removed = cuts.Sum(c => c.CutEnd - c.CutStart)
-                        / (double)result.Fingerprint.SampleRate;
-                    ToastMessages.CompleteTask(toast,
-                        $"检测到 {ranges.Count} 段停顿，可压缩 {cuts.Count} 段，预计减少 {removed:F1} 秒。",
-                        ToastLevel.Info);
-                }
-                if (ReferenceEquals(analysisToast, toast)) analysisToast = null;
-            }
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception ex)
-        {
-            if (IsCurrentAnalysis(track, generation, cancellation))
-            {
-                if (toast is not null)
-                    ToastMessages.CompleteTask(toast, "停顿检测失败，普通播放仍可用：" + ex.Message, ToastLevel.Error);
-                else ToastMessages.Show("停顿检测失败，普通播放仍可用：" + ex.Message, ToastLevel.Error);
-                if (ReferenceEquals(analysisToast, toast)) analysisToast = null;
-            }
-        }
-        finally
-        {
-            if (IsCurrentAnalysis(track, generation, cancellation))
-            {
-                analyzing = false;
-                UpdateControls();
-                RefreshSelectedCache();
-            }
-            if (ReferenceEquals(analysisCancellation, cancellation)) analysisCancellation = null;
-            cancellation.Dispose();
-        }
+        if (analysisToast is not { } toast) return;
+        if (!result.Saved)
+            ToastMessages.CompleteTask(toast, "检测完成，但无法保存静音检测结果；本次仍可导航，裁剪不可用。", ToastLevel.Warning);
+        else
+            ToastMessages.CompleteTask(toast,
+                $"检测到 {result.RangeCount} 段停顿，可压缩 {result.CutCount} 段，预计减少 {result.RemovedSeconds:F1} 秒。",
+                ToastLevel.Info);
+        analysisToast = null;
     }
 
-    private void CancelSelectionCheck()
+    private void ReportAnalysisFailure(Exception ex)
     {
-        selectionGeneration++;
-        selectionCancellation?.Cancel();
-        selectedCanTrim = false;
+        string message = "停顿检测失败，普通播放仍可用：" + ex.Message;
+        if (analysisToast is { } toast) ToastMessages.CompleteTask(toast, message, ToastLevel.Error);
+        else ToastMessages.Show(message, ToastLevel.Error);
+        analysisToast = null;
     }
 
     private void TrackList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         => RefreshSelectedCache();
 
     private void RefreshSelectedCache()
-    {
-        CancelSelectionCheck();
-        if (closing) return;
-        UpdateControls();
-        if (TrackList.SelectedItem is not AudioTrack track) return;
-        var cancellation = new CancellationTokenSource();
-        selectionCancellation = cancellation;
-        int generation = selectionGeneration;
-        Task work = CheckSelectedCacheAsync(track, appSettings.GetSilenceOptions(), generation, cancellation);
-        selectionTask = work;
-        runningSelectionChecks.RemoveAll(task => task.IsCompleted);
-        runningSelectionChecks.Add(work);
-    }
-
-    private async Task CheckSelectedCacheAsync(AudioTrack track, SilenceOptions settings, int generation,
-        CancellationTokenSource cancellation)
-    {
-        try
-        {
-            bool available = await Task.Run(() =>
-            {
-                SilenceAnalysis? cached =
-                    SilenceResultStore.TryLoadVerified(track.FilePath, settings, cancellation.Token);
-                return cached is not null && SilenceTrimmer.PlanCuts(
-                    cached.Ranges, cached.Fingerprint.SampleRate, settings.AllowedSilenceSeconds).Count > 0;
-            }, cancellation.Token);
-            if (!closing && !cancellation.IsCancellationRequested && generation == selectionGeneration
-                && ReferenceEquals(track, TrackList.SelectedItem))
-            {
-                selectedCanTrim = available;
-                UpdateControls();
-            }
-        }
-        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
-        catch (Exception)
-        {
-            // Unreadable/mismatched caches cannot enable trimming. Playback can still proceed.
-        }
-        finally
-        {
-            if (ReferenceEquals(selectionCancellation, cancellation)) selectionCancellation = null;
-            cancellation.Dispose();
-        }
-    }
+        => Silence.CheckTrimAvailability((TrackList.SelectedItem as AudioTrack)?.FilePath, appSettings.GetSilenceOptions());
 
     private async void TrimButton_Click(object sender, RoutedEventArgs e)
     {
-        if (trimming || analyzing || closing || !selectedCanTrim) return;
+        if (Silence.IsTrimming || Silence.IsAnalyzing || closing || !Silence.CanTrimSelected) return;
         if (TrackList.SelectedItem is not AudioTrack track) return;
 
-        SilenceOptions settings = appSettings.GetSilenceOptions();
-        string source = track.FilePath;
-        trimming = true;
-        trimCancellation = new CancellationTokenSource();
-        UpdateControls();
-        trimToast = ToastMessages.ShowTask(
-            $"正在压缩 {Path.GetFileName(source)} 的长静音，请等待裁剪完成。");
-        Task<SilenceTrimResult> work = SilenceTrimmer.TrimAsync(source, settings, trimCancellation.Token);
-        trimTask = work;
+        var toast = ToastMessages.ShowTask(
+            $"正在压缩 {Path.GetFileName(track.FilePath)} 的长静音，请等待裁剪完成。");
         try
         {
-            SilenceTrimResult result = await work;
-            // A folder switch can overlap trimming; wait for its committed root.
-            if (activeOperation is Task operation) await operation;
-            if (closing) return;
-            AddTrimmedOutput(result.OutputPath);
-            if (!result.OutputSilenceSaved)
-                ToastMessages.CompleteTask(trimToast!, "音频已保存，但停顿信息更新失败：" + result.OutputPath,
-                    ToastLevel.Warning, TimeSpan.FromSeconds(15));
-            else
-                ToastMessages.CompleteTask(trimToast!,
-                    $"裁剪完成：{result.OutputPath}。压缩 {result.TrimmedRangeCount} 段，减少 " +
-                    $"{result.RemovedDuration.TotalSeconds:F3} 秒；原时长 " +
-                    $"{AudioTrack.FormatTime(result.OriginalDuration)}，新时长 {AudioTrack.FormatTime(result.OutputDuration)}。",
-                    ToastLevel.Info, TimeSpan.FromSeconds(15));
+            await Silence.TrimAsync(track.FilePath, appSettings.GetSilenceOptions(), async result =>
+            {
+                // A folder switch can overlap trimming; wait for its committed root.
+                if (activeOperation is Task operation) await operation;
+                if (closing) return;
+                AddTrimmedOutput(result.OutputPath);
+                if (!result.OutputSilenceSaved)
+                    ToastMessages.CompleteTask(toast, "音频已保存，但停顿信息更新失败：" + result.OutputPath,
+                        ToastLevel.Warning, TimeSpan.FromSeconds(15));
+                else
+                    ToastMessages.CompleteTask(toast,
+                        $"裁剪完成：{result.OutputPath}。压缩 {result.TrimmedRangeCount} 段，减少 " +
+                        $"{result.RemovedDuration.TotalSeconds:F3} 秒；原时长 " +
+                        $"{AudioTrack.FormatTime(result.OriginalDuration)}，新时长 {AudioTrack.FormatTime(result.OutputDuration)}。",
+                        ToastLevel.Info, TimeSpan.FromSeconds(15));
+            });
         }
         catch (FfmpegUnavailableException ex)
         {
-            if (!closing && trimToast is not null)
-                ToastMessages.CompleteTask(trimToast, ex.Message, ToastLevel.Error, TimeSpan.FromSeconds(15));
+            if (!closing)
+                ToastMessages.CompleteTask(toast, ex.Message, ToastLevel.Error, TimeSpan.FromSeconds(15));
         }
         catch (OperationCanceledException)
         {
-            if (!closing && trimToast is not null)
-                ToastMessages.CompleteTask(trimToast, "长静音裁剪已取消。", ToastLevel.Info);
+            if (!closing)
+                ToastMessages.CompleteTask(toast, "长静音裁剪已取消。", ToastLevel.Info);
         }
         catch (Exception ex)
         {
-            if (!closing && trimToast is not null)
-                ToastMessages.CompleteTask(trimToast, "裁剪失败：" + ex.Message, ToastLevel.Error);
+            if (!closing)
+                ToastMessages.CompleteTask(toast, "裁剪失败：" + ex.Message, ToastLevel.Error);
         }
         finally
         {
-            trimToast = null;
-            trimTask = null;
-            trimCancellation?.Dispose();
-            trimCancellation = null;
-            trimming = false;
             if (!closing)
             {
-                if (loadedTrack is not null && !analysisReady && !analyzing)
+                if (loadedTrack is not null && !Silence.AnalysisReady && !Silence.IsAnalyzing)
                     StartAnalysis(loadedTrack);
                 RefreshSelectedCache();
                 UpdateControls();
@@ -601,7 +464,7 @@ public partial class MainWindow : Window
         UpdatePlaybackModeButton();
         if (detectionChanged && loadedTrack is not null)
         {
-            if (trimming) CancelAnalysis(); // Defer the new settings' analysis until trimming ends.
+            if (Silence.IsTrimming) Silence.CancelAnalysis(); // Defer the new settings' analysis until trimming ends.
             else StartAnalysis(loadedTrack);
         }
         RefreshSelectedCache();
@@ -631,7 +494,7 @@ public partial class MainWindow : Window
         if (key == Key.Space) return ToggleFromUserAsync();
         bool timed = modifiers == ModifierKeys.Control;
         if (closing || dragging || !player.IsLoaded || (operationBusy && !navigating)
-            || (!timed && (analyzing || !analysisReady))) return Task.CompletedTask;
+            || (!timed && (Silence.IsAnalyzing || !Silence.AnalysisReady))) return Task.CompletedTask;
         if (timed && (key == Key.Left ? appSettings.BackwardStepSeconds : appSettings.ForwardStepSeconds) == 0)
             return Task.CompletedTask;
         navigationKeys.Enqueue((key, timed));
@@ -656,8 +519,8 @@ public partial class MainWindow : Window
                     TimeSpan? target = timed
                         ? current + TimeSpan.FromSeconds(key == Key.Left ? -appSettings.BackwardStepSeconds : appSettings.ForwardStepSeconds)
                         : key == Key.Left
-                        ? SilenceDetector.FindPrevious(ranges, current, appSettings.NavigationToleranceMilliseconds)
-                        : SilenceDetector.FindNext(ranges, current, appSettings.NavigationToleranceMilliseconds);
+                        ? Silence.FindPrevious(current, appSettings.NavigationToleranceMilliseconds)
+                        : Silence.FindNext(current, appSettings.NavigationToleranceMilliseconds);
                     // An actual user seek supersedes any pending natural continuation.
                     if (target.HasValue) await player.SeekAsync(target.Value);
                 }, ReaderAction.PreservePlayback);
@@ -737,8 +600,8 @@ public partial class MainWindow : Window
         ScriptButton.IsEnabled = available;
         SettingsButton.IsEnabled = available;
         PlaybackModeButton.IsEnabled = available && settingsFileReady;
-        RefreshButton.IsEnabled = available && !trimming && Playlist.RootFolder is not null;
-        TrimButton.IsEnabled = !closing && !operationBusy && !analyzing && !trimming && selectedCanTrim;
+        RefreshButton.IsEnabled = available && !Silence.IsTrimming && Playlist.RootFolder is not null;
+        TrimButton.IsEnabled = !closing && !operationBusy && !Silence.IsAnalyzing && !Silence.IsTrimming && Silence.CanTrimSelected;
         TrackList.IsEnabled = available;
         PlayButton.IsEnabled = available && (player.IsLoaded || Playlist.Tracks.Count > 0);
         StopButton.IsEnabled = available && player.IsLoaded;
@@ -1038,9 +901,7 @@ public partial class MainWindow : Window
         TakeScriptSeek();
         CloseScriptWindow();
         Playlist.CancelPending();
-        CancelAnalysis();
-        CancelSelectionCheck();
-        trimCancellation?.Cancel();
+        Silence.CancelPending();
         timer.Stop();
         ToastMessages.Clear();
         UpdateControls();
@@ -1048,14 +909,7 @@ public partial class MainWindow : Window
         {
             if (activeOperation is not null) await activeOperation;
             await navigationTask;
-            await Task.WhenAll(runningAnalyses);
-            await Task.WhenAll(runningSelectionChecks);
-            if (trimTask is not null)
-            {
-                try { await trimTask; }
-                catch (OperationCanceledException) { }
-                catch (Exception) { /* TrimButton_Click handles task errors unless closing. */ }
-            }
+            await Silence.WaitForPendingAsync();
             await player.CloseAsync();
             await Dispatcher.Yield(DispatcherPriority.Background);
         }

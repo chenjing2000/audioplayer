@@ -434,6 +434,69 @@ Check("One PCM sample of decoder duration rounding keeps cached silence usable",
     finally { Directory.Delete(folder, true); }
 });
 
+Check("Silence tasks distinguish playing analysis from selected cache checks", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "silence-tasks-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        string playing = Path.Combine(folder, "playing.wav");
+        string selected = Path.Combine(folder, "selected.wav");
+        WaveFileWriter.CreateWaveFile16(playing, new Samples(Signal(100, 4500, 100), 1000, 1, int.MaxValue));
+        WaveFileWriter.CreateWaveFile16(selected, new Samples(Signal(100, 4500, 100), 1000, 1, int.MaxValue));
+        var tasks = new SilenceTasks();
+        var settings = new SilenceOptions();
+        int starts = 0, completions = 0;
+        tasks.AnalysisStarted += _ => starts++;
+        tasks.AnalysisCompleted += _ => completions++;
+        tasks.CheckTrimAvailability(selected, settings);
+        tasks.WaitForPendingAsync().GetAwaiter().GetResult();
+        Assert(!tasks.CanTrimSelected && !File.Exists(SilenceResultStore.GetPath(selected)));
+        tasks.StartAnalysis(playing, settings);
+        tasks.WaitForPendingAsync().GetAwaiter().GetResult();
+        Assert(tasks.AnalysisReady && !tasks.IsAnalyzing && starts == 1 && completions == 1);
+        Assert(tasks.FindNext(TimeSpan.Zero, 200) is not null && !tasks.CanTrimSelected);
+        tasks.StartAnalysis(playing, settings);
+        tasks.WaitForPendingAsync().GetAwaiter().GetResult();
+        Assert(tasks.AnalysisReady && starts == 1 && completions == 1, "Cache hit has no progress notification");
+        tasks.CheckTrimAvailability(playing, settings);
+        tasks.WaitForPendingAsync().GetAwaiter().GetResult();
+        Assert(tasks.CanTrimSelected);
+        tasks.CancelPending();
+        tasks.WaitForPendingAsync().GetAwaiter().GetResult();
+        Assert(!tasks.AnalysisReady && !tasks.CanTrimSelected && tasks.FindNext(TimeSpan.Zero, 200) is null);
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
+Check("Silence trim stays active through output commit", () =>
+{
+    string folder = Path.Combine(Path.GetTempPath(), "silence-task-trim-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(folder);
+    try
+    {
+        string source = Path.Combine(folder, "lesson.wav");
+        WaveFileWriter.CreateWaveFile16(source, new Samples(Signal(100, 4500, 100), 1000, 1, int.MaxValue));
+        var tasks = new SilenceTasks();
+        var settings = new SilenceOptions();
+        tasks.StartAnalysis(source, settings);
+        tasks.WaitForPendingAsync().GetAwaiter().GetResult();
+        tasks.CheckTrimAvailability(source, settings);
+        tasks.WaitForPendingAsync().GetAwaiter().GetResult();
+        string? output = null;
+        tasks.TrimAsync(source, settings, result =>
+        {
+            Assert(tasks.IsTrimming && File.Exists(result.OutputPath));
+            output = result.OutputPath;
+            return Task.CompletedTask;
+        }).GetAwaiter().GetResult();
+        Assert(!tasks.IsTrimming && output is not null && File.Exists(output));
+        tasks.CancelPending();
+        tasks.WaitForPendingAsync().GetAwaiter().GetResult();
+    }
+    finally { Directory.Delete(folder, true); }
+});
+
 Check("Uncompressible silence does not create an output file", () =>
 {
     string folder = Path.Combine(Path.GetTempPath(), "silence-short-" + Guid.NewGuid().ToString("N"));

@@ -296,7 +296,7 @@ internal static class UiChecks
                             writer.WriteSamples(new float[44100 * 4], 0, 44100 * 4);
                         await window.LoadFolderAsync(resultFolder);
                         list.SelectedIndex = 0;
-                        if (Field<Task>(window, "selectionTask") is Task missingCheck) await missingCheck;
+                        if (window.Silence.SelectionTask is Task missingCheck) await missingCheck;
                         Assert(!trimButton.IsEnabled && !File.Exists(SilenceResultStore.GetPath(source)),
                             "Selecting uncached audio does not trigger detection or enable trimming");
 
@@ -309,21 +309,21 @@ internal static class UiChecks
                         File.WriteAllText(resultPath, resultNode.ToJsonString());
                         list.SelectedIndex = -1;
                         list.SelectedIndex = 0;
-                        if (Field<Task>(window, "selectionTask") is Task validCheck) await validCheck;
+                        if (window.Silence.SelectionTask is Task validCheck) await validCheck;
                         Assert(trimButton.IsEnabled,
                             "Cached silence enables scissors even with a one-sample EOF rounding difference");
 
                         File.SetLastWriteTimeUtc(source, File.GetLastWriteTimeUtc(source).AddSeconds(5));
                         list.SelectedIndex = -1;
                         list.SelectedIndex = 0;
-                        if (Field<Task>(window, "selectionTask") is Task outdatedCheck) await outdatedCheck;
+                        if (window.Silence.SelectionTask is Task outdatedCheck) await outdatedCheck;
                         Assert(!trimButton.IsEnabled, "Changed source invalidates selected trim availability");
                         for (int i = 0; i < 12; i++)
                         {
                             list.SelectedIndex = -1;
                             list.SelectedIndex = 0;
                         }
-                        await Task.WhenAll(Field<List<Task>>(window, "runningSelectionChecks")!);
+                        await window.Silence.WaitForPendingAsync();
                         Assert(!trimButton.IsEnabled, "Rapid selection changes leave stale caches disabled");
                         await window.LoadFolderAsync(audioFolder);
                     }
@@ -621,7 +621,7 @@ internal static class UiChecks
                     { ShowInTaskbar = false, ShowActivated = false, Left = -20000, Top = -20000 };
                     closingWindow.Show();
                     var pendingSelection = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                    Field<List<Task>>(closingWindow, "runningSelectionChecks")!.Add(pendingSelection.Task);
+                    Field<List<Task>>(closingWindow.Silence, "runningSelectionChecks")!.Add(pendingSelection.Task);
                     var closeCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     closingWindow.Closed += (_, _) => closeCompleted.TrySetResult();
                     closingWindow.Close();
@@ -1085,8 +1085,7 @@ internal static class UiChecks
                     finally
                     {
                         await window.LoadFolderAsync(audioFolder);
-                        await Task.WhenAll(Field<List<Task>>(window, "runningAnalyses")!);
-                        await Task.WhenAll(Field<List<Task>>(window, "runningSelectionChecks")!);
+                        await window.Silence.WaitForPendingAsync();
                         Directory.Delete(modeFolder, true);
                     }
                     string recoveryPath = Path.Combine(audioFolder, "recovery.wav");
@@ -1095,7 +1094,7 @@ internal static class UiChecks
                     var recoveryTrack = new AudioTrack { FilePath = recoveryPath };
                     MethodInfo playTrack = typeof(MainWindow).GetMethod("PlayTrackAsync", BindingFlags.Instance | BindingFlags.NonPublic)!;
                     await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
-                    if (Field<Task>(window, "analysisTask") is Task recoveryAnalysis) await recoveryAnalysis;
+                    if (window.Silence.AnalysisTask is Task recoveryAnalysis) await recoveryAnalysis;
                     await Field<PlayerEngine>(window, "player")!.StopAsync();
                     string brokenPath = Path.Combine(audioFolder, "broken.wav");
                     File.WriteAllText(brokenPath, "not an audio file");
@@ -1105,7 +1104,7 @@ internal static class UiChecks
                     Assert(failedOpen, "Broken replacement track is rejected");
                     await (Task)playTrack.Invoke(window, new object[] { recoveryTrack })!;
                     Assert(Field<PlayerEngine>(window, "player")!.IsLoaded, "Original track can reopen after a failed replacement");
-                    if (Field<Task>(window, "analysisTask") is Task recoveredAnalysis) await recoveredAnalysis;
+                    if (window.Silence.AnalysisTask is Task recoveredAnalysis) await recoveredAnalysis;
                     var scriptPlayer = Field<PlayerEngine>(window, "player")!;
                     string seekPath = Path.Combine(audioFolder, "script-seek-test.wav");
                     using (var writer = new WaveFileWriter(seekPath, WaveFormat.CreateIeeeFloatWaveFormat(44100, 1)))
@@ -1171,7 +1170,7 @@ internal static class UiChecks
                     Assert(!scriptPlayer.IsPlaying && scriptPlayer.GetCurrentTime() == TimeSpan.Zero &&
                         !Field<DispatcherTimer>(window, "scriptSeekTimer")!.IsEnabled,
                         "Stop cancels pending wheel seek without restarting");
-                    if (Field<Task>(window, "analysisTask") is Task seekAnalysis) await seekAnalysis;
+                    if (window.Silence.AnalysisTask is Task seekAnalysis) await seekAnalysis;
                     await scriptPlayer.CloseAsync();
                     File.Delete(seekPath);
                     if (Directory.GetFiles(audioFolder, "*.mp3").Length == 0)
@@ -1189,7 +1188,7 @@ internal static class UiChecks
                     Assert(ColorOf(row0.Background) == "#FFFFFFFF" && ColorOf(row1.Background) == "#FFF0F0F0", "Alternating white and light grey rows");
                     list.SelectedIndex = 0;
                     await window.HandleShortcutAsync(Key.Space);
-                    Task? analysis = Field<Task>(window, "analysisTask");
+                    Task? analysis = window.Silence.AnalysisTask;
                     if (analysis is not null) await analysis;
                     var player = Field<PlayerEngine>(window, "player")!;
                     Assert(player.PlaybackState == PlaybackState.Playing, "Space opens selected track and plays");
@@ -1218,7 +1217,7 @@ internal static class UiChecks
                      Assert(player.GetCurrentTime() == TimeSpan.Zero && player.IsPaused, "Timed backward seek clamps to zero and stays paused");
                      await window.HandleShortcutAsync(Key.Right, ModifierKeys.Control);
                      Assert(Math.Abs(player.GetCurrentTime().TotalSeconds - Math.Min(4, player.GetDuration().TotalSeconds)) < 0.1 && player.IsPaused, "Timed forward seek uses default step and stays paused");
-                     var ranges = Field<List<SilenceRange>>(window, "ranges")!;
+                     var ranges = SilenceResultStore.TryLoad(((AudioTrack)list.Items[0]).FilePath, new SilenceOptions())!;
                     await player.SeekAsync(ranges[0].Middle);
                     await window.HandleShortcutAsync(Key.Space);
                     double first = player.GetCurrentTime().TotalSeconds;
@@ -1247,7 +1246,7 @@ internal static class UiChecks
                     Assert(rowEnter.Handled, "Focused table row consumes Enter");
                     Task? enterOperation = Field<Task>(window, "activeOperation");
                     if (enterOperation is not null) await enterOperation;
-                    Task? enterAnalysis = Field<Task>(window, "analysisTask");
+                    Task? enterAnalysis = window.Silence.AnalysisTask;
                     if (enterAnalysis is not null) await enterAnalysis;
                     var row1Track = (AudioTrack)row1.Item;
                     Assert(ReferenceEquals(Field<AudioTrack>(window, "loadedTrack"), row1Track) && player.PlaybackState == PlaybackState.Playing, "Enter on focused table row plays that row");
@@ -1337,7 +1336,7 @@ internal static class UiChecks
                     if (Field<Task>(window, "activeOperation") is Task restoredStartup) await restoredStartup;
                     await window.LoadFolderAsync(audioFolder);
                     await window.HandleShortcutAsync(Key.Space);
-                    Assert(FieldValue<bool>(window, "analyzing"), "Analysis in progress before close");
+                    Assert(window.Silence.IsAnalyzing, "Analysis in progress before close");
                     var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     window.Closed += (_, _) => closed.TrySetResult();
                     window.Close();
