@@ -501,6 +501,21 @@ internal static class UiChecks
                      settingsWindow.UpdateLayout();
                      Rect Bounds(FrameworkElement element) => element.TransformToAncestor(settingsWindow)
                          .TransformBounds(new Rect(new Point(), element.RenderSize));
+                     var audioParameterInputs = new[] { "FrameMillisecondsTextBox", "MinimumSilenceTextBox",
+                         "SilenceThresholdTextBox", "NavigationToleranceTextBox", "AllowedSilenceTextBox",
+                         "BackwardStepTextBox", "ForwardStepTextBox" }
+                         .Select(name => (TextBox)settingsWindow.FindName(name)).ToArray();
+                     var audioParameterGrid = (Grid)audioParameterInputs[0].Parent;
+                     var audioParameterBounds = audioParameterInputs.Select(Bounds).ToArray();
+                     var audioParameterRows = audioParameterGrid.RowDefinitions.Take(5).Select(row => row.ActualHeight).ToArray();
+                     Assert(audioParameterRows.All(height => Math.Abs(height - 43) <= 0.5) &&
+                         audioParameterBounds.All(bounds => Math.Abs(bounds.Height - 26) <= 0.5 &&
+                             Math.Abs(bounds.Width - 80) <= 0.5) && Math.Abs(excludedBox.ActualHeight - 26) <= 0.5,
+                         "Audio parameter rows are 43 DIP and input boxes are 26 DIP high");
+                     Assert(audioParameterInputs.Select((box, index) =>
+                         Math.Abs(audioParameterBounds[index].Top - Bounds(audioParameterGrid).Top -
+                             Grid.GetRow(box) * 43 - 8.5) <= 0.5).All(centered => centered),
+                         "Audio inputs are vertically centered in their parameter rows");
                      Rect helpBounds = Bounds(help);
                      Rect exclusionBounds = Bounds(excludedBox);
                      Rect labelBounds = Bounds(exclusionLabel);
@@ -517,9 +532,9 @@ internal static class UiChecks
                          .Select(name => (ComboBox)settingsWindow.FindName(name)).ToArray();
                      Assert(selectors.Select(box => box.Items.Count).SequenceEqual(new[] { 5, 4, 4, 4, 3 }) &&
                          selectors[1].Items.Cast<int>().SequenceEqual(new[] { 17, 18, 19, 20 }) &&
-                         selectors.All(box => box.SelectedItem is not null && box.FontWeight == FontWeights.Normal && box.Margin.Bottom == 10 &&
+                         selectors.All(box => box.SelectedItem is not null && box.FontWeight == FontWeights.Normal && box.Margin == new Thickness(0) &&
                              box.HorizontalContentAlignment == HorizontalAlignment.Center &&
-                             Math.Abs(box.ActualHeight - 33) <= 0.5 && Bounds(box).Bottom <= buttonsBounds.Top),
+                             Math.Abs(box.ActualHeight - 26) <= 0.5 && Bounds(box).Bottom <= buttonsBounds.Top),
                          "Script combo choices are reduced, aligned, and fit above dialog buttons");
                      var subtitleGrid = (Grid)selectors[0].Parent;
                      var columns = subtitleGrid.ColumnDefinitions;
@@ -528,10 +543,15 @@ internal static class UiChecks
                      var fontBounds = Bounds(selectors[0]);
                      var fontLabel = subtitleGrid.Children.OfType<TextBlock>().Single(label => label.Text == "字体");
                      Assert(Math.Abs(leftWidth - rightWidth) <= 1 && Math.Abs(columns[2].ActualWidth - 12) <= 0.5 &&
-                         selectors.Skip(1).All(box => Math.Abs(box.ActualWidth - selectors[1].ActualWidth) <= 1) &&
-                         fontBounds.Width > selectors[1].ActualWidth && Bounds(fontLabel).Right <= fontBounds.Left + 0.5 &&
+                         selectors.Skip(1).All(box => Math.Abs(box.ActualWidth - audioParameterBounds[0].Width) <= 0.5) &&
+                         Math.Abs(fontBounds.Width - 160) <= 0.5 && Bounds(fontLabel).Right <= fontBounds.Left + 0.5 &&
                          Math.Abs(fontBounds.Right - Bounds(selectors[2]).Right) <= 0.5,
                          "Subtitle columns split available width equally; numeric selectors align and font selector is wider");
+                     Assert(subtitleGrid.RowDefinitions.Take(3).Select((row, index) =>
+                         Math.Abs(row.ActualHeight - audioParameterRows[index]) <= 0.5).All(matches => matches) &&
+                         selectors.All(box => Math.Abs(box.ActualHeight - audioParameterBounds[0].Height) <= 0.5 &&
+                             Math.Abs(Bounds(box).Top - audioParameterBounds[Grid.GetRow(box)].Top) <= 0.5),
+                         "Subtitle and audio parameter rows share the same height, spacing and vertical positions");
                      foreach (string font in selectors[0].Items)
                      {
                          var text = new TextBlock { Text = font, FontFamily = selectors[0].FontFamily,
@@ -555,7 +575,10 @@ internal static class UiChecks
                      var playbackBounds = Bounds(colorLists[1]);
                      var backgroundBounds = Bounds(colorLists[2]);
                      var gridBounds = Bounds(subtitleGrid);
-                     Assert(Math.Abs(textBounds.Top - playbackBounds.Top) <= 0.5 &&
+                     Assert(Math.Abs(subtitleGrid.RowDefinitions[4].ActualHeight - 43) <= 0.5 &&
+                         Math.Abs(subtitleGrid.RowDefinitions[5].ActualHeight - 43) <= 0.5 &&
+                         Math.Abs(backgroundBounds.Top - textBounds.Top - 43) <= 0.5 &&
+                         Math.Abs(textBounds.Top - playbackBounds.Top) <= 0.5 &&
                          Math.Abs(textBounds.Left - backgroundBounds.Left) <= 0.5 &&
                          backgroundBounds.Top >= textBounds.Bottom &&
                          textBounds.Right <= gridBounds.Left + leftWidth + 0.5 &&
