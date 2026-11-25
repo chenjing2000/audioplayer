@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
+using AudioPlayer.Settings;
 
 namespace AudioPlayer.Script;
 
