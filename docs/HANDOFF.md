@@ -1,11 +1,11 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — R1–R7 verified; final manual acceptance passed  
+**Updated:** 2026-11-25 — PR #18 merged; post-merge Windows verification and CI passed  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
-**Main baseline:** `bca0333` (application from PR #17, squash merge `5b5c428`).  
-**Development branch:** `refactor/modular-architecture` (not merged).  
-**Last verified development revision:** `e655cfa` (R7 application code). Subsequent acceptance-record commits change documentation only.
+**Main application baseline:** `21f5f75` (PR #18, squash merged).  
+**Accepted feature head:** `867638d` (application revision `e655cfa`); identical Git tree to `21f5f75`.  
+**Local verification:** user log confirms main, origin/main and origin/HEAD matched at `21f5f75`. Subsequent handoff changes are documentation-only. The merged refactor branch was still present remotely at the last check; branch cleanup remains a Git housekeeping step.
 
 ## Current implementation
 
@@ -15,8 +15,10 @@ R1 organized directories and namespaces; R2 extracted Playlist; R3 separated App
 
 ## Verification
 
-R1–R7 passed local Windows automated verification and GitHub CI. At `e655cfa`, the user supplied a complete local sequence: 66 Core, 313 UI, 5 publishing safeguards and 4 published EXE checks = **388 passed, zero failed**; portable publish succeeded. [R7 CI](https://github.com/chenjing2000/audioplayer/actions/runs/45525173631) passed. The user explicitly confirmed all **21 final manual checks** on the published refactor EXE: playlist, playback, silence processing (including listening), Script companion, settings and shutdown. Optional real MP3 playback/metadata/UI cases were skipped in the automated run; mixed DPI and actual device failure remain unverified. Temporary WebView2 test cache remained in use during cleanup. Earlier PR #17's 43 manual checks remain historical evidence. See [Testing](Testing.md) for the detailed results.
+R1–R7 passed local Windows automated verification and GitHub CI. At `e655cfa`, the user supplied a complete local sequence: 66 Core, 313 UI, 5 publishing safeguards and 4 published EXE checks = **388 passed, zero failed**; portable publish succeeded. [R7 CI](https://github.com/chenjing2000/audioplayer/actions/runs/45525173631) passed. The user explicitly confirmed all **21 final manual checks** on the published refactor EXE: playlist, playback, silence processing (including listening), Script companion, settings and shutdown. Optional real MP3 playback/metadata/UI cases were skipped in the automated run; mixed DPI and actual device failure remain unverified. Temporary WebView2 test cache remained in use during cleanup. Earlier PR #17's 43 manual checks remain historical evidence. After explicit merge authorization, PR #18 was squash-merged into main at `21f5f75`. Both [final PR CI](https://github.com/chenjing2000/audioplayer/actions/runs/45526106161) and [post-merge main CI](https://github.com/chenjing2000/audioplayer/actions/runs/45526540916) passed. A separate full local post-merge run at `21f5f75` passed all 388 executed checks and published a fresh EXE. The 21 manual checks were performed before merge on identical application code. See [Testing](Testing.md) for the detailed results.
 
 ## Next action
 
-The refactor is ready for a single pull request into `main`. The application revision `e655cfa` is accepted; the acceptance record changes docs only. Verify the PR checks and merge only after explicit user authorization. After merge, synchronize the Windows checkout to main, rerun Full / Publish / Test-PublishedApp, and clean up the refactor branch. No release tag or assets authorized. Follow root AGENTS.md and WindowsAppPlaybook; preserve user files and avoid unnecessary complexity.
+The modular refactor is complete. Synchronize main to the latest documentation revision and remove the merged refactor branch locally and remotely after confirming it has no unique changes (the accepted head is `867638d`; its tree matches the squash merge `21f5f75`). Local branch deletion after squash requires an explicit force-delete of the verified branch only. No release tag or assets authorized.
+
+For future changes, start from synchronized main, follow root AGENTS.md and WindowsAppPlaybook, and preserve existing functionality and user files. No application changes are required for this milestone. Use Full / Publish / Test-PublishedApp for new application revisions; no repeat local test is necessary for a documentation-only update.
