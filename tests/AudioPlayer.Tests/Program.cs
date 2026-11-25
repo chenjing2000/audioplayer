@@ -84,7 +84,7 @@ Check("Script appearance defaults, persistence and validation", () =>
             ScriptAppearance.Indents.SequenceEqual(new[] { 0, 1, 2 }));
         Assert(ScriptAppearance.Colors.Length == 5 && ScriptAppearance.Backgrounds.Length == 5 &&
             ScriptAppearance.PlaybackColors.SequenceEqual(new[] { "#F6EDC2", "#F5E4D6", "#E1EEDB", "#E0ECF4", "#ECE6F3" }));
-        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0", ScriptColor = "#E0ECF4" };
+        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0" };
         foreach (string color in ScriptAppearance.PlaybackColors)
         {
             settings.ScriptAppearance = settings.ScriptAppearance with { ScriptColor = color };

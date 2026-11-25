@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — continuous playback background final application accepted; merge pending  
+**Updated:** 2026-11-25 — pre-merge review R1–R4 implemented; verification pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `d2b69d7` (PR #19 squash merge).  
@@ -22,8 +22,10 @@ On `feature/playback-background` (from main `0e79b0d`), the reader keeps one tex
 
 - PR #20: first palette `90c179f` passed both CI runs and all 425 executed local checks, with nine of ten manual checks passed; user requested softer colors. Softer palette application `1c62c19` passed both CI runs and all 425 executed local checks again; publish succeeded. User accepted the final visual effect, satisfying the remaining palette item. Final application `32d237d` adds same-line whitespace continuity, passed both CI runs, all 426 final executed local automated checks and all eight focused manual checks. Publish retry and subsequent EXE verification succeeded. Application source net +5 lines relative to main; no new files, classes, methods, fields or dependencies. See Testing for evidence and validation boundaries.
 
+- PR #20 pre-merge review: user authorized R1–R4; add SVG crispEdges to reduce fractional-pixel seams, extend existing integration assertions for a single timed unit wrapped across lines, synchronize Getting-Started and program overview, and remove an overwritten test initializer. No timing or geometry changes. Prior acceptance applies to `32d237d`; review revision requires fresh CI and Windows verification.
+
 ## Next action
 
-Await final documentation-only head CI and explicit user authorization before squash-merging PR #20. No repeat local application run is required for documentation-only changes. After merge, verify main and clean up the development branch. No merge, release tag or assets authorized.
+Validate R1–R4 with fresh feature and PR CI, local Full / Publish / Test-PublishedApp and focused manual checks for continuous background, moving edge smoothness, narrow-window wrapping and seek/resize. Obtain explicit authorization before squash-merging PR #20. No merge, release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.

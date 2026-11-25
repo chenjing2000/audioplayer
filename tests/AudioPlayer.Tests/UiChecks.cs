@@ -892,6 +892,7 @@ internal static class UiChecks
                                     getComputedStyle(layer).pointerEvents==='none' &&
                                     getComputedStyle(timed).color===getComputedStyle(p).color &&
                                     getComputedStyle(layer.querySelector('rect')).fill==='rgb(246, 237, 194)' &&
+                                    getComputedStyle(layer.querySelector('rect')).shapeRendering.toLowerCase()==='crispedges' &&
                                     geometry.every(u=>u.segments.every(s=>Math.abs(s.element.width.baseVal.value-s.painted)<0.01));
                                 })()
                                 """);
@@ -944,6 +945,26 @@ internal static class UiChecks
                                     wrap.style.width='1000px';measure();
                                     const [left,right]=geometry.slice(5).map(u=>u.segments[0]);
                                     if(left.trailingGap<=0 || !near(x(left)+left.width+left.trailingGap,x(right)))return false;
+                                    // A single long timed unit wraps; only its last segment joins the next word.
+                                    wrap.style.cssText='font-family:monospace;width:8ch;text-indent:0';
+                                    wrap.innerHTML=sentence(word('ABCDEFGHIJK',5)+' '+word('xy',6));
+                                    wrap.append(layer());measure();
+                                    const unit=geometry[5], next=geometry[6].segments[0];
+                                    if(unit.segments.length!==2 || geometry[6].segments.length!==1)return false;
+                                    const [first,last]=unit.segments;
+                                    if(first.trailingGap!==0 || last.trailingGap<=0 ||
+                                      near(first.element.y.baseVal.value,last.element.y.baseVal.value) ||
+                                      !near(last.element.y.baseVal.value,next.element.y.baseVal.value) ||
+                                      !near(x(last)+last.width+last.trailingGap,x(next)))return false;
+                                    paintAt(5+first.width/(2*unit.total),false);
+                                    if(!near(first.painted,first.width/2) || last.painted!==0)return false;
+                                    paintAt(5+(first.width+last.width/2)/unit.total,false);
+                                    if(!near(first.painted,first.width) || !near(last.painted,last.width/2))return false;
+                                    paintAt(6,false);
+                                    if(!near(first.painted,first.width) || !near(last.painted,last.width+last.trailingGap) ||
+                                      next.painted!==0 || body.querySelectorAll('svg.paint rect').length!==8)return false;
+                                    paintAt(5.5,false);
+                                    if(!near(first.painted,unit.total/2) || last.painted!==0 || next.painted!==0)return false;
                                     paintAt(7,false);paintAt(0,true);
                                     return geometry.every(u=>u.segments.every(s=>s.painted===0));
                                   } finally {
@@ -951,7 +972,7 @@ internal static class UiChecks
                                   }
                                 })()
                                 """);
-                            Assert(joinedBackground == "true", "Reader joins same-line whitespace only, preserves word timing and gaps at untimed text, punctuation and wraps, and recomputes after reflow");
+                            Assert(joinedBackground == "true", "Reader joins same-line whitespace only, preserves word timing across wraps, leaves untimed text and punctuation gaps, and recomputes after reflow");
 
                             string continuousFollow = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """
