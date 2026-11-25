@@ -1,6 +1,6 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — playback background first palette verified; softer palette validation pending  
+**Updated:** 2026-11-25 — playback background final application accepted; merge pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `d2b69d7` (PR #19 squash merge).  
@@ -20,10 +20,10 @@ On `feature/playback-background` (from main `0e79b0d`), the reader keeps one tex
 - PR #18: 388 automated checks and 21 manual checks passed; post-merge local verification passed. The obsolete refactor branch was removed.
 - PR #19: final cleanup `d831725` passed 424 automated checks (66 Core, 349 UI, 5 publishing safeguards and 4 published EXE), both CI runs and seven user-confirmed manual checks, including keyboard dropdown navigation. Final documentation head `3257d74` passed both CI runs and was squash-merged with explicit user authorization. Main `d2b69d7` has the identical Git tree and passed post-merge main CI and all 424 executed local automated checks. First publish was blocked by an occupied destination EXE; retry and subsequent four published EXE checks succeeded. See [Testing](Testing.md) for detailed historical evidence, [Configuration](Configuration.md) for exact settings values, and remaining real MP3, mixed DPI, device failure and nonfatal WebView2 cleanup boundaries.
 
-- PR #20: first palette `90c179f` passed both CI runs and all 425 executed local checks, with nine of ten manual checks passed; user requested softer colors. The revised palette requires fresh validation. See Testing for evidence.
+- PR #20: first palette `90c179f` passed both CI runs and all 425 executed local checks, with nine of ten manual checks passed; user requested softer colors. Final application `1c62c19` passed both CI runs and all 425 executed local checks again; publish succeeded. User accepted the final visual effect, satisfying the remaining palette item. See Testing for evidence and validation boundaries.
 
 ## Next action
 
-Validate revised palette CI, local Full / Publish / Test-PublishedApp, and focused palette checks (contrast, default, persistence and unchanged reader behavior). No merge, release tag or assets authorized.
+Wait for final documentation-only head CI and explicit user authorization before squash-merging PR #20. No repeat local application run is required for documentation-only changes. After merge, verify main and clean up the branch. No merge, release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.
