@@ -75,19 +75,25 @@ Check("Script appearance defaults, persistence and validation", () =>
         File.WriteAllText(store.FilePath, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0}""");
         var settings = store.LoadOrCreate();
         Assert(settings.ScriptAppearance == new ScriptAppearance());
-        Assert(settings.ScriptAppearance.FontSize == 17 && settings.ScriptAppearance.LineHeight == 1.6 &&
+        Assert(settings.ScriptAppearance.Font == "Newsreader" && settings.ScriptAppearance.FontSize == 17 && settings.ScriptAppearance.LineHeight == 1.6 &&
             settings.ScriptAppearance.FirstLineIndent == 2 && settings.ScriptAppearance.ScriptColor == "#F6EDC2");
-        Assert(ScriptAppearance.Fonts.SequenceEqual(new[] { "Georgia", "Microsoft YaHei UI", "Nunito", "Times New Roman", "Arial" }) &&
+        Assert(ScriptAppearance.Fonts.SequenceEqual(new[] { "Newsreader", "Source Serif 4", "Georgia", "Microsoft YaHei UI", "Nunito" }) &&
             ScriptAppearance.Sizes.SequenceEqual(new[] { 17, 18, 19, 20 }) &&
             ScriptAppearance.Heights.SequenceEqual(new[] { 1.5, 1.6, 1.7, 1.8 }) &&
             ScriptAppearance.Spacings.SequenceEqual(new[] { 8, 12, 16, 20 }) &&
             ScriptAppearance.Indents.SequenceEqual(new[] { 0, 1, 2 }));
         Assert(ScriptAppearance.Colors.Length == 5 && ScriptAppearance.Backgrounds.Length == 5 &&
             ScriptAppearance.PlaybackColors.SequenceEqual(new[] { "#F6EDC2", "#F5E4D6", "#E1EEDB", "#E0ECF4", "#ECE6F3" }));
-        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0" };
+        settings.ScriptAppearance = new ScriptAppearance { Font = "Source Serif 4", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0" };
         foreach (string color in ScriptAppearance.PlaybackColors)
         {
             settings.ScriptAppearance = settings.ScriptAppearance with { ScriptColor = color };
+            store.Save(settings);
+            Assert(store.LoadOrCreate().ScriptAppearance == settings.ScriptAppearance);
+        }
+        foreach (string font in ScriptAppearance.Fonts)
+        {
+            settings.ScriptAppearance = settings.ScriptAppearance with { Font = font };
             store.Save(settings);
             Assert(store.LoadOrCreate().ScriptAppearance == settings.ScriptAppearance);
         }
@@ -127,9 +133,12 @@ Check("Retired script options normalize only on load without rewriting the file"
             CheckMigration(new ScriptAppearance { Font = "Segoe UI", FontSize = size,
                 LineHeight = height, ParagraphAfter = spacing, FirstLineIndent = 3,
                 ScriptColor = "#A33D30", Background = "#FFFFFF" },
-                new ScriptAppearance { Font = "Arial", FontSize = newSize,
+                new ScriptAppearance { Font = "Newsreader", FontSize = newSize,
                     LineHeight = newHeight, ParagraphAfter = newSpacing, FirstLineIndent = 2 });
         }
+
+        foreach (string font in new[] { "Arial", "Times New Roman" })
+            CheckMigration(new ScriptAppearance { Font = font }, new ScriptAppearance { Font = "Newsreader" });
 
         foreach (var (oldColor, newColor) in new[]
         {

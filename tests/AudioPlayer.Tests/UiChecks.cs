@@ -474,10 +474,12 @@ internal static class UiChecks
                     Assert(settingsTabs.Items.Count == 2 && (string)((TabItem)settingsTabs.Items[0]).Header == "音频设置" &&
                         (string)((TabItem)settingsTabs.Items[1]).Header == "字幕参数" && settingsTabs.BorderThickness == new Thickness(0),
                         "Settings tabs have the agreed names and no outer border");
-                    Assert((int)((ComboBox)settingsWindow.FindName("FontSizeBox")).SelectedItem == 17 &&
+                    Assert(((ComboBox)settingsWindow.FindName("FontBox")).Items.Cast<string>().SequenceEqual(new[] { "Newsreader", "Source Serif 4", "Georgia", "Microsoft YaHei UI", "Nunito" }) &&
+                        ((ComboBox)settingsWindow.FindName("FontBox")).SelectedIndex == 0 &&
+                        (int)((ComboBox)settingsWindow.FindName("FontSizeBox")).SelectedItem == 17 &&
                         (double)((ComboBox)settingsWindow.FindName("LineHeightBox")).SelectedItem == 1.6 &&
                         (int)((ComboBox)settingsWindow.FindName("IndentBox")).SelectedItem == 2,
-                        "Script font size, line height and indentation default to 17, 1.6 and 2");
+                        "Script font choices and defaults are Newsreader, 17, 1.6 and 2");
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 480) < 0.01, "Settings window width is 480");
                     Assert(Math.Abs(settingsWindow.Height - 430) < 0.01, "Settings window height is 430");
@@ -652,6 +654,7 @@ internal static class UiChecks
                          chosenAppearance.Background == (string)colorLists[2].Items[2] &&
                          settingsWindow.Settings.ScriptAppearance == new ScriptAppearance(),
                          "Color choices remain staged until confirmation");
+                     ((ComboBox)settingsWindow.FindName("FontBox")).SelectedItem = "Source Serif 4";
                      ((Button)settingsWindow.FindName("RestoreDefaultsButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                      Assert((ScriptAppearance)readAppearance.Invoke(settingsWindow, null)! == new ScriptAppearance() &&
                          colorLists.All(list => list.SelectedIndex == 0), "Restore defaults resets all subtitle controls");
@@ -799,6 +802,7 @@ internal static class UiChecks
                         var editWindow = app.Windows.OfType<SettingsWindow>().Single(w => w.IsVisible);
                         ((TextBox)editWindow.FindName("FrameMillisecondsTextBox")).Text = "25";
                         ((TextBox)editWindow.FindName("MinimumSilenceTextBox")).Text = "600";
+                        ((ComboBox)editWindow.FindName("FontBox")).SelectedItem = "Source Serif 4";
                         ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 19;
                         ((ListBox)editWindow.FindName("PlaybackColorBox")).SelectedIndex = 2;
                         ((Button)editWindow.FindName("OkButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -806,7 +810,7 @@ internal static class UiChecks
                     settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     var saved = settingsStore.LoadOrCreate();
                     Assert(saved.FrameMilliseconds == 25 && saved.MinimumSilenceMilliseconds == 600
-                        && saved.ScriptAppearance.FontSize == 19 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
+                        && saved.ScriptAppearance.Font == "Source Serif 4" && saved.ScriptAppearance.FontSize == 19 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
                         && window.Controller.Settings.ScriptAppearance == saved.ScriptAppearance
                         && window.Controller.Settings.FrameMilliseconds == 25,
                         "Settings dialog saves confirmed values before applying them");
@@ -814,6 +818,7 @@ internal static class UiChecks
                     _ = window.Dispatcher.BeginInvoke(new Action(() =>
                     {
                         var editWindow = app.Windows.OfType<SettingsWindow>().Single(w => w.IsVisible);
+                        ((ComboBox)editWindow.FindName("FontBox")).SelectedItem = "Georgia";
                         ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 18;
                         ((ListBox)editWindow.FindName("BackgroundColorBox")).SelectedIndex = 3;
                         editWindow.DialogResult = false;
@@ -823,7 +828,8 @@ internal static class UiChecks
                         window.Controller.Settings.ScriptAppearance == saved.ScriptAppearance,
                         "Cancel leaves persisted and active subtitle settings unchanged");
                     var restoredWindow = new MainWindow(settingsStore);
-                    Assert(restoredWindow.Controller.Settings.FrameMilliseconds == 25,
+                    Assert(restoredWindow.Controller.Settings.FrameMilliseconds == 25 &&
+                         restoredWindow.Controller.Settings.ScriptAppearance.Font == "Source Serif 4",
                         "Window restores saved settings on next launch");
                     restoredWindow.Close();
                     string invalidConfiguration = "{broken";
@@ -880,6 +886,8 @@ internal static class UiChecks
                                 await Task.Delay(100);
                             }
                             Assert(renderedScriptText == "\"Hello, world.\"", "Embedded WebView2 reader renders Script JSON once without duplicate text");
+                            string defaultFont = await reader.CoreWebView2.ExecuteScriptAsync("getComputedStyle(document.documentElement).fontFamily.startsWith('Newsreader, Georgia,')");
+                            Assert(defaultFont == "true", "Reader default font is Newsreader with Georgia fallback");
                             string measured = await reader.CoreWebView2.ExecuteScriptAsync(
                                 "measure(); update({position:1.5,playing:false,reset:false},true); geometry.length===2 && geometry[0].last===0.75 && geometry[1].last===0.25");
                             Assert(measured == "true", "Reader paints overlapping out-of-order intervals");

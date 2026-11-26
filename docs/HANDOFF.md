@@ -1,10 +1,10 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-25 — PR #21 merged; post-merge application verification passed  
+**Updated:** 2026-11-26 — subtitle font update on feature branch; validation pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `f781975` (PR #21 squash merge).  
-**Merged feature:** `feature/native-script-scroll` ([PR #21](https://github.com/chenjing2000/audioplayer/pull/21)); local and remote branch cleanup pending.  
+**Merged feature:** `feature/native-script-scroll` ([PR #21](https://github.com/chenjing2000/audioplayer/pull/21)); local cleanup user-confirmed; remote cleanup verified.  
 **Last verified main application:** `f781975`; identical tree to accepted feature head `4a4e3e7` (`5a24ec3d261cc5a81d339da23874f13960c66a47`).
 
 ## Current implementation
@@ -16,6 +16,8 @@ PR #19 replaces the playback palette and normalizes retired values on load witho
 PR #20 (from main `0e79b0d`) is merged: the reader keeps one text layer and draws cumulative SVG background rectangles beneath it instead of duplicating/clipping text. The five playback colors become light backgrounds, default #F6EDC2; existing ScriptColor values migrate directly without new fields. The dialog keeps its layout and uses dark playback-swatch checks. Timing, scrolling and playback logic are preserved. The follow-up refinement extends the existing final rectangle of each completed timed unit across pure whitespace to the next timed unit on the same visual line; no extra rectangles or changes to word timing, colors or settings. SVG crispEdges reduces fractional-pixel seams.
 
 PR #21 (merged from `feature/native-script-scroll`, based on main `275e9bf`) removes the dedicated JavaScript wheel handler and its 25% displacement multiplier. Native WebView2 wheel scrolling and scrollbar drag/click use the existing external-scroll detection and 150 ms seek transaction. Preserve middle-button press/autoscroll suppression, keyboard shortcuts, automatic follow, playback background and settings. Review R1–R4 additionally disables browser zoom controls, inlines the single-use previewScroll helper into detectExternalScroll, extends existing UI assertions for external scroll interrupting follow and untimed scroll, and synchronizes release notes.
+
+On `feature/subtitle-fonts` from main `6ed95e2`: use Newsreader as first and default subtitle font, add Source Serif 4, retain Georgia, Microsoft YaHei UI and Nunito, normalize retired Arial/Times New Roman/Segoe UI to Newsreader on load, and use Georgia as reader fallback. No layout or configuration structure changes. CI and Windows acceptance pending.
 
 ## Verification
 
@@ -36,6 +38,6 @@ PR #21 (merged from `feature/native-script-scroll`, based on main `275e9bf`) rem
 
 ## Next action
 
-Verify final main documentation-only CI, synchronize local main, confirm no application/test/tool changes from `f781975`, and remove the accepted local and remote `feature/native-script-scroll` branch after verifying its head. No repeat local application run is necessary for documentation-only changes. No release tag or assets authorized.
+Main `6ed95e2` documentation-only CI passed; only main remained remotely before this feature. User confirms local cleanup. Verify the subtitle font feature in CI and on Windows (installed-font rendering, restored defaults and migration); obtain explicit authorization before merging. No release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.

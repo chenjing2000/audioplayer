@@ -24,3 +24,4 @@ PR #16 was squash merged at `af27658` with successful post-merge Windows CI and 
 
 - PR #20 (merged): replace foreground word coloring with a single text layer over cumulative soft SVG backgrounds, five light playback colors, same-line whitespace continuity and crispEdges to reduce fractional-pixel seams. Existing settings migrate in memory without rewriting files on load.
 - PR #21 (merged): remove the custom wheel handler and 25% multiplier. Native WebView2 wheel and scrollbar scrolling share the existing actual-offset navigation and 150 ms debounce. Disable browser zoom shortcuts; use existing subtitle appearance settings instead. Automatic follow and middle-button press suppression remain unchanged.
+- Subtitle fonts: Newsreader (default, first), Source Serif 4, Georgia, Microsoft YaHei UI and Nunito. Retired Arial, Times New Roman and Segoe UI normalize to Newsreader on load; other valid selections are preserved.
