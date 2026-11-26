@@ -1,10 +1,10 @@
 # AudioPlayer — development handoff
 
-**Updated:** 2026-11-26 — PR #22 merged; post-merge main CI and Windows regression passed; final documentation CI and branch cleanup pending  
+**Updated:** 2026-11-26 — PR #22 complete; subtitle punctuation feature in development, verification pending  
 **Repository:** https://github.com/chenjing2000/audioplayer  
 **Local checkout:** `C:\Projects\AudioPlayer`  
 **Main application baseline:** `560d4e3` (PR #22 squash merge).  
-**Merged feature:** `feature/subtitle-fonts` ([PR #22](https://github.com/chenjing2000/audioplayer/pull/22)); branch cleanup pending.  
+**Merged feature:** `feature/subtitle-fonts` ([PR #22](https://github.com/chenjing2000/audioplayer/pull/22)); branch cleanup complete.  
 **Last verified main application:** `560d4e3`; identical remote and local tree to accepted feature head `d5e2d49` (`329d2b11ab50a62881869d94bf568f13bb4b2d8b`).
 
 ## Current implementation
@@ -18,6 +18,8 @@ PR #20 (from main `0e79b0d`) is merged: the reader keeps one text layer and draw
 PR #21 (merged from `feature/native-script-scroll`, based on main `275e9bf`) removes the dedicated JavaScript wheel handler and its 25% displacement multiplier. Native WebView2 wheel scrolling and scrollbar drag/click use the existing external-scroll detection and 150 ms seek transaction. Preserve middle-button press/autoscroll suppression, keyboard shortcuts, automatic follow, playback background and settings. Review R1–R4 additionally disables browser zoom controls, inlines the single-use previewScroll helper into detectExternalScroll, extends existing UI assertions for external scroll interrupting follow and untimed scroll, and synchronizes release notes.
 
 PR #22 (merged from `feature/subtitle-fonts`, based on main `6ed95e2`): use Newsreader as first and default subtitle font, add Source Serif 4, retain Georgia, Microsoft YaHei UI and Nunito, normalize retired Arial/Times New Roman/Segoe UI to Newsreader on load, and use Georgia and generic serif as reader fallbacks. Remove explicit Segoe UI rendering, including the status text (Microsoft YaHei UI, sans-serif); retain migration only. The quoted CSS font-family fix passed both CI runs at `48e949f`. Replace the four numeric selectors with existing rounded text boxes: font size 10–40, line height 1–3 (up to two decimal places), paragraph spacing 0–40, indentation 0–5. Delete obsolete numeric choices and numeric migration; valid stored numbers remain unchanged. Defaults, layout dimensions and JSON types unchanged. Both CI runs at `39f1826` passed (66 Core, 323 UI, 5 publishing safeguards, 4 published EXE checks; optional real MP3/device checks skipped). Approved R1–R11 review: focus invalid fields on explicit validation, avoid incorrect exception mapping, share digit/decimal grammar and parsed numbers, reuse formatting, align initial reader defaults, simplify migration combinations, extend input and actual reflow checks, update existing docs. Final application/test head `688310f` passed both CI runs and all 17 focused Windows manual checks were explicitly accepted by the user. The supplied Windows log confirms clean synchronized checkout of `688310f`, 455 executed local automated checks passed, zero failed, and first-attempt publishing succeeded.
+
+Current feature `feature/subtitle-punctuation` (base `1255c82`): extend existing trailingGap measurement to allowed untimed ASCII punctuation and Unicode ellipsis, including consecutive marks, line/paragraph ends and prefixes before disallowed characters. Reuse the existing last SVG rectangle, preserve word timing and same-line whitespace bridges. Extend existing WebView2 integration checks; CI and Windows acceptance pending.
 
 ## Verification
 
@@ -42,6 +44,6 @@ PR #22 (merged from `feature/subtitle-fonts`, based on main `6ed95e2`): use News
 
 ## Next action
 
-Verify final documentation-only main CI, then synchronize the local main and clean up `feature/subtitle-fonts` locally and remotely after checking that no additional commits would be lost. Local application acceptance and post-merge regression are complete; no repeat local application run is needed for the documentation-only update. No version change, release tag or assets authorized.
+PR #22 final documentation-only main CI passed ([run](https://github.com/chenjing2000/audioplayer/actions/runs/45782604113)); local synchronization and branch cleanup were reported complete, and remote main was confirmed to be the sole branch before starting this feature. Next verify subtitle punctuation feature CI, review the diff, and complete Windows Full / Publish / Test-PublishedApp and focused manual acceptance. Do not merge without explicit authorization. No version change, release tag or assets authorized.
 
 For future changes, start from synchronized main, follow AGENTS.md and WindowsAppPlaybook, preserve user files, and update existing documents rather than adding redundant ones. No repeat local application run is necessary for documentation-only changes.

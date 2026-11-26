@@ -1143,7 +1143,8 @@ internal static class UiChecks
                                     if(a.trailingGap<=0 || b.trailingGap<=0 ||
                                       !near(x(a)+a.width+a.trailingGap,x(b)) ||
                                       !near(x(b)+b.width+b.trailingGap,x(c)) ||
-                                      [c,d,e,f,g].some(s=>s.trailingGap!==0) ||
+                                      d.trailingGap<=0 || !near(x(d)+d.width+d.trailingGap,x(e)) ||
+                                      [c,e,f,g].some(s=>s.trailingGap!==0) ||
                                       near(f.element.y.baseVal.value,g.element.y.baseVal.value))return false;
                                     paintAt(0.5,false);
                                     if(!near(a.painted,a.width/2) || b.painted!==0)return false;
@@ -1153,7 +1154,7 @@ internal static class UiChecks
                                     if(!near(b.painted,b.width+b.trailingGap) || !near(c.painted,c.width/2))return false;
                                     paintAt(7,false);
                                     if(body.querySelectorAll('svg.paint rect').length!==7 ||
-                                      !near(c.painted,c.width) || !near(d.painted,d.width) ||
+                                      !near(c.painted,c.width) || !near(d.painted,d.width+d.trailingGap) ||
                                       !near(f.painted,f.width))return false;
                                     paintAt(0.5,false);
                                     if(!near(a.painted,a.width/2) || geometry.slice(1).some(u=>u.segments.some(s=>s.painted!==0)))return false;
@@ -1188,7 +1189,82 @@ internal static class UiChecks
                                   }
                                 })()
                                 """);
-                            Assert(joinedBackground == "true", "Reader joins same-line whitespace only, preserves word timing across wraps, leaves untimed text and punctuation gaps, and recomputes after reflow");
+                            Assert(joinedBackground == "true", "Reader joins allowed same-line gaps, preserves word timing across wraps, leaves untimed text unpainted, and recomputes after reflow");
+
+                            string punctuationBackground = await reader.CoreWebView2.ExecuteScriptAsync(
+                                """
+                                (() => {
+                                  const saved=[...body.childNodes],savedPlayback=playback;
+                                  const p=document.createElement('p');
+                                  const word=(text,start)=>'<span class="timed" data-start="'+start+'" data-end="'+(start+1)+'">'+text+'</span>';
+                                  const near=(a,b)=>Math.abs(a-b)<0.02;
+                                  const x=s=>s.element.x.baseVal.value;
+                                  function arrange(content,width='1000px',nowrap=true){
+                                    p.style.cssText='font-family:monospace;text-indent:0;width:'+width+';white-space:'+(nowrap?'nowrap':'normal');
+                                    p.innerHTML=content;
+                                    const svg=document.createElementNS(ns,'svg');svg.setAttribute('class','paint');p.append(svg);
+                                    body.replaceChildren(p);measure();paintAt(0,true);
+                                  }
+                                  function punctuationRight(span,node,length){
+                                    const range=document.createRange();
+                                    range.setStart(node,0);range.setEnd(node,length);
+                                    return Math.max(...[...range.getClientRects()].map(r=>r.right))-span.getBoundingClientRect().right;
+                                  }
+                                  try {
+                                    for(const marks of [',','.',';',':','?','!','…','...','?!','!!']){
+                                      arrange('<span class="sentence">'+word('Alpha',0)+marks+' '+word('Beta',1)+'</span>');
+                                      const [a,b]=geometry.map(u=>u.segments[0]);
+                                      if(a.trailingGap<=0 || !near(x(a)+a.width+a.trailingGap,x(b)) ||
+                                         b.trailingGap!==0 || p.querySelectorAll('svg rect').length!==2)return 'bridge '+marks;
+                                      paintAt(0.99,false);
+                                      if(!near(a.painted,a.width*0.99) || b.painted!==0)return 'partial '+marks;
+                                      paintAt(1,false);
+                                      if(!near(a.painted,a.width+a.trailingGap) || b.painted!==0)return 'complete '+marks;
+                                      paintAt(0.5,false);
+                                      if(!near(a.painted,a.width/2) || b.painted!==0)return 'rewind '+marks;
+                                    }
+                                    for(const [suffix,count,next] of [
+                                      ['...',3,false],['?! ',2,false],[',"',1,true],
+                                      [', untimed ',1,true],['— ',0,true],[' (',0,true],['"!',0,false]
+                                    ]){
+                                      arrange('<span class="sentence">'+word('Alpha',0)+suffix+(next?word('Beta',1):'')+'</span>');
+                                      const span=p.querySelector('.timed'),a=geometry[0].segments[0];
+                                      const expected=count?punctuationRight(span,span.nextSibling,count):0;
+                                      if((count && expected<=0) || !near(a.trailingGap,expected))return 'prefix '+suffix;
+                                      paintAt(1,false);
+                                      if(!near(a.painted,a.width+expected))return 'prefix paint '+suffix;
+                                    }
+                                    // A line-ending comma is measured without crossing to the next line.
+                                    arrange('<span class="sentence">'+word('Alpha',0)+', '+word('Beta',1)+'</span>','8ch',false);
+                                    let [a,b]=geometry.map(u=>u.segments[0]);
+                                    const span=p.querySelector('.timed');
+                                    const expected=punctuationRight(span,span.nextSibling,1);
+                                    if(expected<=0 || !near(a.trailingGap,expected) ||
+                                      near(a.element.y.baseVal.value,b.element.y.baseVal.value))return 'line end';
+                                    p.style.width='1000px';measure();
+                                    [a,b]=geometry.map(u=>u.segments[0]);
+                                    if(!near(x(a)+a.width+a.trailingGap,x(b)))return 'reflow';
+                                    // A punctuation suffix can start in the next sentence, but not the next paragraph.
+                                    arrange('<span class="sentence">'+word('Alpha',0)+'</span><span class="sentence">?! '+word('Beta',1)+'</span>');
+                                    [a,b]=geometry.map(u=>u.segments[0]);
+                                    if(a.trailingGap<=0 || !near(x(a)+a.width+a.trailingGap,x(b)))return 'sentence';
+                                    // Punctuation in a timed unit keeps its own progress and is never prepainted.
+                                    arrange('<span class="sentence">'+word('Alpha',0)+word(',',1)+' '+word('Beta!',2)+'</span>');
+                                    const [first,comma,last]=geometry.map(u=>u.segments[0]);
+                                    paintAt(1,false);
+                                    if(first.trailingGap!==0 || comma.painted!==0 || last.trailingGap!==0)return 'timed punctuation';
+                                    paintAt(1.5,false);
+                                    if(!near(comma.painted,comma.width/2))return 'timed partial';
+                                    paintAt(2.5,false);
+                                    if(!near(last.painted,last.width/2))return 'included punctuation';
+                                    paintAt(0,true);
+                                    return geometry.every(u=>u.segments.every(s=>s.painted===0));
+                                  } finally {
+                                    body.replaceChildren(...saved);playback=savedPlayback;measure();
+                                  }
+                                })()
+                                """);
+                            Assert(punctuationBackground == "true", "Reader completes allowed punctuation and spaces without crossing untimed text or visual lines, preserves timed punctuation, and handles rewind and reflow: " + punctuationBackground);
 
                             string continuousFollow = await reader.CoreWebView2.ExecuteScriptAsync(
                                 """
