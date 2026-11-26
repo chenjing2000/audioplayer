@@ -177,19 +177,42 @@ function measure(){
     const paint=p.querySelector(':scope > .paint');
     paint.replaceChildren();const base=paint.getBoundingClientRect();
     let previous=null;
+    const range=document.createRange(),walker=document.createTreeWalker(p,NodeFilter.SHOW_TEXT);
+    function extendPrevious(next,firstRect){
+      if(!previous)return;
+      range.setStartAfter(previous.span);range.setEndBefore(next);
+      const text=range.toString();
+      const prefix=/^[\s,.;:?!…]*/u.exec(text)[0];
+      // Keep the existing same-line bridge when the entire gap is allowed.
+      if(prefix.length && prefix.length===text.length && firstRect &&
+         Math.abs(previous.rect.top-firstRect.top)<2){
+        const gap=firstRect.left-previous.rect.right;
+        if(gap>0){previous.segment.trailingGap=gap;return;}
+      }
+      // Otherwise extend only through the last allowed punctuation on this line,
+      // never through trailing whitespace, a different line or an untimed word.
+      let remaining=prefix.trimEnd().length;
+      if(!remaining)return;
+      walker.currentNode=previous.span.lastChild;
+      while(remaining>0){
+        const node=walker.nextNode();
+        if(!node)break;
+        const part=node.data.slice(0,remaining);
+        for(const match of part.matchAll(/\S+/gu)){
+          range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);
+          for(const rect of range.getClientRects())
+            if(Math.abs(previous.rect.top-rect.top)<2)
+              previous.segment.trailingGap=Math.max(previous.segment.trailingGap,rect.right-previous.rect.right);
+        }
+        remaining-=part.length;
+      }
+    }
     for(const span of p.querySelectorAll(':scope > .sentence .timed')){
       const start=Number(span.dataset.start),end=Number(span.dataset.end);
-      const range=document.createRange();range.selectNodeContents(span);
+      range.selectNodeContents(span);
       const rects=[...range.getClientRects()].filter(r=>r.width>0.25&&r.height>0.25).sort((a,b)=>a.top-b.top||a.left-b.left);
+      extendPrevious(span,rects[0]);
       if(!rects.length){previous=null;continue;}
-      // Join only whitespace between adjacent timed units on the same visual line.
-      if(previous && Math.abs(previous.rect.top-rects[0].top)<2){
-        const gap=rects[0].left-previous.rect.right;
-        if(gap>0){
-          range.setStartAfter(previous.span);range.setEndBefore(span);
-          if(/^\s+$/u.test(range.toString()))previous.segment.trailingGap=gap;
-        }
-      }
       const total=rects.reduce((sum,r)=>sum+r.width,0);
       let consumed=0;
       const segments=rects.map(r=>{
@@ -206,6 +229,7 @@ function measure(){
       geometry.push({start,end,segments,total,last:NaN});
       previous={span,rect:rects.at(-1),segment:segments.at(-1)};
     }
+    extendPrevious(paint);
   }
   lines.sort((a,b)=>a.y-b.y);
   followAnchors=buildFollowAnchors(lines);
