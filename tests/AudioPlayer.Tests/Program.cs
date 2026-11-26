@@ -143,19 +143,19 @@ Check("Retired script options normalize only on load without rewriting the file"
             Assert(store.LoadOrCreate().ScriptAppearance == expected);
         }
 
-        foreach (int size in new[] { 14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28 })
-        foreach (double height in new[] { 1.4, 2.0 })
-        foreach (int spacing in new[] { 0, 14, 18, 24 })
-        {
-            CheckMigration(new ScriptAppearance { Font = "Segoe UI", FontSize = size,
-                LineHeight = height, ParagraphAfter = spacing, FirstLineIndent = 3,
-                ScriptColor = "#A33D30", Background = "#FFFFFF" },
-                new ScriptAppearance { Font = "Newsreader", FontSize = size,
-                    LineHeight = height, ParagraphAfter = spacing, FirstLineIndent = 3 });
-        }
-
-        foreach (string font in new[] { "Arial", "Times New Roman" })
+        foreach (string font in new[] { "Segoe UI", "Arial", "Times New Roman" })
             CheckMigration(new ScriptAppearance { Font = font }, new ScriptAppearance { Font = "Newsreader" });
+
+        foreach (int size in new[] { 14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28 })
+            CheckMigration(new ScriptAppearance { FontSize = size }, new ScriptAppearance { FontSize = size });
+        foreach (double height in new[] { 1.4, 2.0 })
+            CheckMigration(new ScriptAppearance { LineHeight = height }, new ScriptAppearance { LineHeight = height });
+        foreach (int spacing in new[] { 0, 14, 18, 24 })
+            CheckMigration(new ScriptAppearance { ParagraphAfter = spacing }, new ScriptAppearance { ParagraphAfter = spacing });
+
+        CheckMigration(new ScriptAppearance { Font = "Segoe UI", FontSize = 28, LineHeight = 2.0,
+            ParagraphAfter = 0, FirstLineIndent = 3, ScriptColor = "#A33D30", Background = "#FFFFFF" },
+            new ScriptAppearance { FontSize = 28, LineHeight = 2.0, ParagraphAfter = 0, FirstLineIndent = 3 });
 
         foreach (var (oldColor, newColor) in new[]
         {

@@ -254,16 +254,16 @@
 
         <TextBlock Grid.Row="4" Text="允许静音时长 (s)" VerticalAlignment="Center" Margin="0,0,4,0"/>
         <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="AllowedSilenceTextBox" Grid.Row="4" Grid.Column="1"
-                 PreviewTextInput="AllowedSilenceTextBox_PreviewTextInput" DataObject.Pasting="AllowedSilenceTextBox_Pasting"
+                 PreviewTextInput="DecimalTextBox_PreviewTextInput" DataObject.Pasting="DecimalTextBox_Pasting"
                  LostKeyboardFocus="SilenceInput_LostKeyboardFocus"/>
 
         <TextBlock Grid.Row="0" Grid.Column="3" Text="后退步长 (s)" VerticalAlignment="Center" Margin="0,0,4,0"/>
         <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="BackwardStepTextBox" MaxLength="2" Grid.Row="0" Grid.Column="4"
-                 PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting"/>
+                 PreviewTextInput="DigitsTextBox_PreviewTextInput" DataObject.Pasting="DigitsTextBox_Pasting"/>
 
         <TextBlock Grid.Row="1" Grid.Column="3" Text="前进步长 (s)" VerticalAlignment="Center" Margin="0,0,4,0"/>
         <TextBox Style="{StaticResource RoundedInput}" TextChanged="Field_TextChanged" x:Name="ForwardStepTextBox" MaxLength="2" Grid.Row="1" Grid.Column="4"
-                 PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting"/>
+                 PreviewTextInput="DigitsTextBox_PreviewTextInput" DataObject.Pasting="DigitsTextBox_Pasting"/>
 
         <TextBlock x:Name="HelpText" Grid.Row="5" Grid.ColumnSpan="5" Foreground="#6B7280" TextWrapping="Wrap"
                    VerticalAlignment="Top" Text="允许静音时长只影响裁剪，不影响左右跳转。"/>
@@ -291,16 +291,16 @@
               <ComboBox x:Name="FontBox" Grid.ColumnSpan="2" Width="160" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="字体"/>
               <TextBlock Grid.Column="3" Text="字号（DIP）" VerticalAlignment="Center" Margin="0,0,4,0"/>
               <TextBox x:Name="FontSizeBox" Grid.Column="4" Style="{StaticResource RoundedInput}" Width="80" HorizontalAlignment="Right" MaxLength="2" TextChanged="Field_TextChanged"
-                        PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting" AutomationProperties.Name="字号"/>
+                        PreviewTextInput="DigitsTextBox_PreviewTextInput" DataObject.Pasting="DigitsTextBox_Pasting" AutomationProperties.Name="字号"/>
               <TextBlock Grid.Row="1" Text="行高" VerticalAlignment="Center" Margin="0,0,4,0"/>
               <TextBox x:Name="LineHeightBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource RoundedInput}" Width="80" HorizontalAlignment="Right" MaxLength="4" TextChanged="Field_TextChanged"
-                        PreviewTextInput="LineHeightBox_PreviewTextInput" DataObject.Pasting="LineHeightBox_Pasting" AutomationProperties.Name="行高"/>
+                        PreviewTextInput="DecimalTextBox_PreviewTextInput" DataObject.Pasting="DecimalTextBox_Pasting" AutomationProperties.Name="行高"/>
               <TextBlock Grid.Row="1" Grid.Column="3" Text="段后间距（DIP）" VerticalAlignment="Center" Margin="0,0,4,0"/>
               <TextBox x:Name="ParagraphAfterBox" Grid.Row="1" Grid.Column="4" Style="{StaticResource RoundedInput}" Width="80" HorizontalAlignment="Right" MaxLength="2" TextChanged="Field_TextChanged"
-                        PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting" AutomationProperties.Name="段后间距"/>
+                        PreviewTextInput="DigitsTextBox_PreviewTextInput" DataObject.Pasting="DigitsTextBox_Pasting" AutomationProperties.Name="段后间距"/>
               <TextBlock Grid.Row="2" Text="首行缩进（em）" VerticalAlignment="Center" Margin="0,0,4,0"/>
               <TextBox x:Name="IndentBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource RoundedInput}" Width="80" HorizontalAlignment="Right" MaxLength="1" TextChanged="Field_TextChanged"
-                        PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting" AutomationProperties.Name="首行缩进"/>
+                        PreviewTextInput="DigitsTextBox_PreviewTextInput" DataObject.Pasting="DigitsTextBox_Pasting" AutomationProperties.Name="首行缩进"/>
               <Border Grid.Row="3" Grid.ColumnSpan="5" Background="#DDE2E9"/>
               <TextBlock Grid.Row="4" Text="正文颜色" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,0"/>
               <ListBox x:Name="TextColorBox" Grid.Row="4" Grid.ColumnSpan="2" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
