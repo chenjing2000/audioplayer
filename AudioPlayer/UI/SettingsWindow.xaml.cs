@@ -23,10 +23,6 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         Settings = settings;
         FontBox.ItemsSource = ScriptAppearance.Fonts;
-        FontSizeBox.ItemsSource = ScriptAppearance.Sizes;
-        LineHeightBox.ItemsSource = ScriptAppearance.Heights;
-        ParagraphAfterBox.ItemsSource = ScriptAppearance.Spacings;
-        IndentBox.ItemsSource = ScriptAppearance.Indents;
         TextColorBox.ItemsSource = ScriptAppearance.Colors;
         PlaybackColorBox.ItemsSource = ScriptAppearance.PlaybackColors;
         BackgroundColorBox.ItemsSource = ScriptAppearance.Backgrounds;
@@ -53,10 +49,10 @@ public partial class SettingsWindow : Window
     {
         var appearance = settings.ScriptAppearance;
         FontBox.SelectedItem = appearance.Font;
-        FontSizeBox.SelectedItem = appearance.FontSize;
-        LineHeightBox.SelectedItem = appearance.LineHeight;
-        ParagraphAfterBox.SelectedItem = appearance.ParagraphAfter;
-        IndentBox.SelectedItem = appearance.FirstLineIndent;
+        FontSizeBox.Text = appearance.FontSize.ToString(CultureInfo.InvariantCulture);
+        LineHeightBox.Text = appearance.LineHeight.ToString("0.##", CultureInfo.InvariantCulture);
+        ParagraphAfterBox.Text = appearance.ParagraphAfter.ToString(CultureInfo.InvariantCulture);
+        IndentBox.Text = appearance.FirstLineIndent.ToString(CultureInfo.InvariantCulture);
         TextColorBox.SelectedItem = appearance.Color;
         PlaybackColorBox.SelectedItem = appearance.ScriptColor;
         BackgroundColorBox.SelectedItem = appearance.Background;
@@ -73,7 +69,7 @@ public partial class SettingsWindow : Window
 
     private bool TryReadValues(out AppSettings settings)
     {
-        settings = new AppSettings { PlaybackMode = playbackMode, ScriptAppearance = ReadAppearance() };
+        settings = new AppSettings { PlaybackMode = playbackMode };
 
         if (!int.TryParse(FrameMillisecondsTextBox.Text.Trim(), out int frameMilliseconds))
             return ShowValueError("分析帧长度必须是整数。", FrameMillisecondsTextBox);
@@ -93,6 +89,16 @@ public partial class SettingsWindow : Window
             return ShowValueError("后退步长必须是 0 到 99 的整数。", BackwardStepTextBox);
         if (!IsStepText(ForwardStepTextBox.Text) || !int.TryParse(ForwardStepTextBox.Text, out int forward))
             return ShowValueError("前进步长必须是 0 到 99 的整数。", ForwardStepTextBox);
+        foreach (var (field, message) in new[]
+        {
+            (FontSizeBox, $"字号必须是 {ScriptAppearance.MinFontSize} 到 {ScriptAppearance.MaxFontSize} 的整数。"),
+            (LineHeightBox, $"行高必须在 {ScriptAppearance.MinLineHeight} 到 {ScriptAppearance.MaxLineHeight} 之间，且最多两位小数。"),
+            (ParagraphAfterBox, $"段后间距必须是 {ScriptAppearance.MinParagraphAfter} 到 {ScriptAppearance.MaxParagraphAfter} 的整数。"),
+            (IndentBox, $"首行缩进必须是 {ScriptAppearance.MinFirstLineIndent} 到 {ScriptAppearance.MaxFirstLineIndent} 的整数。")
+        })
+            if (!IsFieldValid(field)) return ShowValueError(message, field);
+
+        settings.ScriptAppearance = ReadAppearance();
         settings.ExcludedFolderNames = ExcludedFolderNamesTextBox.Text;
         settings.BackwardStepSeconds = backward;
         settings.ForwardStepSeconds = forward;
@@ -128,6 +134,10 @@ public partial class SettingsWindow : Window
         BackwardStepTextBox.Text = backward.ToString(CultureInfo.InvariantCulture);
         ForwardStepTextBox.Text = forward.ToString(CultureInfo.InvariantCulture);
         AllowedSilenceTextBox.Text = allowedSeconds.ToString("0.0", CultureInfo.InvariantCulture);
+        FontSizeBox.Text = settings.ScriptAppearance.FontSize.ToString(CultureInfo.InvariantCulture);
+        LineHeightBox.Text = settings.ScriptAppearance.LineHeight.ToString("0.##", CultureInfo.InvariantCulture);
+        ParagraphAfterBox.Text = settings.ScriptAppearance.ParagraphAfter.ToString(CultureInfo.InvariantCulture);
+        IndentBox.Text = settings.ScriptAppearance.FirstLineIndent.ToString(CultureInfo.InvariantCulture);
         ClearValueError();
         return true;
     }
@@ -145,15 +155,14 @@ public partial class SettingsWindow : Window
         }
     }
 
-    // LoadValues always selects an allowed item. Keep defaults and validation
-    // in ScriptAppearance, not in a second set of UI-specific fallback values.
+    // Called after numeric fields have passed validation; defaults and ranges live in ScriptAppearance.
     private ScriptAppearance ReadAppearance() => new()
     {
         Font = (string)FontBox.SelectedItem,
-        FontSize = (int)FontSizeBox.SelectedItem,
-        LineHeight = (double)LineHeightBox.SelectedItem,
-        ParagraphAfter = (int)ParagraphAfterBox.SelectedItem,
-        FirstLineIndent = (int)IndentBox.SelectedItem,
+        FontSize = int.Parse(FontSizeBox.Text, NumberStyles.None, CultureInfo.InvariantCulture),
+        LineHeight = double.Parse(LineHeightBox.Text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture),
+        ParagraphAfter = int.Parse(ParagraphAfterBox.Text, NumberStyles.None, CultureInfo.InvariantCulture),
+        FirstLineIndent = int.Parse(IndentBox.Text, NumberStyles.None, CultureInfo.InvariantCulture),
         Color = (string)TextColorBox.SelectedItem,
         ScriptColor = (string)PlaybackColorBox.SelectedItem,
         Background = (string)BackgroundColorBox.SelectedItem
@@ -162,10 +171,26 @@ public partial class SettingsWindow : Window
     private static bool IsStepText(string text) => text.Length <= 2 && text.All(c => c is >= '0' and <= '9');
 
     private void StepTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
-        => e.Handled = !IsStepText(BuildCandidateText((TextBox)sender, e.Text));
+    {
+        var box = (TextBox)sender;
+        string candidate = BuildCandidateText(box, e.Text);
+        e.Handled = !IsStepText(candidate) || candidate.Length > box.MaxLength;
+    }
 
     private void StepTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
-        => ValidatePaste((TextBox)sender, e, IsStepText);
+    {
+        var box = (TextBox)sender;
+        ValidatePaste(box, e, text => IsStepText(text) && text.Length <= box.MaxLength);
+    }
+
+    private static bool IsLineHeightText(string text)
+        => Regex.IsMatch(text, @"^[0-9]?(?:\.[0-9]{0,2})?\z");
+
+    private void LineHeightBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        => e.Handled = !IsLineHeightText(BuildCandidateText((TextBox)sender, e.Text));
+
+    private void LineHeightBox_Pasting(object sender, DataObjectPastingEventArgs e)
+        => ValidatePaste((TextBox)sender, e, IsLineHeightText);
 
     private void PositiveIntegerTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         => e.Handled = !IsIntegerText(BuildCandidateText((TextBox)sender, e.Text), false);
@@ -220,9 +245,7 @@ public partial class SettingsWindow : Window
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
-        if (FontBox.IsKeyboardFocusWithin || FontSizeBox.IsKeyboardFocusWithin ||
-            LineHeightBox.IsKeyboardFocusWithin || ParagraphAfterBox.IsKeyboardFocusWithin ||
-            IndentBox.IsKeyboardFocusWithin || TextColorBox.IsKeyboardFocusWithin ||
+        if (FontBox.IsKeyboardFocusWithin || TextColorBox.IsKeyboardFocusWithin ||
             PlaybackColorBox.IsKeyboardFocusWithin || BackgroundColorBox.IsKeyboardFocusWithin) return;
         e.Handled = true; // Enter checks values without accepting or closing the dialog.
         TryReadValues(out _);
@@ -253,6 +276,19 @@ public partial class SettingsWindow : Window
         }
         if (ReferenceEquals(box, BackwardStepTextBox) || ReferenceEquals(box, ForwardStepTextBox))
             return box.Text.Length > 0 && IsStepText(box.Text);
+        if (ReferenceEquals(box, FontSizeBox))
+            return IsStepText(box.Text) && int.TryParse(box.Text, out int fontSize) &&
+                fontSize is >= ScriptAppearance.MinFontSize and <= ScriptAppearance.MaxFontSize;
+        if (ReferenceEquals(box, LineHeightBox))
+            return IsLineHeightText(box.Text) && double.TryParse(box.Text, NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture, out double lineHeight) &&
+                lineHeight is >= ScriptAppearance.MinLineHeight and <= ScriptAppearance.MaxLineHeight;
+        if (ReferenceEquals(box, ParagraphAfterBox))
+            return IsStepText(box.Text) && int.TryParse(box.Text, out int paragraphAfter) &&
+                paragraphAfter is >= ScriptAppearance.MinParagraphAfter and <= ScriptAppearance.MaxParagraphAfter;
+        if (ReferenceEquals(box, IndentBox))
+            return box.Text.Length == 1 && IsStepText(box.Text) && int.TryParse(box.Text, out int indent) &&
+                indent is >= ScriptAppearance.MinFirstLineIndent and <= ScriptAppearance.MaxFirstLineIndent;
         if (ReferenceEquals(box, FrameMillisecondsTextBox))
             return int.TryParse(box.Text, out int frameValue) && frameValue is >= SilenceOptions.MinFrameMilliseconds and <= SilenceOptions.MaxFrameMilliseconds;
         if (ReferenceEquals(box, MinimumSilenceTextBox))

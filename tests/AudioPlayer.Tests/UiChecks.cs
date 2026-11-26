@@ -476,10 +476,11 @@ internal static class UiChecks
                         "Settings tabs have the agreed names and no outer border");
                     Assert(((ComboBox)settingsWindow.FindName("FontBox")).Items.Cast<string>().SequenceEqual(new[] { "Newsreader", "Source Serif 4", "Georgia", "Microsoft YaHei UI", "Nunito" }) &&
                         ((ComboBox)settingsWindow.FindName("FontBox")).SelectedIndex == 0 &&
-                        (int)((ComboBox)settingsWindow.FindName("FontSizeBox")).SelectedItem == 17 &&
-                        (double)((ComboBox)settingsWindow.FindName("LineHeightBox")).SelectedItem == 1.6 &&
-                        (int)((ComboBox)settingsWindow.FindName("IndentBox")).SelectedItem == 2,
-                        "Script font choices and defaults are Newsreader, 17, 1.6 and 2");
+                        ((TextBox)settingsWindow.FindName("FontSizeBox")).Text == "17" &&
+                        ((TextBox)settingsWindow.FindName("LineHeightBox")).Text == "1.6" &&
+                        ((TextBox)settingsWindow.FindName("ParagraphAfterBox")).Text == "16" &&
+                        ((TextBox)settingsWindow.FindName("IndentBox")).Text == "2",
+                        "Script font choices and defaults are Newsreader, 17, 1.6, 16 and 2");
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 480) < 0.01, "Settings window width is 480");
                     Assert(Math.Abs(settingsWindow.Height - 430) < 0.01, "Settings window height is 430");
@@ -541,14 +542,18 @@ internal static class UiChecks
                          "Settings help, exclusion controls and buttons do not overlap or overflow");
                      settingsTabs.SelectedIndex = 1;
                      settingsWindow.UpdateLayout();
-                     var selectors = new[] { "FontBox", "FontSizeBox", "LineHeightBox", "ParagraphAfterBox", "IndentBox" }
-                         .Select(name => (ComboBox)settingsWindow.FindName(name)).ToArray();
-                     Assert(selectors.Select(box => box.Items.Count).SequenceEqual(new[] { 5, 4, 4, 4, 3 }) &&
-                         selectors[1].Items.Cast<int>().SequenceEqual(new[] { 17, 18, 19, 20 }) &&
-                         selectors.All(box => box.SelectedItem is not null && box.FontWeight == FontWeights.Normal && box.Margin == new Thickness(0) &&
-                             box.HorizontalContentAlignment == HorizontalAlignment.Center &&
-                             Math.Abs(box.ActualHeight - 30) <= 0.5 && Bounds(box).Bottom <= buttonsBounds.Top),
-                         "Script combo choices are reduced, aligned, and fit above dialog buttons");
+                     var fontSelector = (ComboBox)settingsWindow.FindName("FontBox");
+                     var subtitleInputs = new[] { "FontSizeBox", "LineHeightBox", "ParagraphAfterBox", "IndentBox" }
+                         .Select(name => (TextBox)settingsWindow.FindName(name)).ToArray();
+                     var selectors = new FrameworkElement[] { fontSelector, subtitleInputs[0], subtitleInputs[1], subtitleInputs[2], subtitleInputs[3] };
+                     Assert(fontSelector.Items.Count == 5 && fontSelector.SelectedItem is not null &&
+                         fontSelector.FontWeight == FontWeights.Normal && fontSelector.HorizontalContentAlignment == HorizontalAlignment.Center &&
+                         subtitleInputs.Select(box => box.MaxLength).SequenceEqual(new[] { 2, 4, 2, 1 }) &&
+                         subtitleInputs.All(box => box.TextAlignment == TextAlignment.Center && box.VerticalContentAlignment == VerticalAlignment.Center &&
+                             box.FontWeight == FontWeights.Normal && !box.AllowDrop) &&
+                         selectors.All(box => box.Margin == new Thickness(0) && Math.Abs(box.ActualHeight - 30) <= 0.5 &&
+                             Bounds(box).Bottom <= buttonsBounds.Top),
+                         "Script font selector and four numeric text boxes are aligned and fit above dialog buttons");
                      var subtitleGrid = (Grid)selectors[0].Parent;
                      var columns = subtitleGrid.ColumnDefinitions;
                      double leftWidth = columns[0].ActualWidth + columns[1].ActualWidth;
@@ -565,16 +570,16 @@ internal static class UiChecks
                          selectors.All(box => Math.Abs(box.ActualHeight - audioParameterBounds[0].Height) <= 0.5 &&
                              Math.Abs(Bounds(box).Top - audioParameterBounds[Grid.GetRow(box)].Top) <= 0.5),
                          "Subtitle and audio parameter rows share the same height, spacing and vertical positions");
-                     foreach (string font in selectors[0].Items)
+                     foreach (string font in fontSelector.Items)
                      {
-                         var text = new TextBlock { Text = font, FontFamily = selectors[0].FontFamily,
-                             FontSize = selectors[0].FontSize, FontWeight = selectors[0].FontWeight };
+                         var text = new TextBlock { Text = font, FontFamily = fontSelector.FontFamily,
+                             FontSize = fontSelector.FontSize, FontWeight = fontSelector.FontWeight };
                          text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                          Assert(text.DesiredSize.Width <= fontBounds.Width - 30,
                              "Font selector has space for " + font);
                      }
-                     foreach (var box in selectors)
                      {
+                         var box = fontSelector;
                          box.ApplyTemplate();
                          var toggle = FindVisual<System.Windows.Controls.Primitives.ToggleButton>(box)!;
                          toggle.ApplyTemplate();
@@ -597,6 +602,16 @@ internal static class UiChecks
                          option.IsSelected = true;
                          Assert(ColorOf(surface.Background) == "#FFD9EBEF" && ColorOf(option.Foreground) == "#FF26798A",
                              "Dropdown selected item uses the settings theme");
+                     }
+                     foreach (var input in subtitleInputs)
+                     {
+                         input.ApplyTemplate();
+                         var host = (ScrollViewer)input.Template.FindName("PART_ContentHost", input);
+                         var line = new TextBlock { Text = input.Text, FontFamily = input.FontFamily, FontSize = input.FontSize };
+                         line.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                         Assert(FindVisual<Border>(input)!.CornerRadius.TopLeft == 6 &&
+                             host.ViewportHeight >= line.DesiredSize.Height - 0.5 &&
+                             host.ExtentHeight <= host.ViewportHeight + 0.5, input.Name + " has a full text viewport");
                      }
                      var colorLists = new[] { "TextColorBox", "PlaybackColorBox", "BackgroundColorBox" }
                          .Select(name => (ListBox)settingsWindow.FindName(name)).ToArray();
@@ -655,6 +670,10 @@ internal static class UiChecks
                          settingsWindow.Settings.ScriptAppearance == new ScriptAppearance(),
                          "Color choices remain staged until confirmation");
                      ((ComboBox)settingsWindow.FindName("FontBox")).SelectedItem = "Source Serif 4";
+                     subtitleInputs[0].Text = "40";
+                     subtitleInputs[1].Text = "2.75";
+                     subtitleInputs[2].Text = "0";
+                     subtitleInputs[3].Text = "5";
                      ((Button)settingsWindow.FindName("RestoreDefaultsButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                      Assert((ScriptAppearance)readAppearance.Invoke(settingsWindow, null)! == new ScriptAppearance() &&
                          colorLists.All(list => list.SelectedIndex == 0), "Restore defaults resets all subtitle controls");
@@ -696,6 +715,30 @@ internal static class UiChecks
                      var allowedBox = (TextBox)settingsWindow.FindName("AllowedSilenceTextBox");
                      MethodInfo readValues = typeof(SettingsWindow).GetMethod("TryReadValues",
                          BindingFlags.Instance | BindingFlags.NonPublic)!;
+                     MethodInfo lineHeightInput = typeof(SettingsWindow).GetMethod("IsLineHeightText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     Assert(new[] { "", ".", "1", "1.", "1.6", "1.65", "3.00" }.All(v => (bool)lineHeightInput.Invoke(null, new object[] { v })!) &&
+                         new[] { "+1", "-1", "1.625", "1..2", "１", "1,2", " 1", "1\n" }.All(v => !(bool)lineHeightInput.Invoke(null, new object[] { v })!),
+                         "Line height input permits only ASCII digits, one point and at most two decimals");
+                     var subtitleToasts = (ToastHost)settingsWindow.FindName("ToastMessages");
+                     string[] invalidValues = { "41", "3.01", "41", "6" };
+                     string[] validValues = { "28", "1.65", "0", "5" };
+                     for (int i = 0; i < subtitleInputs.Length; i++)
+                     {
+                         var input = subtitleInputs[i];
+                         input.Text = invalidValues[i];
+                         Assert(!(bool)readValues.Invoke(settingsWindow, new object?[] { null })! &&
+                             input.BorderBrush == Brushes.IndianRed, input.Name + " rejects out of range value");
+                         input.Text = "";
+                         Assert(!(bool)readValues.Invoke(settingsWindow, new object?[] { null })!, input.Name + " rejects empty value");
+                         input.Text = validValues[i];
+                         Assert(input.BorderBrush != Brushes.IndianRed &&
+                             (bool)readValues.Invoke(settingsWindow, new object?[] { null })!, input.Name + " accepts corrected value");
+                         subtitleToasts.Clear();
+                     }
+                     subtitleInputs[1].Text = "1.60";
+                     Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })! && subtitleInputs[1].Text == "1.6",
+                         "Line height normalizes trailing zeroes without rounding");
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                      excludedBox.Text = " audio , video; AUDIO；中文 文件夹，";
                      Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })! && excludedBox.Text == "audio, video, 中文 文件夹", "Folder names normalize on validation");
                      excludedBox.Text = "audio*";
@@ -803,14 +846,19 @@ internal static class UiChecks
                         ((TextBox)editWindow.FindName("FrameMillisecondsTextBox")).Text = "25";
                         ((TextBox)editWindow.FindName("MinimumSilenceTextBox")).Text = "600";
                         ((ComboBox)editWindow.FindName("FontBox")).SelectedItem = "Source Serif 4";
-                        ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 19;
+                        ((TextBox)editWindow.FindName("FontSizeBox")).Text = "28";
+                        ((TextBox)editWindow.FindName("LineHeightBox")).Text = "1.65";
+                        ((TextBox)editWindow.FindName("ParagraphAfterBox")).Text = "0";
+                        ((TextBox)editWindow.FindName("IndentBox")).Text = "5";
                         ((ListBox)editWindow.FindName("PlaybackColorBox")).SelectedIndex = 2;
                         ((Button)editWindow.FindName("OkButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }));
                     settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     var saved = settingsStore.LoadOrCreate();
                     Assert(saved.FrameMilliseconds == 25 && saved.MinimumSilenceMilliseconds == 600
-                        && saved.ScriptAppearance.Font == "Source Serif 4" && saved.ScriptAppearance.FontSize == 19 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
+                        && saved.ScriptAppearance.Font == "Source Serif 4" && saved.ScriptAppearance.FontSize == 28 &&
+                        saved.ScriptAppearance.LineHeight == 1.65 && saved.ScriptAppearance.ParagraphAfter == 0 &&
+                        saved.ScriptAppearance.FirstLineIndent == 5 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
                         && window.Controller.Settings.ScriptAppearance == saved.ScriptAppearance
                         && window.Controller.Settings.FrameMilliseconds == 25,
                         "Settings dialog saves confirmed values before applying them");
@@ -819,7 +867,8 @@ internal static class UiChecks
                     {
                         var editWindow = app.Windows.OfType<SettingsWindow>().Single(w => w.IsVisible);
                         ((ComboBox)editWindow.FindName("FontBox")).SelectedItem = "Georgia";
-                        ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 18;
+                        ((TextBox)editWindow.FindName("FontSizeBox")).Text = "18";
+                        ((TextBox)editWindow.FindName("LineHeightBox")).Text = "2.05";
                         ((ListBox)editWindow.FindName("BackgroundColorBox")).SelectedIndex = 3;
                         editWindow.DialogResult = false;
                     }));
@@ -829,7 +878,7 @@ internal static class UiChecks
                         "Cancel leaves persisted and active subtitle settings unchanged");
                     var restoredWindow = new MainWindow(settingsStore);
                     Assert(restoredWindow.Controller.Settings.FrameMilliseconds == 25 &&
-                         restoredWindow.Controller.Settings.ScriptAppearance.Font == "Source Serif 4",
+                         restoredWindow.Controller.Settings.ScriptAppearance == saved.ScriptAppearance,
                         "Window restores saved settings on next launch");
                     restoredWindow.Close();
                     string invalidConfiguration = "{broken";

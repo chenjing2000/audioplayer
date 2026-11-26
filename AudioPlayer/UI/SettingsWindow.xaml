@@ -290,13 +290,17 @@
               <TextBlock Text="字体" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,0"/>
               <ComboBox x:Name="FontBox" Grid.ColumnSpan="2" Width="160" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="字体"/>
               <TextBlock Grid.Column="3" Text="字号（DIP）" VerticalAlignment="Center" Margin="0,0,4,0"/>
-              <ComboBox x:Name="FontSizeBox" Grid.Column="4" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="字号"/>
+              <TextBox x:Name="FontSizeBox" Grid.Column="4" Style="{StaticResource RoundedInput}" Width="80" HorizontalAlignment="Right" MaxLength="2" TextChanged="Field_TextChanged"
+                        PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting" AutomationProperties.Name="字号"/>
               <TextBlock Grid.Row="1" Text="行高" VerticalAlignment="Center" Margin="0,0,4,0"/>
-              <ComboBox x:Name="LineHeightBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="行高"/>
+              <TextBox x:Name="LineHeightBox" Grid.Row="1" Grid.Column="1" Style="{StaticResource RoundedInput}" Width="80" HorizontalAlignment="Right" MaxLength="4" TextChanged="Field_TextChanged"
+                        PreviewTextInput="LineHeightBox_PreviewTextInput" DataObject.Pasting="LineHeightBox_Pasting" AutomationProperties.Name="行高"/>
               <TextBlock Grid.Row="1" Grid.Column="3" Text="段后间距（DIP）" VerticalAlignment="Center" Margin="0,0,4,0"/>
-              <ComboBox x:Name="ParagraphAfterBox" Grid.Row="1" Grid.Column="4" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="段后间距"/>
+              <TextBox x:Name="ParagraphAfterBox" Grid.Row="1" Grid.Column="4" Style="{StaticResource RoundedInput}" Width="80" HorizontalAlignment="Right" MaxLength="2" TextChanged="Field_TextChanged"
+                        PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting" AutomationProperties.Name="段后间距"/>
               <TextBlock Grid.Row="2" Text="首行缩进（em）" VerticalAlignment="Center" Margin="0,0,4,0"/>
-              <ComboBox x:Name="IndentBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource RoundedComboBox}" AutomationProperties.Name="首行缩进"/>
+              <TextBox x:Name="IndentBox" Grid.Row="2" Grid.Column="1" Style="{StaticResource RoundedInput}" Width="80" HorizontalAlignment="Right" MaxLength="1" TextChanged="Field_TextChanged"
+                        PreviewTextInput="StepTextBox_PreviewTextInput" DataObject.Pasting="StepTextBox_Pasting" AutomationProperties.Name="首行缩进"/>
               <Border Grid.Row="3" Grid.ColumnSpan="5" Background="#DDE2E9"/>
               <TextBlock Grid.Row="4" Text="正文颜色" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,0,4,0"/>
               <ListBox x:Name="TextColorBox" Grid.Row="4" Grid.ColumnSpan="2" Style="{StaticResource ColorChoices}" SelectionChanged="ColorSelection_Changed"
