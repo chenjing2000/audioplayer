@@ -1244,10 +1244,21 @@ internal static class UiChecks
                                     p.style.width='1000px';measure();
                                     [a,b]=geometry.map(u=>u.segments[0]);
                                     if(!near(x(a)+a.width+a.trailingGap,x(b)))return 'reflow';
-                                    // A punctuation suffix can start in the next sentence, but not the next paragraph.
+                                    // A punctuation suffix can start in the next sentence.
                                     arrange('<span class="sentence">'+word('Alpha',0)+'</span><span class="sentence">?! '+word('Beta',1)+'</span>');
                                     [a,b]=geometry.map(u=>u.segments[0]);
                                     if(a.trailingGap<=0 || !near(x(a)+a.width+a.trailingGap,x(b)))return 'sentence';
+                                    arrange('<span class="sentence">'+word('Alpha',0)+'</span><span class="sentence">?! "untimed"</span>');
+                                    const suffix=p.querySelectorAll('.sentence')[1].firstChild;
+                                    const across=punctuationRight(p.querySelector('.timed'),suffix,2);
+                                    if(across<=0 || !near(geometry[0].segments[0].trailingGap,across))return 'sentence prefix';
+                                    // A new paragraph is never part of the previous unit's suffix.
+                                    arrange('<span class="sentence">'+word('Alpha',0)+' </span>');
+                                    const nextParagraph=p.cloneNode(false);
+                                    nextParagraph.innerHTML='<span class="sentence">! '+word('Beta',1)+'</span>';
+                                    nextParagraph.append(p.querySelector('svg.paint').cloneNode(false));
+                                    body.append(nextParagraph);measure();
+                                    if(geometry.length!==2 || geometry[0].segments[0].trailingGap!==0)return 'paragraph boundary';
                                     // Punctuation in a timed unit keeps its own progress and is never prepainted.
                                     arrange('<span class="sentence">'+word('Alpha',0)+word(',',1)+' '+word('Beta!',2)+'</span>');
                                     const [first,comma,last]=geometry.map(u=>u.segments[0]);
