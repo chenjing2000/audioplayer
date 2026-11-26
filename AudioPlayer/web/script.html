@@ -276,7 +276,7 @@ function receivePlayback(data){
 chrome.webview.addEventListener('message',({data})=>{
   if(data.type==='appearance'){
     const a=data.appearance,root=document.documentElement.style;
-    root.fontFamily=a.font+', Georgia, "Segoe UI", serif';
+    root.fontFamily='"'+a.font+'", Georgia, "Segoe UI", serif';
     root.fontSize=a.fontSize+'px';root.lineHeight=String(a.lineHeight);
     root.color=a.color;root.backgroundColor=a.background;
     root.setProperty('--paragraph-after',a.paragraphAfter+'px');

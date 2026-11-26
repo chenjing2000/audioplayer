@@ -967,17 +967,22 @@ internal static class UiChecks
                                     """
                                     (() => {
                                       const root=document.documentElement, p=document.querySelector('#text p');
-                                      return getComputedStyle(root).fontFamily.includes('Source Serif 4') &&
-                                        root.style.fontSize==='28px' && root.style.lineHeight==='1.65' &&
-                                        getComputedStyle(p).marginBottom==='0px' && getComputedStyle(p).textIndent==='140px' &&
-                                        measureFrame===0 && geometry.length===2 && followAnchors.length>0 &&
-                                        geometry.every(u=>u.segments.length>0 && u.total>0);
+                                      const actual={fontFamily:getComputedStyle(root).fontFamily,
+                                        fontSize:root.style.fontSize,lineHeight:root.style.lineHeight,
+                                        paragraphAfter:getComputedStyle(p).marginBottom,indent:getComputedStyle(p).textIndent,
+                                        measureFrame,units:geometry.length,anchors:followAnchors.length,
+                                        validGeometry:geometry.every(u=>u.segments.length>0 && u.total>0)};
+                                      return (actual.fontFamily.startsWith('"Source Serif 4", Georgia,') &&
+                                        actual.fontSize==='28px' && actual.lineHeight==='1.65' &&
+                                        actual.paragraphAfter==='0px' && actual.indent==='140px' &&
+                                        actual.measureFrame===0 && actual.units===2 && actual.anchors>0 &&
+                                        actual.validGeometry) || actual;
                                     })()
                                     """);
                                 if (newAppearance == "true") break;
                                 await Task.Delay(50);
                             }
-                            Assert(newAppearance == "true", "Reader applies custom subtitle font and numeric values and recomputes geometry and anchors");
+                            Assert(newAppearance == "true", "Reader applies custom subtitle font and numeric values and recomputes geometry and anchors: " + newAppearance);
                             readerWindow.SetAppearance(new ScriptAppearance());
                             deadline = DateTime.UtcNow.AddSeconds(10);
                             string restoredAppearance = "";
@@ -987,16 +992,20 @@ internal static class UiChecks
                                     """
                                     (() => {
                                       const root=document.documentElement, p=document.querySelector('#text p');
-                                      return getComputedStyle(root).fontFamily.startsWith('Newsreader, Georgia,') &&
-                                        root.style.fontSize==='17px' && root.style.lineHeight==='1.6' &&
-                                        getComputedStyle(p).marginBottom==='16px' && getComputedStyle(p).textIndent==='34px' &&
-                                        measureFrame===0 && geometry.length===2;
+                                      const actual={fontFamily:getComputedStyle(root).fontFamily,
+                                        fontSize:root.style.fontSize,lineHeight:root.style.lineHeight,
+                                        paragraphAfter:getComputedStyle(p).marginBottom,indent:getComputedStyle(p).textIndent,
+                                        measureFrame,units:geometry.length};
+                                      return (actual.fontFamily.startsWith('Newsreader, Georgia,') &&
+                                        actual.fontSize==='17px' && actual.lineHeight==='1.6' &&
+                                        actual.paragraphAfter==='16px' && actual.indent==='34px' &&
+                                        actual.measureFrame===0 && actual.units===2) || actual;
                                     })()
                                     """);
                                 if (restoredAppearance == "true") break;
                                 await Task.Delay(50);
                             }
-                            Assert(restoredAppearance == "true", "Reader reapplies default appearance before playback regression checks");
+                            Assert(restoredAppearance == "true", "Reader reapplies default appearance before playback regression checks: " + restoredAppearance);
                             string measured = await reader.CoreWebView2.ExecuteScriptAsync(
                                 "measure(); update({position:1.5,playing:false,reset:false},true); geometry.length===2 && geometry[0].last===0.75 && geometry[1].last===0.25");
                             Assert(measured == "true", "Reader paints overlapping out-of-order intervals");
