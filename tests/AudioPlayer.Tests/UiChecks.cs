@@ -955,8 +955,8 @@ internal static class UiChecks
                                 await Task.Delay(100);
                             }
                             Assert(renderedScriptText == "\"Hello, world.\"", "Embedded WebView2 reader renders Script JSON once without duplicate text");
-                            string defaultFont = await reader.CoreWebView2.ExecuteScriptAsync("getComputedStyle(document.documentElement).fontFamily.startsWith('Newsreader, Georgia,')");
-                            Assert(defaultFont == "true", "Reader default font is Newsreader with Georgia fallback");
+                            string defaultFont = await reader.CoreWebView2.ExecuteScriptAsync("getComputedStyle(document.documentElement).fontFamily==='Newsreader, Georgia, serif'");
+                            Assert(defaultFont == "true", "Reader default font is Newsreader with Georgia and generic serif fallback only");
                             readerWindow.SetAppearance(new ScriptAppearance
                                 { Font = "Source Serif 4", FontSize = 28, LineHeight = 1.65, ParagraphAfter = 0, FirstLineIndent = 5 });
                             string newAppearance = "";
@@ -972,7 +972,7 @@ internal static class UiChecks
                                         paragraphAfter:getComputedStyle(p).marginBottom,indent:getComputedStyle(p).textIndent,
                                         measureFrame,units:geometry.length,anchors:followAnchors.length,
                                         validGeometry:geometry.every(u=>u.segments.length>0 && u.total>0)};
-                                      return (actual.fontFamily.startsWith('"Source Serif 4", Georgia,') &&
+                                      return (actual.fontFamily==='"Source Serif 4", Georgia, serif' &&
                                         actual.fontSize==='28px' && actual.lineHeight==='1.65' &&
                                         actual.paragraphAfter==='0px' && actual.indent==='140px' &&
                                         actual.measureFrame===0 && actual.units===2 && actual.anchors>0 &&
@@ -996,7 +996,7 @@ internal static class UiChecks
                                         fontSize:root.style.fontSize,lineHeight:root.style.lineHeight,
                                         paragraphAfter:getComputedStyle(p).marginBottom,indent:getComputedStyle(p).textIndent,
                                         measureFrame,units:geometry.length};
-                                      return (actual.fontFamily.startsWith('Newsreader, Georgia,') &&
+                                      return (actual.fontFamily==='Newsreader, Georgia, serif' &&
                                         actual.fontSize==='17px' && actual.lineHeight==='1.6' &&
                                         actual.paragraphAfter==='16px' && actual.indent==='34px' &&
                                         actual.measureFrame===0 && actual.units===2) || actual;

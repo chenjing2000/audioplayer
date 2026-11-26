@@ -45,4 +45,4 @@ AudioPlayer 配置文件存放在实际 EXE 同目录，默认 `AudioPlayer.sett
 
 读取时仅对移除的旧合法字体及颜色在内存中归一化：Segoe UI、Arial、Times New Roman → Newsreader；播放背景色 #A33D30/#B64550/#D71920/#F5E7A6 → #F6EDC2、#A45A2C/#BC4600/#F4D9C4 → #F5E4D6、#856300/#8A2BE2/#E5DDF2 → #ECE6F3、#53713C/#007D45/#D5E8CC → #E1EEDB、#26798A/#1685B8/#D3E5F3 → #E0ECF4；背景色 #FFFFFF → #F8F8F6。仍合法的已保存值不变，其他非法值及显式 null 仍按既有错误机制处理。读取不重写原文件；用户执行后续显式保存（例如设置确定或播放模式切换）时按现有原子保存流程写入有效参数。配置结构不变。
 
-Newsreader、Source Serif 4 使用 Windows 已安装的字体，不随程序打包；所选字体缺失时依次尝试 Georgia、Segoe UI 和浏览器默认衬线字体。WebView2 缓存位于实际 EXE 同目录 `cache/webview2`，为可重建的运行时数据，不是原文来源。
+Newsreader、Source Serif 4 使用 Windows 已安装的字体，不随程序打包；所选字体缺失时依次尝试 Georgia 和浏览器默认衬线字体；阅读器状态文字使用 Microsoft YaHei UI 和通用 sans-serif。Segoe UI 不再作为显式显示字体，仅保留旧配置归一化。WebView2 缓存位于实际 EXE 同目录 `cache/webview2`，为可重建的运行时数据，不是原文来源。
