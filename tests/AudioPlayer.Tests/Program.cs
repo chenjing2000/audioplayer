@@ -75,27 +75,50 @@ Check("Script appearance defaults, persistence and validation", () =>
         File.WriteAllText(store.FilePath, """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0}""");
         var settings = store.LoadOrCreate();
         Assert(settings.ScriptAppearance == new ScriptAppearance());
-        Assert(settings.ScriptAppearance.FontSize == 17 && settings.ScriptAppearance.LineHeight == 1.6 &&
-            settings.ScriptAppearance.FirstLineIndent == 2 && settings.ScriptAppearance.ScriptColor == "#F6EDC2");
-        Assert(ScriptAppearance.Fonts.SequenceEqual(new[] { "Georgia", "Microsoft YaHei UI", "Nunito", "Times New Roman", "Arial" }) &&
-            ScriptAppearance.Sizes.SequenceEqual(new[] { 17, 18, 19, 20 }) &&
-            ScriptAppearance.Heights.SequenceEqual(new[] { 1.5, 1.6, 1.7, 1.8 }) &&
-            ScriptAppearance.Spacings.SequenceEqual(new[] { 8, 12, 16, 20 }) &&
-            ScriptAppearance.Indents.SequenceEqual(new[] { 0, 1, 2 }));
+        Assert(settings.ScriptAppearance.Font == "Newsreader" && settings.ScriptAppearance.FontSize == 17 && settings.ScriptAppearance.LineHeight == 1.6 &&
+            settings.ScriptAppearance.ParagraphAfter == 16 && settings.ScriptAppearance.FirstLineIndent == 2 && settings.ScriptAppearance.ScriptColor == "#F6EDC2");
+        Assert(ScriptAppearance.Fonts.SequenceEqual(new[] { "Newsreader", "Source Serif 4", "Georgia", "Microsoft YaHei UI", "Nunito" }));
         Assert(ScriptAppearance.Colors.Length == 5 && ScriptAppearance.Backgrounds.Length == 5 &&
             ScriptAppearance.PlaybackColors.SequenceEqual(new[] { "#F6EDC2", "#F5E4D6", "#E1EEDB", "#E0ECF4", "#ECE6F3" }));
-        settings.ScriptAppearance = new ScriptAppearance { Font = "Arial", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0" };
+        settings.ScriptAppearance = new ScriptAppearance { Font = "Source Serif 4", FontSize = 18, LineHeight = 1.8, ParagraphAfter = 20, FirstLineIndent = 0, Background = "#EFF5F0" };
         foreach (string color in ScriptAppearance.PlaybackColors)
         {
             settings.ScriptAppearance = settings.ScriptAppearance with { ScriptColor = color };
             store.Save(settings);
             Assert(store.LoadOrCreate().ScriptAppearance == settings.ScriptAppearance);
         }
+        foreach (string font in ScriptAppearance.Fonts)
+        {
+            settings.ScriptAppearance = settings.ScriptAppearance with { Font = font };
+            store.Save(settings);
+            Assert(store.LoadOrCreate().ScriptAppearance == settings.ScriptAppearance);
+        }
+        foreach (var appearance in new[]
+        {
+            new ScriptAppearance { FontSize = 10, LineHeight = 1, ParagraphAfter = 0, FirstLineIndent = 0 },
+            new ScriptAppearance { FontSize = 40, LineHeight = 3, ParagraphAfter = 40, FirstLineIndent = 5 },
+            new ScriptAppearance { FontSize = 28, LineHeight = 1.65, ParagraphAfter = 24, FirstLineIndent = 3 }
+        })
+        {
+            settings.ScriptAppearance = appearance;
+            store.Save(settings);
+            Assert(store.LoadOrCreate().ScriptAppearance == appearance);
+        }
         string original = File.ReadAllText(store.FilePath);
-        settings.ScriptAppearance = settings.ScriptAppearance with { FontSize = 99 };
-        try { store.Save(settings); throw new Exception("Invalid appearance accepted"); }
-        catch (ArgumentOutOfRangeException) { }
-        Assert(File.ReadAllText(store.FilePath) == original);
+        foreach (var appearance in new[]
+        {
+            new ScriptAppearance { FontSize = 9 }, new ScriptAppearance { FontSize = 41 },
+            new ScriptAppearance { LineHeight = 0.99 }, new ScriptAppearance { LineHeight = 3.01 },
+            new ScriptAppearance { LineHeight = 1.625 }, new ScriptAppearance { LineHeight = double.NaN },
+            new ScriptAppearance { ParagraphAfter = -1 }, new ScriptAppearance { ParagraphAfter = 41 },
+            new ScriptAppearance { FirstLineIndent = -1 }, new ScriptAppearance { FirstLineIndent = 6 }
+        })
+        {
+            settings.ScriptAppearance = appearance;
+            try { store.Save(settings); throw new Exception("Invalid appearance accepted"); }
+            catch (ArgumentOutOfRangeException) { }
+            Assert(File.ReadAllText(store.FilePath) == original);
+        }
     }
     finally { Directory.Delete(folder, true); }
 });
@@ -120,16 +143,19 @@ Check("Retired script options normalize only on load without rewriting the file"
             Assert(store.LoadOrCreate().ScriptAppearance == expected);
         }
 
-        foreach (var (size, newSize) in new[] { (14, 17), (15, 17), (16, 17), (17, 17), (18, 18), (19, 19), (20, 20), (22, 20), (24, 20), (26, 20), (28, 20) })
-        foreach (var (height, newHeight) in new[] { (1.4, 1.5), (2.0, 1.8) })
-        foreach (var (spacing, newSpacing) in new[] { (0, 8), (14, 16), (18, 20), (24, 20) })
-        {
-            CheckMigration(new ScriptAppearance { Font = "Segoe UI", FontSize = size,
-                LineHeight = height, ParagraphAfter = spacing, FirstLineIndent = 3,
-                ScriptColor = "#A33D30", Background = "#FFFFFF" },
-                new ScriptAppearance { Font = "Arial", FontSize = newSize,
-                    LineHeight = newHeight, ParagraphAfter = newSpacing, FirstLineIndent = 2 });
-        }
+        foreach (string font in new[] { "Segoe UI", "Arial", "Times New Roman" })
+            CheckMigration(new ScriptAppearance { Font = font }, new ScriptAppearance { Font = "Newsreader" });
+
+        foreach (int size in new[] { 14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28 })
+            CheckMigration(new ScriptAppearance { FontSize = size }, new ScriptAppearance { FontSize = size });
+        foreach (double height in new[] { 1.4, 2.0 })
+            CheckMigration(new ScriptAppearance { LineHeight = height }, new ScriptAppearance { LineHeight = height });
+        foreach (int spacing in new[] { 0, 14, 18, 24 })
+            CheckMigration(new ScriptAppearance { ParagraphAfter = spacing }, new ScriptAppearance { ParagraphAfter = spacing });
+
+        CheckMigration(new ScriptAppearance { Font = "Segoe UI", FontSize = 28, LineHeight = 2.0,
+            ParagraphAfter = 0, FirstLineIndent = 3, ScriptColor = "#A33D30", Background = "#FFFFFF" },
+            new ScriptAppearance { FontSize = 28, LineHeight = 2.0, ParagraphAfter = 0, FirstLineIndent = 3 });
 
         foreach (var (oldColor, newColor) in new[]
         {
@@ -151,12 +177,23 @@ Check("Retired script options normalize only on load without rewriting the file"
         catch (ArgumentOutOfRangeException) { }
         Assert(File.ReadAllText(store.FilePath) == invalidColor);
 
-        settings.ScriptAppearance = new ScriptAppearance { FontSize = 21 };
-        string invalid = System.Text.Json.JsonSerializer.Serialize(settings);
-        File.WriteAllText(store.FilePath, invalid);
-        try { store.LoadOrCreate(); throw new Exception("Unknown appearance value accepted"); }
-        catch (ArgumentOutOfRangeException) { }
-        Assert(File.ReadAllText(store.FilePath) == invalid);
+        foreach (var appearance in new[]
+        {
+            new ScriptAppearance { FontSize = 9 }, new ScriptAppearance { FontSize = 41 },
+            new ScriptAppearance { LineHeight = 0.99 }, new ScriptAppearance { LineHeight = 3.01 },
+            new ScriptAppearance { LineHeight = 1.625 },
+            new ScriptAppearance { ParagraphAfter = -1 }, new ScriptAppearance { ParagraphAfter = 41 },
+            new ScriptAppearance { FirstLineIndent = -1 }, new ScriptAppearance { FirstLineIndent = 6 },
+            new ScriptAppearance { Font = "Unknown Font" }, new ScriptAppearance { Font = null! }
+        })
+        {
+            settings.ScriptAppearance = appearance;
+            string invalid = System.Text.Json.JsonSerializer.Serialize(settings);
+            File.WriteAllText(store.FilePath, invalid);
+            try { store.LoadOrCreate(); throw new Exception("Unknown appearance value accepted"); }
+            catch (ArgumentOutOfRangeException) { }
+            Assert(File.ReadAllText(store.FilePath) == invalid);
+        }
 
         string partial = """{"FrameMilliseconds":10,"MinimumSilenceMilliseconds":300,"SilenceThresholdDb":-45,"NavigationToleranceMilliseconds":200,"AllowedSilenceSeconds":2.0,"ScriptAppearance":{"FontSize":17,"FirstLineIndent":0}}""";
         File.WriteAllText(store.FilePath, partial);

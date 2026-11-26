@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -15,6 +14,7 @@ namespace AudioPlayer.UI;
 public partial class SettingsWindow : Window
 {
     private TextBox? invalidField;
+    private bool locatingInvalidField;
     private PlaybackMode playbackMode;
     public AppSettings Settings { get; private set; }
 
@@ -23,15 +23,10 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         Settings = settings;
         FontBox.ItemsSource = ScriptAppearance.Fonts;
-        FontSizeBox.ItemsSource = ScriptAppearance.Sizes;
-        LineHeightBox.ItemsSource = ScriptAppearance.Heights;
-        ParagraphAfterBox.ItemsSource = ScriptAppearance.Spacings;
-        IndentBox.ItemsSource = ScriptAppearance.Indents;
         TextColorBox.ItemsSource = ScriptAppearance.Colors;
         PlaybackColorBox.ItemsSource = ScriptAppearance.PlaybackColors;
         BackgroundColorBox.ItemsSource = ScriptAppearance.Backgrounds;
         LoadValues(settings);
-
     }
 
     private void RestoreDefaultsButton_Click(object sender, RoutedEventArgs e)
@@ -44,7 +39,11 @@ public partial class SettingsWindow : Window
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
     {
-        if (!TryReadValues(out AppSettings settings)) return;
+        if (!TryReadValues(out AppSettings settings))
+        {
+            FocusInvalidField();
+            return;
+        }
         Settings = settings;
         DialogResult = true;
     }
@@ -53,10 +52,7 @@ public partial class SettingsWindow : Window
     {
         var appearance = settings.ScriptAppearance;
         FontBox.SelectedItem = appearance.Font;
-        FontSizeBox.SelectedItem = appearance.FontSize;
-        LineHeightBox.SelectedItem = appearance.LineHeight;
-        ParagraphAfterBox.SelectedItem = appearance.ParagraphAfter;
-        IndentBox.SelectedItem = appearance.FirstLineIndent;
+        DisplayAppearanceNumbers(appearance);
         TextColorBox.SelectedItem = appearance.Color;
         PlaybackColorBox.SelectedItem = appearance.ScriptColor;
         BackgroundColorBox.SelectedItem = appearance.Background;
@@ -71,9 +67,17 @@ public partial class SettingsWindow : Window
         AllowedSilenceTextBox.Text = settings.AllowedSilenceSeconds.ToString("0.0", CultureInfo.InvariantCulture);
     }
 
+    private void DisplayAppearanceNumbers(ScriptAppearance appearance)
+    {
+        FontSizeBox.Text = appearance.FontSize.ToString(CultureInfo.InvariantCulture);
+        LineHeightBox.Text = appearance.LineHeight.ToString("0.##", CultureInfo.InvariantCulture);
+        ParagraphAfterBox.Text = appearance.ParagraphAfter.ToString(CultureInfo.InvariantCulture);
+        IndentBox.Text = appearance.FirstLineIndent.ToString(CultureInfo.InvariantCulture);
+    }
+
     private bool TryReadValues(out AppSettings settings)
     {
-        settings = new AppSettings { PlaybackMode = playbackMode, ScriptAppearance = ReadAppearance() };
+        settings = new AppSettings { PlaybackMode = playbackMode };
 
         if (!int.TryParse(FrameMillisecondsTextBox.Text.Trim(), out int frameMilliseconds))
             return ShowValueError("分析帧长度必须是整数。", FrameMillisecondsTextBox);
@@ -84,15 +88,35 @@ public partial class SettingsWindow : Window
         if (!int.TryParse(NavigationToleranceTextBox.Text.Trim(), out int navigationToleranceMilliseconds))
             return ShowValueError("前后跳转容差必须是整数。", NavigationToleranceTextBox);
         string allowedText = AllowedSilenceTextBox.Text.Trim();
-        if (!IsCompleteSilenceSeconds(allowedText)
+        if (!IsDecimalText(allowedText, int.MaxValue, 1, requireWhole: true)
             || !decimal.TryParse(allowedText, NumberStyles.AllowDecimalPoint,
                 CultureInfo.InvariantCulture, out decimal allowedSeconds))
             return ShowValueError("允许静音时长不能为空，且最多只能有一位小数。", AllowedSilenceTextBox);
 
-        if (!IsStepText(BackwardStepTextBox.Text) || !int.TryParse(BackwardStepTextBox.Text, out int backward))
+        if (!TryReadDigits(BackwardStepTextBox, 0, 99, out int backward))
             return ShowValueError("后退步长必须是 0 到 99 的整数。", BackwardStepTextBox);
-        if (!IsStepText(ForwardStepTextBox.Text) || !int.TryParse(ForwardStepTextBox.Text, out int forward))
+        if (!TryReadDigits(ForwardStepTextBox, 0, 99, out int forward))
             return ShowValueError("前进步长必须是 0 到 99 的整数。", ForwardStepTextBox);
+        if (!TryReadDigits(FontSizeBox, ScriptAppearance.MinFontSize, ScriptAppearance.MaxFontSize, out int fontSize))
+            return ShowValueError($"字号必须是 {ScriptAppearance.MinFontSize} 到 {ScriptAppearance.MaxFontSize} 的整数。", FontSizeBox);
+        if (!TryReadLineHeight(out double lineHeight))
+            return ShowValueError($"行高必须在 {ScriptAppearance.MinLineHeight} 到 {ScriptAppearance.MaxLineHeight} 之间，且最多两位小数。", LineHeightBox);
+        if (!TryReadDigits(ParagraphAfterBox, ScriptAppearance.MinParagraphAfter, ScriptAppearance.MaxParagraphAfter, out int paragraphAfter))
+            return ShowValueError($"段后间距必须是 {ScriptAppearance.MinParagraphAfter} 到 {ScriptAppearance.MaxParagraphAfter} 的整数。", ParagraphAfterBox);
+        if (!TryReadDigits(IndentBox, ScriptAppearance.MinFirstLineIndent, ScriptAppearance.MaxFirstLineIndent, out int indent))
+            return ShowValueError($"首行缩进必须是 {ScriptAppearance.MinFirstLineIndent} 到 {ScriptAppearance.MaxFirstLineIndent} 的整数。", IndentBox);
+
+        settings.ScriptAppearance = new ScriptAppearance
+        {
+            Font = (string)FontBox.SelectedItem,
+            FontSize = fontSize,
+            LineHeight = lineHeight,
+            ParagraphAfter = paragraphAfter,
+            FirstLineIndent = indent,
+            Color = (string)TextColorBox.SelectedItem,
+            ScriptColor = (string)PlaybackColorBox.SelectedItem,
+            Background = (string)BackgroundColorBox.SelectedItem
+        };
         settings.ExcludedFolderNames = ExcludedFolderNamesTextBox.Text;
         settings.BackwardStepSeconds = backward;
         settings.ForwardStepSeconds = forward;
@@ -109,7 +133,7 @@ public partial class SettingsWindow : Window
         }
         catch (ArgumentOutOfRangeException ex)
         {
-            TextBox field = ex.ParamName switch
+            TextBox? field = ex.ParamName switch
             {
                 nameof(AppSettings.FrameMilliseconds) => FrameMillisecondsTextBox,
                 nameof(AppSettings.MinimumSilenceMilliseconds) => MinimumSilenceTextBox,
@@ -118,7 +142,8 @@ public partial class SettingsWindow : Window
                 nameof(AppSettings.BackwardStepSeconds) => BackwardStepTextBox,
                 nameof(AppSettings.ForwardStepSeconds) => ForwardStepTextBox,
                 nameof(AppSettings.ExcludedFolderNames) => ExcludedFolderNamesTextBox,
-                _ => AllowedSilenceTextBox
+                nameof(AppSettings.AllowedSilenceSeconds) => AllowedSilenceTextBox,
+                _ => null
             };
             return ShowValueError(ex.Message.Split('\n')[0], field);
         }
@@ -128,6 +153,7 @@ public partial class SettingsWindow : Window
         BackwardStepTextBox.Text = backward.ToString(CultureInfo.InvariantCulture);
         ForwardStepTextBox.Text = forward.ToString(CultureInfo.InvariantCulture);
         AllowedSilenceTextBox.Text = allowedSeconds.ToString("0.0", CultureInfo.InvariantCulture);
+        DisplayAppearanceNumbers(settings.ScriptAppearance);
         ClearValueError();
         return true;
     }
@@ -145,27 +171,54 @@ public partial class SettingsWindow : Window
         }
     }
 
-    // LoadValues always selects an allowed item. Keep defaults and validation
-    // in ScriptAppearance, not in a second set of UI-specific fallback values.
-    private ScriptAppearance ReadAppearance() => new()
+    private static bool IsDigitsText(string text, int maxLength)
+        => text.Length <= maxLength && text.All(c => c is >= '0' and <= '9');
+
+    private static bool TryReadDigits(TextBox box, int min, int max, out int value)
+        => int.TryParse(box.Text, NumberStyles.None, CultureInfo.InvariantCulture, out value)
+            && IsDigitsText(box.Text, box.MaxLength) && value >= min && value <= max;
+
+    private bool TryReadLineHeight(out double value)
+        => double.TryParse(LineHeightBox.Text, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out value)
+            && IsDecimalText(LineHeightBox.Text, 1, ScriptAppearance.LineHeightDecimalPlaces, requireWhole: true)
+            && value is >= ScriptAppearance.MinLineHeight and <= ScriptAppearance.MaxLineHeight;
+
+    private void DigitsTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
     {
-        Font = (string)FontBox.SelectedItem,
-        FontSize = (int)FontSizeBox.SelectedItem,
-        LineHeight = (double)LineHeightBox.SelectedItem,
-        ParagraphAfter = (int)ParagraphAfterBox.SelectedItem,
-        FirstLineIndent = (int)IndentBox.SelectedItem,
-        Color = (string)TextColorBox.SelectedItem,
-        ScriptColor = (string)PlaybackColorBox.SelectedItem,
-        Background = (string)BackgroundColorBox.SelectedItem
-    };
+        var box = (TextBox)sender;
+        e.Handled = !IsDigitsText(BuildCandidateText(box, e.Text), box.MaxLength);
+    }
 
-    private static bool IsStepText(string text) => text.Length <= 2 && text.All(c => c is >= '0' and <= '9');
+    private void DigitsTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
+    {
+        var box = (TextBox)sender;
+        ValidatePaste(box, e, text => IsDigitsText(text, box.MaxLength));
+    }
 
-    private void StepTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
-        => e.Handled = !IsStepText(BuildCandidateText((TextBox)sender, e.Text));
+    private static bool IsDecimalText(string text, int maxWholeDigits, int maxFractionDigits, bool requireWhole)
+    {
+        int point = text.IndexOf('.');
+        string whole = point < 0 ? text : text[..point];
+        return (!requireWhole || whole.Length > 0) && IsDigitsText(whole, maxWholeDigits)
+            && (point < 0 || IsDigitsText(text[(point + 1)..], maxFractionDigits));
+    }
 
-    private void StepTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
-        => ValidatePaste((TextBox)sender, e, IsStepText);
+    private bool IsEditableDecimalText(TextBox box, string text)
+        => ReferenceEquals(box, LineHeightBox)
+            ? IsDecimalText(text, 1, ScriptAppearance.LineHeightDecimalPlaces, requireWhole: false)
+            : IsDecimalText(text, int.MaxValue, 1, requireWhole: false);
+
+    private void DecimalTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+    {
+        var box = (TextBox)sender;
+        e.Handled = !IsEditableDecimalText(box, BuildCandidateText(box, e.Text));
+    }
+
+    private void DecimalTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
+    {
+        var box = (TextBox)sender;
+        ValidatePaste(box, e, text => IsEditableDecimalText(box, text));
+    }
 
     private void PositiveIntegerTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         => e.Handled = !IsIntegerText(BuildCandidateText((TextBox)sender, e.Text), false);
@@ -205,33 +258,19 @@ public partial class SettingsWindow : Window
         return true;
     }
 
-    private static bool IsEditableSilenceSeconds(string text)
-        => Regex.IsMatch(text, @"^[0-9]*(?:\.[0-9]?)?$");
-
-    private static bool IsCompleteSilenceSeconds(string text)
-        => Regex.IsMatch(text, @"^[0-9]+(?:\.[0-9]?)?$");
-
-    private void AllowedSilenceTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
-        => e.Handled = !IsEditableSilenceSeconds(BuildCandidateText((TextBox)sender, e.Text));
-
-    private void AllowedSilenceTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
-        => ValidatePaste((TextBox)sender, e, IsEditableSilenceSeconds);
-
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
-        if (FontBox.IsKeyboardFocusWithin || FontSizeBox.IsKeyboardFocusWithin ||
-            LineHeightBox.IsKeyboardFocusWithin || ParagraphAfterBox.IsKeyboardFocusWithin ||
-            IndentBox.IsKeyboardFocusWithin || TextColorBox.IsKeyboardFocusWithin ||
+        if (FontBox.IsKeyboardFocusWithin || TextColorBox.IsKeyboardFocusWithin ||
             PlaybackColorBox.IsKeyboardFocusWithin || BackgroundColorBox.IsKeyboardFocusWithin) return;
         e.Handled = true; // Enter checks values without accepting or closing the dialog.
-        TryReadValues(out _);
+        if (!TryReadValues(out _)) FocusInvalidField();
     }
 
     private void SilenceInput_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
         // Dialog action buttons own their own handling. Avoid validating twice on a click.
-        if (ReferenceEquals(e.NewFocus, OkButton)
+        if (locatingInvalidField || ReferenceEquals(e.NewFocus, OkButton)
             || ReferenceEquals(e.NewFocus, CancelButton)
             || ReferenceEquals(e.NewFocus, RestoreDefaultsButton))
             return;
@@ -252,7 +291,15 @@ public partial class SettingsWindow : Window
             catch (ArgumentOutOfRangeException) { return false; }
         }
         if (ReferenceEquals(box, BackwardStepTextBox) || ReferenceEquals(box, ForwardStepTextBox))
-            return box.Text.Length > 0 && IsStepText(box.Text);
+            return TryReadDigits(box, 0, 99, out _);
+        if (ReferenceEquals(box, FontSizeBox))
+            return TryReadDigits(box, ScriptAppearance.MinFontSize, ScriptAppearance.MaxFontSize, out _);
+        if (ReferenceEquals(box, LineHeightBox))
+            return TryReadLineHeight(out _);
+        if (ReferenceEquals(box, ParagraphAfterBox))
+            return TryReadDigits(box, ScriptAppearance.MinParagraphAfter, ScriptAppearance.MaxParagraphAfter, out _);
+        if (ReferenceEquals(box, IndentBox))
+            return TryReadDigits(box, ScriptAppearance.MinFirstLineIndent, ScriptAppearance.MaxFirstLineIndent, out _);
         if (ReferenceEquals(box, FrameMillisecondsTextBox))
             return int.TryParse(box.Text, out int frameValue) && frameValue is >= SilenceOptions.MinFrameMilliseconds and <= SilenceOptions.MaxFrameMilliseconds;
         if (ReferenceEquals(box, MinimumSilenceTextBox))
@@ -262,21 +309,39 @@ public partial class SettingsWindow : Window
         if (ReferenceEquals(box, NavigationToleranceTextBox))
             return int.TryParse(box.Text, out int toleranceValue) && toleranceValue is >= SilenceOptions.MinNavigationToleranceMilliseconds and <= SilenceOptions.MaxNavigationToleranceMilliseconds;
         string input = box.Text.Trim();
-        return IsCompleteSilenceSeconds(input)
+        return ReferenceEquals(box, AllowedSilenceTextBox) && IsDecimalText(input, int.MaxValue, 1, requireWhole: true)
             && decimal.TryParse(input, NumberStyles.AllowDecimalPoint,
                 CultureInfo.InvariantCulture, out decimal seconds)
             && int.TryParse(MinimumSilenceTextBox.Text, out int minimum)
             && seconds >= minimum / 1000m;
     }
 
-    private bool ShowValueError(string message, TextBox field)
+    private bool ShowValueError(string message, TextBox? field)
     {
-        if (invalidField is not null && !ReferenceEquals(invalidField, field))
-            invalidField.ClearValue(TextBox.BorderBrushProperty);
+        ClearValueError();
         invalidField = field;
-        field.BorderBrush = Brushes.IndianRed;
+        if (field is not null) field.BorderBrush = Brushes.IndianRed;
         ToastMessages.Show(message, ToastLevel.Warning);
         return false;
+    }
+
+    private void FocusInvalidField()
+    {
+        if (invalidField is not TextBox field) return;
+        locatingInvalidField = true;
+        try
+        {
+            foreach (TabItem tab in SettingsTabs.Items)
+                if (ReferenceEquals(tab.Content, field.Parent))
+                {
+                    SettingsTabs.SelectedItem = tab;
+                    break;
+                }
+            UpdateLayout();
+            field.Focus();
+            field.SelectAll();
+        }
+        finally { locatingInvalidField = false; }
     }
 
     private void ClearValueError()

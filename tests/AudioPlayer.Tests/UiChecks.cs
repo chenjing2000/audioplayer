@@ -474,10 +474,13 @@ internal static class UiChecks
                     Assert(settingsTabs.Items.Count == 2 && (string)((TabItem)settingsTabs.Items[0]).Header == "音频设置" &&
                         (string)((TabItem)settingsTabs.Items[1]).Header == "字幕参数" && settingsTabs.BorderThickness == new Thickness(0),
                         "Settings tabs have the agreed names and no outer border");
-                    Assert((int)((ComboBox)settingsWindow.FindName("FontSizeBox")).SelectedItem == 17 &&
-                        (double)((ComboBox)settingsWindow.FindName("LineHeightBox")).SelectedItem == 1.6 &&
-                        (int)((ComboBox)settingsWindow.FindName("IndentBox")).SelectedItem == 2,
-                        "Script font size, line height and indentation default to 17, 1.6 and 2");
+                    Assert(((ComboBox)settingsWindow.FindName("FontBox")).Items.Cast<string>().SequenceEqual(new[] { "Newsreader", "Source Serif 4", "Georgia", "Microsoft YaHei UI", "Nunito" }) &&
+                        ((ComboBox)settingsWindow.FindName("FontBox")).SelectedIndex == 0 &&
+                        ((TextBox)settingsWindow.FindName("FontSizeBox")).Text == "17" &&
+                        ((TextBox)settingsWindow.FindName("LineHeightBox")).Text == "1.6" &&
+                        ((TextBox)settingsWindow.FindName("ParagraphAfterBox")).Text == "16" &&
+                        ((TextBox)settingsWindow.FindName("IndentBox")).Text == "2",
+                        "Script font choices and defaults are Newsreader, 17, 1.6, 16 and 2");
                     Assert(settingsWindow.Title == "设置", "Settings dialog title has the updated name");
                     Assert(Math.Abs(settingsWindow.Width - 480) < 0.01, "Settings window width is 480");
                     Assert(Math.Abs(settingsWindow.Height - 430) < 0.01, "Settings window height is 430");
@@ -539,14 +542,18 @@ internal static class UiChecks
                          "Settings help, exclusion controls and buttons do not overlap or overflow");
                      settingsTabs.SelectedIndex = 1;
                      settingsWindow.UpdateLayout();
-                     var selectors = new[] { "FontBox", "FontSizeBox", "LineHeightBox", "ParagraphAfterBox", "IndentBox" }
-                         .Select(name => (ComboBox)settingsWindow.FindName(name)).ToArray();
-                     Assert(selectors.Select(box => box.Items.Count).SequenceEqual(new[] { 5, 4, 4, 4, 3 }) &&
-                         selectors[1].Items.Cast<int>().SequenceEqual(new[] { 17, 18, 19, 20 }) &&
-                         selectors.All(box => box.SelectedItem is not null && box.FontWeight == FontWeights.Normal && box.Margin == new Thickness(0) &&
-                             box.HorizontalContentAlignment == HorizontalAlignment.Center &&
-                             Math.Abs(box.ActualHeight - 30) <= 0.5 && Bounds(box).Bottom <= buttonsBounds.Top),
-                         "Script combo choices are reduced, aligned, and fit above dialog buttons");
+                     var fontSelector = (ComboBox)settingsWindow.FindName("FontBox");
+                     var subtitleInputs = new[] { "FontSizeBox", "LineHeightBox", "ParagraphAfterBox", "IndentBox" }
+                         .Select(name => (TextBox)settingsWindow.FindName(name)).ToArray();
+                     var selectors = new FrameworkElement[] { fontSelector, subtitleInputs[0], subtitleInputs[1], subtitleInputs[2], subtitleInputs[3] };
+                     Assert(fontSelector.Items.Count == 5 && fontSelector.SelectedItem is not null &&
+                         fontSelector.FontWeight == FontWeights.Normal && fontSelector.HorizontalContentAlignment == HorizontalAlignment.Center &&
+                         subtitleInputs.Select(box => box.MaxLength).SequenceEqual(new[] { 2, 4, 2, 1 }) &&
+                         subtitleInputs.All(box => box.TextAlignment == TextAlignment.Center && box.VerticalContentAlignment == VerticalAlignment.Center &&
+                             box.FontWeight == FontWeights.Normal && !box.AllowDrop) &&
+                         selectors.All(box => box.Margin == new Thickness(0) && Math.Abs(box.ActualHeight - 30) <= 0.5 &&
+                             Bounds(box).Bottom <= buttonsBounds.Top),
+                         "Script font selector and four numeric text boxes are aligned and fit above dialog buttons");
                      var subtitleGrid = (Grid)selectors[0].Parent;
                      var columns = subtitleGrid.ColumnDefinitions;
                      double leftWidth = columns[0].ActualWidth + columns[1].ActualWidth;
@@ -563,16 +570,16 @@ internal static class UiChecks
                          selectors.All(box => Math.Abs(box.ActualHeight - audioParameterBounds[0].Height) <= 0.5 &&
                              Math.Abs(Bounds(box).Top - audioParameterBounds[Grid.GetRow(box)].Top) <= 0.5),
                          "Subtitle and audio parameter rows share the same height, spacing and vertical positions");
-                     foreach (string font in selectors[0].Items)
+                     foreach (string font in fontSelector.Items)
                      {
-                         var text = new TextBlock { Text = font, FontFamily = selectors[0].FontFamily,
-                             FontSize = selectors[0].FontSize, FontWeight = selectors[0].FontWeight };
+                         var text = new TextBlock { Text = font, FontFamily = fontSelector.FontFamily,
+                             FontSize = fontSelector.FontSize, FontWeight = fontSelector.FontWeight };
                          text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                          Assert(text.DesiredSize.Width <= fontBounds.Width - 30,
                              "Font selector has space for " + font);
                      }
-                     foreach (var box in selectors)
                      {
+                         var box = fontSelector;
                          box.ApplyTemplate();
                          var toggle = FindVisual<System.Windows.Controls.Primitives.ToggleButton>(box)!;
                          toggle.ApplyTemplate();
@@ -595,6 +602,16 @@ internal static class UiChecks
                          option.IsSelected = true;
                          Assert(ColorOf(surface.Background) == "#FFD9EBEF" && ColorOf(option.Foreground) == "#FF26798A",
                              "Dropdown selected item uses the settings theme");
+                     }
+                     foreach (var input in subtitleInputs)
+                     {
+                         input.ApplyTemplate();
+                         var host = (ScrollViewer)input.Template.FindName("PART_ContentHost", input);
+                         var line = new TextBlock { Text = input.Text, FontFamily = input.FontFamily, FontSize = input.FontSize };
+                         line.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                         Assert(FindVisual<Border>(input)!.CornerRadius.TopLeft == 6 &&
+                             host.ViewportHeight >= line.DesiredSize.Height - 0.5 &&
+                             host.ExtentHeight <= host.ViewportHeight + 0.5, input.Name + " has a full text viewport");
                      }
                      var colorLists = new[] { "TextColorBox", "PlaybackColorBox", "BackgroundColorBox" }
                          .Select(name => (ListBox)settingsWindow.FindName(name)).ToArray();
@@ -645,15 +662,24 @@ internal static class UiChecks
                          colors.SelectedIndex = -1;
                          Assert(colors.SelectedIndex == 2, "A color group cannot become unselected");
                      }
-                     var readAppearance = typeof(SettingsWindow).GetMethod("ReadAppearance", BindingFlags.Instance | BindingFlags.NonPublic)!;
-                     var chosenAppearance = (ScriptAppearance)readAppearance.Invoke(settingsWindow, null)!;
+                     MethodInfo readValues = typeof(SettingsWindow).GetMethod("TryReadValues",
+                         BindingFlags.Instance | BindingFlags.NonPublic)!;
+                     var staged = new object?[] { null };
+                     Assert((bool)readValues.Invoke(settingsWindow, staged)!, "Staged subtitle values are valid");
+                     var chosenAppearance = ((AppSettings)staged[0]!).ScriptAppearance;
                      Assert(chosenAppearance.Color == (string)colorLists[0].Items[2] &&
                          chosenAppearance.ScriptColor == (string)colorLists[1].Items[2] &&
                          chosenAppearance.Background == (string)colorLists[2].Items[2] &&
                          settingsWindow.Settings.ScriptAppearance == new ScriptAppearance(),
                          "Color choices remain staged until confirmation");
+                     ((ComboBox)settingsWindow.FindName("FontBox")).SelectedItem = "Source Serif 4";
+                     subtitleInputs[0].Text = "40";
+                     subtitleInputs[1].Text = "2.75";
+                     subtitleInputs[2].Text = "0";
+                     subtitleInputs[3].Text = "5";
                      ((Button)settingsWindow.FindName("RestoreDefaultsButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-                     Assert((ScriptAppearance)readAppearance.Invoke(settingsWindow, null)! == new ScriptAppearance() &&
+                     Assert((bool)readValues.Invoke(settingsWindow, staged)! &&
+                         ((AppSettings)staged[0]!).ScriptAppearance == new ScriptAppearance() &&
                          colorLists.All(list => list.SelectedIndex == 0), "Restore defaults resets all subtitle controls");
                      settingsTabs.SelectedIndex = 0;
                      settingsWindow.UpdateLayout();
@@ -661,9 +687,9 @@ internal static class UiChecks
                      var backwardBox = (TextBox)settingsWindow.FindName("BackwardStepTextBox");
                      var forwardBox = (TextBox)settingsWindow.FindName("ForwardStepTextBox");
                      Assert(backwardBox.Text == "5" && forwardBox.Text == "4" && backwardBox.MaxLength == 2 && forwardBox.MaxLength == 2, "Step defaults and length");
-                     MethodInfo stepInput = typeof(SettingsWindow).GetMethod("IsStepText", BindingFlags.Static | BindingFlags.NonPublic)!;
-                     Assert(new[] { "", "0", "99", "05" }.All(v => (bool)stepInput.Invoke(null, new object[] { v })!)
-                         && new[] { "+5", "-1", "100", "2.5", "５", "a" }.All(v => !(bool)stepInput.Invoke(null, new object[] { v })!), "Step input is ASCII digits only");
+                     MethodInfo stepInput = typeof(SettingsWindow).GetMethod("IsDigitsText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     Assert(new[] { "", "0", "99", "05" }.All(v => (bool)stepInput.Invoke(null, new object[] { v, 2 })!)
+                         && new[] { "+5", "-1", "100", "2.5", "５", "a" }.All(v => !(bool)stepInput.Invoke(null, new object[] { v, 2 })!), "Step input is ASCII digits only");
                      Assert(MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control) && MainWindow.IsPlaybackShortcut(Key.Right, ModifierKeys.Control)
                          && MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.None) && !MainWindow.IsPlaybackShortcut(Key.Space, ModifierKeys.Control)
                          && !MainWindow.IsPlaybackShortcut(Key.Left, ModifierKeys.Control | ModifierKeys.Shift), "Shortcut modifier routing");
@@ -674,25 +700,137 @@ internal static class UiChecks
                      Assert(new[] { "", "+", "-", "-45", "+45", "0" }.All(v => (bool)integerInput.Invoke(null, new object[] { v, true })!)
                          && new[] { "4-5", "-4.5", "--1", "５", "a" }.All(v => !(bool)integerInput.Invoke(null, new object[] { v, true })!),
                          "Silence threshold box accepts digits and one leading sign only");
-                    MethodInfo editableSeconds = typeof(SettingsWindow).GetMethod("IsEditableSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
-                     MethodInfo completeSeconds = typeof(SettingsWindow).GetMethod("IsCompleteSilenceSeconds", BindingFlags.Static | BindingFlags.NonPublic)!;
-                     Assert((bool)editableSeconds.Invoke(null, new object[] { "2." })!
-                          && (bool)editableSeconds.Invoke(null, new object[] { "" })!
-                          && !(bool)editableSeconds.Invoke(null, new object[] { "2.35" })!
-                          && !(bool)editableSeconds.Invoke(null, new object[] { "2.00" })!,
-                          "Seconds input limits typed and pasted precision");
-                     Assert((bool)completeSeconds.Invoke(null, new object[] { "2." })!
-                          && (bool)completeSeconds.Invoke(null, new object[] { "2.0" })!
-                          && !(bool)completeSeconds.Invoke(null, new object[] { "." })!,
-                          "Trailing period is valid at confirmation");
+                     MethodInfo decimalInput = typeof(SettingsWindow).GetMethod("IsDecimalText", BindingFlags.Static | BindingFlags.NonPublic)!;
+                     Assert(new[] { "2.", "", "." }.All(v => (bool)decimalInput.Invoke(null, new object[] { v, int.MaxValue, 1, false })!) &&
+                         new[] { "2.35", "2.00", "2\n", "2..0" }.All(v => !(bool)decimalInput.Invoke(null, new object[] { v, int.MaxValue, 1, false })!),
+                         "Seconds input limits typed and pasted precision");
+                     Assert(new[] { "2.", "2.0" }.All(v => (bool)decimalInput.Invoke(null, new object[] { v, int.MaxValue, 1, true })!) &&
+                         new[] { ".", "" }.All(v => !(bool)decimalInput.Invoke(null, new object[] { v, int.MaxValue, 1, true })!),
+                         "Trailing period is valid at confirmation, missing whole digits are not");
                      var restoreButton = (Button)settingsWindow.FindName("RestoreDefaultsButton");
                      var cancelButton = (Button)settingsWindow.FindName("CancelButton");
                      var okButton = (Button)settingsWindow.FindName("OkButton");
                      Assert(Math.Abs(restoreButton.Width - 76) < 0.01, "Restore button width is 76");
                      Assert(Math.Abs(cancelButton.Width - 54) < 0.01 && Math.Abs(okButton.Width - 54) < 0.01, "Dialog button widths are 54");
                      var allowedBox = (TextBox)settingsWindow.FindName("AllowedSilenceTextBox");
-                     MethodInfo readValues = typeof(SettingsWindow).GetMethod("TryReadValues",
-                         BindingFlags.Instance | BindingFlags.NonPublic)!;
+                     Assert(new[] { "", ".", "1", "1.", "1.6", "1.65", "3.00" }.All(v => (bool)decimalInput.Invoke(null, new object[] { v, 1, 2, false })!) &&
+                         new[] { "+1", "-1", "1.625", "1..2", "１", "1,2", " 1", "1\n" }.All(v => !(bool)decimalInput.Invoke(null, new object[] { v, 1, 2, false })!),
+                         "Line height input permits only ASCII digits, one point and at most two decimals");
+                     foreach (var (input, accepted, rejected) in new[]
+                     {
+                         (subtitleInputs[0], "28", "+2"), (subtitleInputs[1], "1.65", "1.625"),
+                         (subtitleInputs[2], "40", "４０"), (subtitleInputs[3], "5", "12")
+                     })
+                     {
+                         foreach (var (candidate, valid) in new[] { (accepted, true), (rejected, false) })
+                         {
+                             input.SelectAll();
+                             var typing = new TextCompositionEventArgs(Keyboard.PrimaryDevice,
+                                 new TextComposition(InputManager.Current, input, candidate))
+                                 { RoutedEvent = TextCompositionManager.PreviewTextInputEvent };
+                             input.RaiseEvent(typing);
+                             var data = new DataObject(DataFormats.Text, candidate);
+                             var paste = new DataObjectPastingEventArgs(data, false, DataFormats.Text);
+                             input.RaiseEvent(paste);
+                             Assert(typing.Handled == !valid && paste.CommandCancelled == !valid,
+                                 input.Name + " applies the same input grammar to typing and selection replacement by paste");
+                         }
+                     }
+                     var subtitleToasts = (ToastHost)settingsWindow.FindName("ToastMessages");
+                     string[] invalidValues = { "41", "3.01", "41", "6" };
+                     string[] validValues = { "28", "1.65", "0", "5" };
+                     for (int i = 0; i < subtitleInputs.Length; i++)
+                     {
+                         var input = subtitleInputs[i];
+                         input.Text = invalidValues[i];
+                         Assert(!(bool)readValues.Invoke(settingsWindow, new object?[] { null })! &&
+                             input.BorderBrush == Brushes.IndianRed, input.Name + " rejects out of range value");
+                         input.Text = "";
+                         Assert(!(bool)readValues.Invoke(settingsWindow, new object?[] { null })!, input.Name + " rejects empty value");
+                         input.Text = validValues[i];
+                         Assert(input.BorderBrush != Brushes.IndianRed &&
+                             (bool)readValues.Invoke(settingsWindow, new object?[] { null })!, input.Name + " accepts corrected value");
+                         subtitleToasts.Clear();
+                     }
+                     foreach (var (input, expected) in new[] { ("1.60", "1.6"), ("1.", "1"), ("3.00", "3") })
+                     {
+                         subtitleInputs[1].Text = input;
+                         Assert((bool)readValues.Invoke(settingsWindow, staged)! && subtitleInputs[1].Text == expected,
+                             "Line height normalizes " + input + " without rounding");
+                     }
+                     subtitleInputs[1].Text = ".";
+                     Assert(!(bool)readValues.Invoke(settingsWindow, staged)! && subtitleInputs[1].BorderBrush == Brushes.IndianRed,
+                         "Line height requires a whole number at confirmation");
+                     subtitleInputs[1].Text = "1.6";
+                     foreach (var (input, initial, offset, inserted, valid) in new[]
+                     {
+                         (subtitleInputs[0], "", 0, "2", true),
+                         (subtitleInputs[0], "2", 1, "8", true),
+                         (subtitleInputs[0], "28", 1, "a", false),
+                         (subtitleInputs[1], "16", 1, ".", true),
+                         (subtitleInputs[1], "1.6", 1, ".", false)
+                     })
+                     {
+                         input.Text = initial;
+                         input.Select(offset, 0);
+                         var typing = new TextCompositionEventArgs(Keyboard.PrimaryDevice,
+                             new TextComposition(InputManager.Current, input, inserted))
+                             { RoutedEvent = TextCompositionManager.PreviewTextInputEvent };
+                         input.RaiseEvent(typing);
+                         Assert(typing.Handled == !valid, input.Name + " validates insertion at the caret");
+                     }
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     subtitleInputs[0].Text = "45";
+                     settingsTabs.SelectedIndex = 0;
+                     okButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     Assert(settingsTabs.SelectedIndex == 1 && subtitleInputs[0].BorderBrush == Brushes.IndianRed &&
+                         subtitleInputs[0].SelectionLength == 2, "Confirm reveals and selects the invalid subtitle field");
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     audioParameterInputs[0].Text = "0";
+                     settingsTabs.SelectedIndex = 1;
+                     okButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     Assert(settingsTabs.SelectedIndex == 0 && audioParameterInputs[0].BorderBrush == Brushes.IndianRed &&
+                         audioParameterInputs[0].SelectionLength == 1, "Confirm reveals and selects the invalid audio field");
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     subtitleInputs[0].Text = "45";
+                     settingsTabs.SelectedIndex = 0;
+                     var ordinaryFocusLoss = new KeyboardFocusChangedEventArgs(Keyboard.PrimaryDevice,
+                         Environment.TickCount, allowedBox, audioParameterInputs[0])
+                         { RoutedEvent = Keyboard.LostKeyboardFocusEvent };
+                     allowedBox.RaiseEvent(ordinaryFocusLoss);
+                     Assert(settingsTabs.SelectedIndex == 0 && subtitleInputs[0].BorderBrush == Brushes.IndianRed,
+                         "Ordinary focus validation does not switch tabs");
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     Assert(subtitleInputs[0].Text == "17" && subtitleInputs[0].BorderBrush != Brushes.IndianRed &&
+                         settingsWindow.Settings.ScriptAppearance == new ScriptAppearance(),
+                         "Restore clears invalid staged subtitle values without saving");
+                     subtitleInputs[0].Text = "45";
+                     Assert(!(bool)readValues.Invoke(settingsWindow, staged)! &&
+                         subtitleInputs[0].BorderBrush == Brushes.IndianRed, "Invalid subtitle number marks its own field");
+                     subtitleInputs[0].Text = "17";
+                     var fontBox = (ComboBox)settingsWindow.FindName("FontBox");
+                     fontBox.SelectedIndex = -1; // Model validation fails without a numeric-field mapping.
+                     Assert(!(bool)readValues.Invoke(settingsWindow, staged)! &&
+                         audioParameterInputs.Concat(subtitleInputs).Append(excludedBox).All(box => box.BorderBrush != Brushes.IndianRed),
+                         "Unmapped model exception warns without marking an unrelated input");
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                     settingsWindow.Show();
+                     settingsTabs.SelectedIndex = 0;
+                     settingsWindow.UpdateLayout();
+                     subtitleInputs[0].Text = "45";
+                     audioParameterInputs[0].Focus();
+                     var invalidEnter = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(settingsWindow)!,
+                         Environment.TickCount, Key.Enter) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
+                     audioParameterInputs[0].RaiseEvent(invalidEnter);
+                     Assert(invalidEnter.Handled && settingsTabs.SelectedIndex == 1 &&
+                         subtitleInputs[0].BorderBrush == Brushes.IndianRed && subtitleInputs[0].SelectionLength == 2 &&
+                         settingsWindow.Settings.ScriptAppearance == new ScriptAppearance(),
+                         "Enter reveals the invalid field without accepting or saving");
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     settingsTabs.SelectedIndex = 0;
+                     settingsWindow.Hide();
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                      excludedBox.Text = " audio , video; AUDIO；中文 文件夹，";
                      Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })! && excludedBox.Text == "audio, video, 中文 文件夹", "Folder names normalize on validation");
                      excludedBox.Text = "audio*";
@@ -799,14 +937,20 @@ internal static class UiChecks
                         var editWindow = app.Windows.OfType<SettingsWindow>().Single(w => w.IsVisible);
                         ((TextBox)editWindow.FindName("FrameMillisecondsTextBox")).Text = "25";
                         ((TextBox)editWindow.FindName("MinimumSilenceTextBox")).Text = "600";
-                        ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 19;
+                        ((ComboBox)editWindow.FindName("FontBox")).SelectedItem = "Source Serif 4";
+                        ((TextBox)editWindow.FindName("FontSizeBox")).Text = "28";
+                        ((TextBox)editWindow.FindName("LineHeightBox")).Text = "1.65";
+                        ((TextBox)editWindow.FindName("ParagraphAfterBox")).Text = "0";
+                        ((TextBox)editWindow.FindName("IndentBox")).Text = "5";
                         ((ListBox)editWindow.FindName("PlaybackColorBox")).SelectedIndex = 2;
                         ((Button)editWindow.FindName("OkButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     }));
                     settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     var saved = settingsStore.LoadOrCreate();
                     Assert(saved.FrameMilliseconds == 25 && saved.MinimumSilenceMilliseconds == 600
-                        && saved.ScriptAppearance.FontSize == 19 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
+                        && saved.ScriptAppearance.Font == "Source Serif 4" && saved.ScriptAppearance.FontSize == 28 &&
+                        saved.ScriptAppearance.LineHeight == 1.65 && saved.ScriptAppearance.ParagraphAfter == 0 &&
+                        saved.ScriptAppearance.FirstLineIndent == 5 && saved.ScriptAppearance.ScriptColor == ScriptAppearance.PlaybackColors[2]
                         && window.Controller.Settings.ScriptAppearance == saved.ScriptAppearance
                         && window.Controller.Settings.FrameMilliseconds == 25,
                         "Settings dialog saves confirmed values before applying them");
@@ -814,16 +958,19 @@ internal static class UiChecks
                     _ = window.Dispatcher.BeginInvoke(new Action(() =>
                     {
                         var editWindow = app.Windows.OfType<SettingsWindow>().Single(w => w.IsVisible);
-                        ((ComboBox)editWindow.FindName("FontSizeBox")).SelectedItem = 18;
+                        ((ComboBox)editWindow.FindName("FontBox")).SelectedItem = "Georgia";
+                        ((TextBox)editWindow.FindName("FontSizeBox")).Text = "41";
+                        ((TextBox)editWindow.FindName("LineHeightBox")).Text = "2.05";
                         ((ListBox)editWindow.FindName("BackgroundColorBox")).SelectedIndex = 3;
                         editWindow.DialogResult = false;
                     }));
                     settingsButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                     Assert(File.ReadAllText(settingsStore.FilePath) == savedBeforeCancel &&
                         window.Controller.Settings.ScriptAppearance == saved.ScriptAppearance,
-                        "Cancel leaves persisted and active subtitle settings unchanged");
+                        "Cancel with an invalid staged subtitle value leaves persisted and active settings unchanged");
                     var restoredWindow = new MainWindow(settingsStore);
-                    Assert(restoredWindow.Controller.Settings.FrameMilliseconds == 25,
+                    Assert(restoredWindow.Controller.Settings.FrameMilliseconds == 25 &&
+                         restoredWindow.Controller.Settings.ScriptAppearance == saved.ScriptAppearance,
                         "Window restores saved settings on next launch");
                     restoredWindow.Close();
                     string invalidConfiguration = "{broken";
@@ -880,6 +1027,75 @@ internal static class UiChecks
                                 await Task.Delay(100);
                             }
                             Assert(renderedScriptText == "\"Hello, world.\"", "Embedded WebView2 reader renders Script JSON once without duplicate text");
+                            string defaultFont = await reader.CoreWebView2.ExecuteScriptAsync("getComputedStyle(document.documentElement).fontFamily==='Newsreader, Georgia, serif'");
+                            Assert(defaultFont == "true", "Reader default font is Newsreader with Georgia and generic serif fallback only");
+                            await reader.CoreWebView2.ExecuteScriptAsync("document.querySelector('#text p').style.width='160px'");
+                            readerWindow.SetAppearance(new ScriptAppearance
+                                { Font = "Source Serif 4", FontSize = 40, LineHeight = 1.65, ParagraphAfter = 0, FirstLineIndent = 5 });
+                            string newAppearance = "";
+                            deadline = DateTime.UtcNow.AddSeconds(10);
+                            while (DateTime.UtcNow < deadline)
+                            {
+                                newAppearance = await reader.CoreWebView2.ExecuteScriptAsync(
+                                    """
+                                    (() => {
+                                      const root=document.documentElement, p=document.querySelector('#text p');
+                                      const base=p.querySelector('svg.paint').getBoundingClientRect();
+                                      const spans=[...p.querySelectorAll('.timed')].sort((a,b)=>Number(a.dataset.start)-Number(b.dataset.start));
+                                      const near=(a,b)=>Math.abs(a-b)<0.5;
+                                      const centers=[];
+                                      const validGeometry=geometry.length===spans.length && geometry.every((u,i)=>{
+                                        const range=document.createRange();range.selectNodeContents(spans[i]);
+                                        const rects=[...range.getClientRects()].filter(r=>r.width>0.25&&r.height>0.25)
+                                          .sort((a,b)=>a.top-b.top||a.left-b.left);
+                                        centers.push(...rects.map(r=>r.top+window.scrollY+r.height/2));
+                                        return rects.length>0 && rects.length===u.segments.length && u.total>0 &&
+                                          u.segments.every((s,j)=>near(s.width,rects[j].width) &&
+                                            near(s.element.x.baseVal.value,rects[j].left-base.left) &&
+                                            near(s.element.y.baseVal.value,rects[j].top-base.top-1) &&
+                                            near(s.element.height.baseVal.value,rects[j].height+2));
+                                      });
+                                      const actual={fontFamily:getComputedStyle(root).fontFamily,
+                                        fontSize:root.style.fontSize,lineHeight:root.style.lineHeight,
+                                        paragraphAfter:getComputedStyle(p).marginBottom,indent:getComputedStyle(p).textIndent,
+                                        measureFrame,units:geometry.length,anchors:followAnchors.length,
+                                        wrapped:centers.some(y=>Math.abs(y-centers[0])>2),
+                                        validGeometry,validAnchors:followAnchors.every(a=>centers.some(y=>near(y,a.y)))};
+                                      return (actual.fontFamily==='"Source Serif 4", Georgia, serif' &&
+                                        actual.fontSize==='40px' && actual.lineHeight==='1.65' &&
+                                        actual.paragraphAfter==='0px' && actual.indent==='200px' &&
+                                        actual.measureFrame===0 && actual.units===2 && actual.anchors>0 &&
+                                        actual.wrapped && actual.validGeometry && actual.validAnchors) || actual;
+                                    })()
+                                    """);
+                                if (newAppearance == "true") break;
+                                await Task.Delay(50);
+                            }
+                            Assert(newAppearance == "true", "Reader applies custom subtitle font and numeric values and recomputes geometry and anchors: " + newAppearance);
+                            await reader.CoreWebView2.ExecuteScriptAsync("document.querySelector('#text p').style.removeProperty('width')");
+                            readerWindow.SetAppearance(new ScriptAppearance());
+                            deadline = DateTime.UtcNow.AddSeconds(10);
+                            string restoredAppearance = "";
+                            while (DateTime.UtcNow < deadline)
+                            {
+                                restoredAppearance = await reader.CoreWebView2.ExecuteScriptAsync(
+                                    """
+                                    (() => {
+                                      const root=document.documentElement, p=document.querySelector('#text p');
+                                      const actual={fontFamily:getComputedStyle(root).fontFamily,
+                                        fontSize:root.style.fontSize,lineHeight:root.style.lineHeight,
+                                        paragraphAfter:getComputedStyle(p).marginBottom,indent:getComputedStyle(p).textIndent,
+                                        measureFrame,units:geometry.length};
+                                      return (actual.fontFamily==='Newsreader, Georgia, serif' &&
+                                        actual.fontSize==='17px' && actual.lineHeight==='1.6' &&
+                                        actual.paragraphAfter==='16px' && actual.indent==='34px' &&
+                                        actual.measureFrame===0 && actual.units===2) || actual;
+                                    })()
+                                    """);
+                                if (restoredAppearance == "true") break;
+                                await Task.Delay(50);
+                            }
+                            Assert(restoredAppearance == "true", "Reader reapplies default appearance before playback regression checks: " + restoredAppearance);
                             string measured = await reader.CoreWebView2.ExecuteScriptAsync(
                                 "measure(); update({position:1.5,playing:false,reset:false},true); geometry.length===2 && geometry[0].last===0.75 && geometry[1].last===0.25");
                             Assert(measured == "true", "Reader paints overlapping out-of-order intervals");

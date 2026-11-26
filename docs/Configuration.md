@@ -32,15 +32,17 @@ AudioPlayer 配置文件存放在实际 EXE 同目录，默认 `AudioPlayer.sett
 
 | ScriptAppearance 字段 | 默认 | 可选值 |
 | --- | --- | --- |
-| Font | Georgia | Georgia, Microsoft YaHei UI, Nunito, Times New Roman, Arial |
-| FontSize | 17 | 17, 18, 19, 20 DIP |
-| LineHeight | 1.6 | 1.5, 1.6, 1.7, 1.8 |
-| ParagraphAfter | 16 | 8, 12, 16, 20 DIP |
-| FirstLineIndent | 2 | 0, 1, 2 em |
+| Font | Newsreader | Newsreader, Source Serif 4, Georgia, Microsoft YaHei UI, Nunito |
+| FontSize | 17 | 10–40 DIP，整数 |
+| LineHeight | 1.6 | 1–3，最多两位小数 |
+| ParagraphAfter | 16 | 0–40 DIP，整数 |
+| FirstLineIndent | 2 | 0–5 em，整数 |
 | Color | #283747 | #283747, #344054, #3F4750, #315247, #513D4D |
 | ScriptColor | #F6EDC2 | #F6EDC2, #F5E4D6, #E1EEDB, #E0ECF4, #ECE6F3 |
 | Background | #F8F8F6 | #F8F8F6, #F0F3F7, #F7F1E6, #EFF5F0, #F1F0F7 |
 
-读取时仅对本次移除的旧合法值在内存中归一化：Segoe UI → Arial；字号 14/15/16 → 17、22/24/26/28 → 20（17–20 保持原值）；行高 1.4 → 1.5、2.0 → 1.8；段后间距 0 → 8、14 → 16、18/24 → 20；缩进 3 → 2；播放背景色 #A33D30/#B64550/#D71920/#F5E7A6 → #F6EDC2、#A45A2C/#BC4600/#F4D9C4 → #F5E4D6、#856300/#8A2BE2/#E5DDF2 → #ECE6F3、#53713C/#007D45/#D5E8CC → #E1EEDB、#26798A/#1685B8/#D3E5F3 → #E0ECF4；背景色 #FFFFFF → #F8F8F6。仍合法的已保存值不变，其他非法值及显式 null 仍按既有错误机制处理。读取不重写原文件；用户执行后续显式保存（例如设置确定或播放模式切换）时按现有原子保存流程写入有效参数。配置结构不变。
+四个数值使用圆角文本框，键盘输入和粘贴仅接受 ASCII 数字（行高可含一个英文小数点及最多两位小数）；Enter 或确定时校验非空和范围，非法值保留窗口并提示，主动确认或 Enter 校验失败时定位对应选项卡并选中错误输入框，普通失焦校验不切换选项卡；修正后清除错误。行高按 `0.##` 显示，不强行补零或截断。所有范围内旧数值原样保留。
 
-字体缺失时由系统/浏览器回退。WebView2 缓存位于实际 EXE 同目录 `cache/webview2`，为可重建的运行时数据，不是原文来源。
+读取时仅对移除的旧合法字体及颜色在内存中归一化：Segoe UI、Arial、Times New Roman → Newsreader；播放背景色 #A33D30/#B64550/#D71920/#F5E7A6 → #F6EDC2、#A45A2C/#BC4600/#F4D9C4 → #F5E4D6、#856300/#8A2BE2/#E5DDF2 → #ECE6F3、#53713C/#007D45/#D5E8CC → #E1EEDB、#26798A/#1685B8/#D3E5F3 → #E0ECF4；背景色 #FFFFFF → #F8F8F6。仍合法的已保存值不变，其他非法值及显式 null 仍按既有错误机制处理。读取不重写原文件；用户执行后续显式保存（例如设置确定或播放模式切换）时按现有原子保存流程写入有效参数。配置结构不变。
+
+Newsreader、Source Serif 4 使用 Windows 已安装的字体，不随程序打包；所选字体缺失时依次尝试 Georgia 和浏览器默认衬线字体；阅读器状态文字使用 Microsoft YaHei UI 和通用 sans-serif。Segoe UI 不再作为显式显示字体，仅保留旧配置归一化。WebView2 缓存位于实际 EXE 同目录 `cache/webview2`，为可重建的运行时数据，不是原文来源。
