@@ -719,6 +719,26 @@ internal static class UiChecks
                      Assert(new[] { "", ".", "1", "1.", "1.6", "1.65", "3.00" }.All(v => (bool)lineHeightInput.Invoke(null, new object[] { v })!) &&
                          new[] { "+1", "-1", "1.625", "1..2", "１", "1,2", " 1", "1\n" }.All(v => !(bool)lineHeightInput.Invoke(null, new object[] { v })!),
                          "Line height input permits only ASCII digits, one point and at most two decimals");
+                     foreach (var (input, accepted, rejected) in new[]
+                     {
+                         (subtitleInputs[0], "28", "+2"), (subtitleInputs[1], "1.65", "1.625"),
+                         (subtitleInputs[2], "40", "４０"), (subtitleInputs[3], "5", "12")
+                     })
+                     {
+                         foreach (var (candidate, valid) in new[] { (accepted, true), (rejected, false) })
+                         {
+                             input.SelectAll();
+                             var typing = new TextCompositionEventArgs(Keyboard.PrimaryDevice,
+                                 new TextComposition(InputManager.Current, input, candidate))
+                                 { RoutedEvent = TextCompositionManager.PreviewTextInputEvent };
+                             input.RaiseEvent(typing);
+                             var data = new DataObject(DataFormats.Text, candidate);
+                             var paste = new DataObjectPastingEventArgs(data, false, DataFormats.Text);
+                             input.RaiseEvent(paste);
+                             Assert(typing.Handled == !valid && paste.CommandCancelled == !valid,
+                                 input.Name + " applies the same input grammar to typing and selection replacement by paste");
+                         }
+                     }
                      var subtitleToasts = (ToastHost)settingsWindow.FindName("ToastMessages");
                      string[] invalidValues = { "41", "3.01", "41", "6" };
                      string[] validValues = { "28", "1.65", "0", "5" };
@@ -937,6 +957,46 @@ internal static class UiChecks
                             Assert(renderedScriptText == "\"Hello, world.\"", "Embedded WebView2 reader renders Script JSON once without duplicate text");
                             string defaultFont = await reader.CoreWebView2.ExecuteScriptAsync("getComputedStyle(document.documentElement).fontFamily.startsWith('Newsreader, Georgia,')");
                             Assert(defaultFont == "true", "Reader default font is Newsreader with Georgia fallback");
+                            readerWindow.SetAppearance(new ScriptAppearance
+                                { Font = "Source Serif 4", FontSize = 28, LineHeight = 1.65, ParagraphAfter = 0, FirstLineIndent = 5 });
+                            string newAppearance = "";
+                            deadline = DateTime.UtcNow.AddSeconds(10);
+                            while (DateTime.UtcNow < deadline)
+                            {
+                                newAppearance = await reader.CoreWebView2.ExecuteScriptAsync(
+                                    """
+                                    (() => {
+                                      const root=document.documentElement, p=document.querySelector('#text p');
+                                      return getComputedStyle(root).fontFamily.includes('Source Serif 4') &&
+                                        root.style.fontSize==='28px' && root.style.lineHeight==='1.65' &&
+                                        getComputedStyle(p).marginBottom==='0px' && getComputedStyle(p).textIndent==='140px' &&
+                                        measureFrame===0 && geometry.length===2 && followAnchors.length>0 &&
+                                        geometry.every(u=>u.segments.length>0 && u.total>0);
+                                    })()
+                                    """);
+                                if (newAppearance == "true") break;
+                                await Task.Delay(50);
+                            }
+                            Assert(newAppearance == "true", "Reader applies custom subtitle font and numeric values and recomputes geometry and anchors");
+                            readerWindow.SetAppearance(new ScriptAppearance());
+                            deadline = DateTime.UtcNow.AddSeconds(10);
+                            string restoredAppearance = "";
+                            while (DateTime.UtcNow < deadline)
+                            {
+                                restoredAppearance = await reader.CoreWebView2.ExecuteScriptAsync(
+                                    """
+                                    (() => {
+                                      const root=document.documentElement, p=document.querySelector('#text p');
+                                      return getComputedStyle(root).fontFamily.startsWith('Newsreader, Georgia,') &&
+                                        root.style.fontSize==='17px' && root.style.lineHeight==='1.6' &&
+                                        getComputedStyle(p).marginBottom==='16px' && getComputedStyle(p).textIndent==='34px' &&
+                                        measureFrame===0 && geometry.length===2;
+                                    })()
+                                    """);
+                                if (restoredAppearance == "true") break;
+                                await Task.Delay(50);
+                            }
+                            Assert(restoredAppearance == "true", "Reader reapplies default appearance before playback regression checks");
                             string measured = await reader.CoreWebView2.ExecuteScriptAsync(
                                 "measure(); update({position:1.5,playing:false,reset:false},true); geometry.length===2 && geometry[0].last===0.75 && geometry[1].last===0.25");
                             Assert(measured == "true", "Reader paints overlapping out-of-order intervals");
