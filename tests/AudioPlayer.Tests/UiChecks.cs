@@ -804,6 +804,32 @@ internal static class UiChecks
                      Assert(subtitleInputs[0].Text == "17" && subtitleInputs[0].BorderBrush != Brushes.IndianRed &&
                          settingsWindow.Settings.ScriptAppearance == new ScriptAppearance(),
                          "Restore clears invalid staged subtitle values without saving");
+                     subtitleInputs[0].Text = "45";
+                     Assert(!(bool)readValues.Invoke(settingsWindow, staged)! &&
+                         subtitleInputs[0].BorderBrush == Brushes.IndianRed, "Invalid subtitle number marks its own field");
+                     subtitleInputs[0].Text = "17";
+                     var fontBox = (ComboBox)settingsWindow.FindName("FontBox");
+                     fontBox.SelectedIndex = -1; // Model validation fails without a numeric-field mapping.
+                     Assert(!(bool)readValues.Invoke(settingsWindow, staged)! &&
+                         audioParameterInputs.Concat(subtitleInputs).Append(excludedBox).All(box => box.BorderBrush != Brushes.IndianRed),
+                         "Unmapped model exception warns without marking an unrelated input");
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                     settingsWindow.Show();
+                     settingsTabs.SelectedIndex = 0;
+                     settingsWindow.UpdateLayout();
+                     subtitleInputs[0].Text = "45";
+                     audioParameterInputs[0].Focus();
+                     var invalidEnter = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(settingsWindow)!,
+                         Environment.TickCount, Key.Enter) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
+                     audioParameterInputs[0].RaiseEvent(invalidEnter);
+                     Assert(invalidEnter.Handled && settingsTabs.SelectedIndex == 1 &&
+                         subtitleInputs[0].BorderBrush == Brushes.IndianRed && subtitleInputs[0].SelectionLength == 2 &&
+                         settingsWindow.Settings.ScriptAppearance == new ScriptAppearance(),
+                         "Enter reveals the invalid field without accepting or saving");
+                     restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                     settingsTabs.SelectedIndex = 0;
+                     settingsWindow.Hide();
                      restoreButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
                      excludedBox.Text = " audio , video; AUDIO；中文 文件夹，";
                      Assert((bool)readValues.Invoke(settingsWindow, new object?[] { null })! && excludedBox.Text == "audio, video, 中文 文件夹", "Folder names normalize on validation");
