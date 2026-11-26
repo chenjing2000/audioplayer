@@ -1274,33 +1274,37 @@ internal static class UiChecks
                                     p.style.width='1000px';measure();
                                     [a,b]=geometry.map(u=>u.segments[0]);
                                     if(!near(x(a)+a.width+a.trailingGap,x(b)))return 'reflow';
-                                    // Force punctuation itself to wrap, independently of font-specific line breaking.
+                                    // Preserve explicit line breaks for deterministic punctuation layouts;
+                                    // the long timed word still wraps naturally at a narrow width.
                                     for(const [text,marks,width,expectedCount] of [
-                                      ['Alpha','?!...','6ch',1],
-                                      ['Alpha','?!...','5ch',0],
-                                      ['Alpha','? !...','7ch',1],
+                                      ['Alpha','?\n!...','1000px',1],
+                                      ['Alpha','\n?!...','1000px',0],
+                                      ['Alpha','? \n!...','1000px',1],
                                       ['ABCDEFGHIJK','?!','8ch',2]
                                     ]){
                                       arrange('<span class="sentence">'+word(text,0)+marks+'</span>',width,false);
-                                      p.style.wordBreak='break-all';measure();
+                                      p.style.whiteSpace='pre-line';measure();
                                       const unit=geometry[0],last=unit.segments.at(-1),timed=p.querySelector('.timed');
                                       const r=document.createRange();r.selectNodeContents(timed);
                                       const lastRect=[...r.getClientRects()].at(-1);
                                       const node=timed.nextSibling;
-                                      let right=lastRect.right,count=0;
+                                      let right=lastRect.right,count=0,offLine=0;
                                       for(let i=0;i<marks.length;i++){
-                                        if(marks[i]===' ')continue;
+                                        if(/\s/u.test(marks[i]))continue;
                                         r.setStart(node,i);r.setEnd(node,i+1);
                                         const rect=r.getBoundingClientRect();
-                                        if(Math.abs(rect.top-lastRect.top)<2 && rect.width>0){
+                                        if(rect.width<=0)continue;
+                                        if(Math.abs(rect.top-lastRect.top)<2){
                                           count++;right=Math.max(right,rect.right);
-                                        }
+                                        }else offLine++;
                                       }
-                                      if(count!==expectedCount || !near(last.trailingGap,right-lastRect.right) ||
-                                        unit.segments.slice(0,-1).some(s=>s.trailingGap!==0))return 'wrapped marks '+text+marks+' '+count;
+                                      if(count!==expectedCount || count+offLine!==marks.replace(/\s/gu,'').length ||
+                                        (marks.includes('\n')?offLine===0:unit.segments.length<2))return 'wrap fixture '+text+': '+count+'/'+offLine;
+                                      if(!near(last.trailingGap,right-lastRect.right) ||
+                                        unit.segments.slice(0,-1).some(s=>s.trailingGap!==0))return 'wrapped marks '+text+': '+last.trailingGap+'/'+(right-lastRect.right);
                                       paintAt(1,false);
                                       if(!near(last.painted,last.width+right-lastRect.right))return 'wrapped paint';
-                                      p.style.width='1000px';measure();
+                                      p.style.width='1000px';p.style.whiteSpace='nowrap';measure();
                                       const flat=geometry[0].segments[0];
                                       const end=punctuationRight(timed,node,marks.length);
                                       if(geometry[0].segments.length!==1 || !near(flat.trailingGap,end))return 'wrapped reflow';
