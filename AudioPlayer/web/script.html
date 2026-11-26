@@ -191,14 +191,14 @@ function measure(){
       }
       // Otherwise extend only through the last allowed punctuation on this line,
       // never through trailing whitespace, a different line or an untimed word.
-      if(!/[,.;:?!…]/u.test(prefix))return;
+      let remaining=prefix.trimEnd().length;
+      if(!remaining)return;
       walker.currentNode=previous.span.lastChild;
-      let remaining=prefix.length;
       while(remaining>0){
         const node=walker.nextNode();
         if(!node)break;
         const part=node.data.slice(0,remaining);
-        for(const match of part.matchAll(/[,.;:?!…]+/gu)){
+        for(const match of part.matchAll(/\S+/gu)){
           range.setStart(node,match.index);range.setEnd(node,match.index+match[0].length);
           for(const rect of range.getClientRects())
             if(Math.abs(previous.rect.top-rect.top)<2)
